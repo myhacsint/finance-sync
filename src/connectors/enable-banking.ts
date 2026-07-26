@@ -251,13 +251,20 @@ export async function fetchEnableBanking(
       source.settings?.dateTo ?? new Date().toISOString().slice(0, 10)
     );
     const periodDays = Number(source.settings?.periodDays ?? 90);
-    for (const period of transactionPeriods(dateFrom, dateTo, periodDays)) {
+    const strategy = String(source.settings?.strategy ?? "default");
+    const periods = strategy === "longest"
+      ? [{ dateFrom }]
+      : transactionPeriods(dateFrom, dateTo, periodDays);
+    for (const period of periods) {
       let continuationKey: string | undefined;
       let periodPages = 0;
       do {
         const query = new URLSearchParams({ transaction_status: "BOOK" });
+        if (strategy === "longest") query.set("strategy", "longest");
         if (period.dateFrom) query.set("date_from", period.dateFrom);
-        if (period.dateTo) query.set("date_to", period.dateTo);
+        if (strategy !== "longest" && period.dateTo) {
+          query.set("date_to", period.dateTo);
+        }
         if (continuationKey) query.set("continuation_key", continuationKey);
         const result = await api<EnableBankingTransactions>(
           source,
