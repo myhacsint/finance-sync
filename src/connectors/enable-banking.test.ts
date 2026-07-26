@@ -95,6 +95,7 @@ test("aktuelle Sitzung, Saldo, Vorzeichen und Folgeseiten werden verarbeitet", a
           applicationId: "app-id",
           dateFrom: "2026-07-01",
           dateTo: "2026-07-26",
+          strategy: "longest",
           ownersByAccount: { "stable-account": ["Erik"] }
         }
       },
@@ -114,7 +115,7 @@ test("aktuelle Sitzung, Saldo, Vorzeichen und Folgeseiten werden verarbeitet", a
     );
     assert.ok(
       requested.includes(
-        "/accounts/uid-1/transactions?transaction_status=BOOK&date_from=2026-07-01&date_to=2026-07-26&continuation_key=next-page"
+        "/accounts/uid-1/transactions?transaction_status=BOOK&strategy=longest&date_from=2026-07-01&continuation_key=next-page"
       )
     );
   } finally {
