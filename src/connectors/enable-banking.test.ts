@@ -93,6 +93,7 @@ test("aktuelle Sitzung, Saldo, Vorzeichen und Folgeseiten werden verarbeitet", a
         owners: ["Fallback"],
         settings: {
           applicationId: "app-id",
+          dateFrom: "2000-01-01",
           ownersByAccount: { "stable-account": ["Erik"] }
         }
       },
@@ -112,7 +113,7 @@ test("aktuelle Sitzung, Saldo, Vorzeichen und Folgeseiten werden verarbeitet", a
     );
     assert.ok(
       requested.includes(
-        "/accounts/uid-1/transactions?transaction_status=BOOK&continuation_key=next-page"
+        "/accounts/uid-1/transactions?transaction_status=BOOK&date_from=2000-01-01&continuation_key=next-page"
       )
     );
   } finally {
