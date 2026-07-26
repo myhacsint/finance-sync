@@ -215,8 +215,10 @@ export async function fetchEnableBanking(
     const pages: EnableBankingTransactions[] = [];
     let continuationKey: string | undefined;
     const maximumPages = Number(source.settings?.maximumPages ?? 50);
+    const dateFrom = String(source.settings?.dateFrom ?? "");
     do {
       const query = new URLSearchParams({ transaction_status: "BOOK" });
+      if (dateFrom) query.set("date_from", dateFrom);
       if (continuationKey) query.set("continuation_key", continuationKey);
       const result = await api<EnableBankingTransactions>(
         source,
