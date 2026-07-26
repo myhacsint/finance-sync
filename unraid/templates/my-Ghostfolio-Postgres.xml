@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Ghostfolio-Postgres</Name>
+  <Repository>postgres:15-alpine</Repository>
+  <Registry>https://hub.docker.com/_/postgres</Registry>
+  <Network>finance-hub</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://hub.docker.com/_/postgres</Support>
+  <Project>https://www.postgresql.org/</Project>
+  <Overview>Dedizierte PostgreSQL-15-Datenbank für Ghostfolio. Kein Host-Port.</Overview>
+  <Category>Other:</Category>
+  <WebUI/>
+  <TemplateURL/>
+  <Icon>https://raw.githubusercontent.com/docker-library/docs/master/postgres/logo.png</Icon>
+  <ExtraParams>--restart=unless-stopped --health-cmd=&quot;pg_isready -U ghostfolio -d ghostfolio&quot; --health-interval=10s --health-timeout=5s --health-retries=5</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="Daten" Target="/var/lib/postgresql/data" Default="/mnt/user/appdata/finance-hub/ghostfolio-postgres" Mode="rw" Description="Persistente Datenbank" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/finance-hub/ghostfolio-postgres</Config>
+  <Config Name="Passwortdatei" Target="/run/secrets/postgres-password" Default="/mnt/user/appdata/finance-hub/secrets/ghostfolio-postgres-password" Mode="ro" Description="Root-geschützte Passwortdatei" Type="Path" Display="advanced" Required="true" Mask="false">/mnt/user/appdata/finance-hub/secrets/ghostfolio-postgres-password</Config>
+  <Config Name="POSTGRES_DB" Target="POSTGRES_DB" Default="ghostfolio" Mode="" Description="" Type="Variable" Display="advanced" Required="true" Mask="false">ghostfolio</Config>
+  <Config Name="POSTGRES_USER" Target="POSTGRES_USER" Default="ghostfolio" Mode="" Description="" Type="Variable" Display="advanced" Required="true" Mask="false">ghostfolio</Config>
+  <Config Name="POSTGRES_PASSWORD_FILE" Target="POSTGRES_PASSWORD_FILE" Default="/run/secrets/postgres-password" Mode="" Description="" Type="Variable" Display="advanced" Required="true" Mask="false">/run/secrets/postgres-password</Config>
+  <TailscaleStateDir/>
+</Container>

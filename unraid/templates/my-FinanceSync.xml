@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>FinanceSync</Name>
+  <Repository>ghcr.io/myhacsint/finance-sync:stable</Repository>
+  <Registry>https://ghcr.io/myhacsint/finance-sync</Registry>
+  <Network>finance-hub</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/myhacsint/finance-sync/issues</Support>
+  <Project>https://github.com/myhacsint/finance-sync</Project>
+  <Overview>Lokaler Daten-Hub für Bank-, Depot-, Vorsorge- und Solana-Daten. Keine Secrets im Image oder Template.</Overview>
+  <Category>Other:</Category>
+  <WebUI>https://homeserver.coin-matrix.ts.net:8080</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/myhacsint/finance-sync/main/unraid/templates/my-FinanceSync.xml</TemplateURL>
+  <Icon/>
+  <ExtraParams>--restart=unless-stopped --security-opt=no-new-privileges:true -p 127.0.0.1:8080:8080</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires>ActualServer, Ghostfolio</Requires>
+  <Config Name="Daten" Target="/app/data" Default="/mnt/user/appdata/finance-hub/finance-sync" Mode="rw" Description="SQLite und Konfiguration" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/finance-hub/finance-sync</Config>
+  <Config Name="Archiv" Target="/archive" Default="/mnt/user/finance-archive" Mode="rw" Description="Roharchiv, normalisierte Daten und Exporte" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/finance-archive</Config>
+  <Config Name="Dokument-Inbox" Target="/inbox" Default="/mnt/user/finance-inbox" Mode="rw" Description="Eingehende Dokumente" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/finance-inbox</Config>
+  <Config Name="Secrets" Target="/run/secrets" Default="/mnt/user/appdata/finance-hub/secrets" Mode="ro" Description="Einzelne, geschützte Secret-Dateien" Type="Path" Display="advanced" Required="true" Mask="false">/mnt/user/appdata/finance-hub/secrets</Config>
+  <Config Name="Backup-Status" Target="/backup" Default="/mnt/user/backup/finance-hub" Mode="ro" Description="Nur Leserechte für Backup-Altersprüfung" Type="Path" Display="advanced" Required="true" Mask="false">/mnt/user/backup/finance-hub</Config>
+  <Config Name="Timezone" Target="TZ" Default="Europe/Berlin" Mode="" Description="" Type="Variable" Display="advanced" Required="true" Mask="false">Europe/Berlin</Config>
+  <TailscaleStateDir/>
+</Container>

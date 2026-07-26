@@ -1,0 +1,94 @@
+{
+  "port": 8080,
+  "timezone": "Europe/Berlin",
+  "publicBaseUrl": "https://homeserver.coin-matrix.ts.net:8080",
+  "sources": [
+    {
+      "id": "dkb-giro",
+      "kind": "enable-banking",
+      "enabled": false,
+      "scheduleHours": 24,
+      "owners": ["Person A"],
+      "settings": {
+        "applicationId": "",
+        "aspspName": "DKB",
+        "country": "DE",
+        "consentExpiresAt": ""
+      }
+    },
+    {
+      "id": "dkb-gemeinschaft",
+      "kind": "enable-banking",
+      "enabled": false,
+      "scheduleHours": 24,
+      "owners": ["Person A", "Person B"],
+      "settings": {
+        "applicationId": "",
+        "aspspName": "DKB",
+        "country": "DE",
+        "consentExpiresAt": ""
+      }
+    },
+    {
+      "id": "comdirect-giro",
+      "kind": "enable-banking",
+      "enabled": false,
+      "scheduleHours": 24,
+      "owners": ["Person A"],
+      "settings": {
+        "applicationId": "",
+        "aspspName": "comdirect",
+        "country": "DE",
+        "consentExpiresAt": ""
+      }
+    },
+    {
+      "id": "comdirect-depot",
+      "kind": "comdirect",
+      "enabled": false,
+      "scheduleHours": 24,
+      "owners": ["Person A"]
+    },
+    {
+      "id": "dkb-depots",
+      "kind": "dkb-fints",
+      "enabled": false,
+      "scheduleHours": 24,
+      "owners": ["Person A", "Person B"]
+    },
+    {
+      "id": "solana",
+      "kind": "solana",
+      "enabled": false,
+      "scheduleHours": 6,
+      "owners": ["Person A"],
+      "settings": {
+        "wallets": []
+      }
+    },
+    {
+      "id": "sutor-riester",
+      "kind": "manual",
+      "enabled": true,
+      "owners": ["Person A"]
+    },
+    {
+      "id": "alte-leipziger",
+      "kind": "manual",
+      "enabled": true,
+      "owners": ["Person A"]
+    }
+  ],
+  "actual": {
+    "enabled": false,
+    "serverUrl": "http://ActualServer:5006",
+    "budgetId": "",
+    "dataDir": "/app/data/actual-cache",
+    "accountMap": {}
+  },
+  "ghostfolio": {
+    "enabled": false,
+    "serverUrl": "http://Ghostfolio:3333",
+    "accountMap": {}
+  }
+}

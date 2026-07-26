@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>ActualServer</Name>
+  <Repository>actualbudget/actual-server:latest</Repository>
+  <Registry>https://hub.docker.com/r/actualbudget/actual-server</Registry>
+  <Network>finance-hub</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/actualbudget/actual-server/issues</Support>
+  <Project>https://actualbudget.org/</Project>
+  <Overview>Actual Budget für den Finanz-Hub. Daten liegen getrennt unter /mnt/user/appdata/finance-hub/actual.</Overview>
+  <Category>Other:</Category>
+  <WebUI>https://homeserver.coin-matrix.ts.net:5006</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/hofq/docker-templates/main/actual-server.xml</TemplateURL>
+  <Icon>https://github.com/actualbudget/actual/raw/master/packages/desktop-electron/icons/icon.png</Icon>
+  <ExtraParams>--restart=unless-stopped -p 127.0.0.1:5006:5006</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="Daten" Target="/data" Default="/mnt/user/appdata/finance-hub/actual" Mode="rw" Description="Persistente Actual-Daten" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/finance-hub/actual</Config>
+  <TailscaleStateDir/>
+</Container>
