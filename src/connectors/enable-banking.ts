@@ -123,6 +123,38 @@ function ownerForAccount(
   return source.owners?.join(", ");
 }
 
+function formatDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function transactionPeriods(
+  dateFrom: string,
+  dateTo: string,
+  periodDays: number
+): Array<{ dateFrom?: string; dateTo?: string }> {
+  if (!dateFrom) return [{}];
+  const first = new Date(`${dateFrom}T00:00:00.000Z`);
+  const last = new Date(`${dateTo}T00:00:00.000Z`);
+  if (
+    Number.isNaN(first.getTime())
+    || Number.isNaN(last.getTime())
+    || first > last
+    || periodDays < 1
+  ) {
+    throw new Error("Ungültiger Enable-Banking-Zeitraum");
+  }
+  const periods: Array<{ dateFrom: string; dateTo: string }> = [];
+  for (let start = first; start <= last;) {
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + periodDays - 1);
+    if (end > last) end.setTime(last.getTime());
+    periods.push({ dateFrom: formatDate(start), dateTo: formatDate(end) });
+    start = new Date(end);
+    start.setUTCDate(start.getUTCDate() + 1);
+  }
+  return periods;
+}
+
 export async function fetchEnableBanking(
   source: SourceConfig,
   storedSessionId?: string
@@ -213,20 +245,29 @@ export async function fetchEnableBanking(
     }
 
     const pages: EnableBankingTransactions[] = [];
-    let continuationKey: string | undefined;
     const maximumPages = Number(source.settings?.maximumPages ?? 50);
     const dateFrom = String(source.settings?.dateFrom ?? "");
-    do {
-      const query = new URLSearchParams({ transaction_status: "BOOK" });
-      if (dateFrom) query.set("date_from", dateFrom);
-      if (continuationKey) query.set("continuation_key", continuationKey);
-      const result = await api<EnableBankingTransactions>(
-        source,
-        `/accounts/${encodeURIComponent(uid)}/transactions?${query.toString()}`
-      );
-      pages.push(result);
-      continuationKey = result.continuation_key;
-    } while (continuationKey && pages.length < maximumPages);
+    const dateTo = String(
+      source.settings?.dateTo ?? new Date().toISOString().slice(0, 10)
+    );
+    const periodDays = Number(source.settings?.periodDays ?? 90);
+    for (const period of transactionPeriods(dateFrom, dateTo, periodDays)) {
+      let continuationKey: string | undefined;
+      let periodPages = 0;
+      do {
+        const query = new URLSearchParams({ transaction_status: "BOOK" });
+        if (period.dateFrom) query.set("date_from", period.dateFrom);
+        if (period.dateTo) query.set("date_to", period.dateTo);
+        if (continuationKey) query.set("continuation_key", continuationKey);
+        const result = await api<EnableBankingTransactions>(
+          source,
+          `/accounts/${encodeURIComponent(uid)}/transactions?${query.toString()}`
+        );
+        pages.push(result);
+        periodPages += 1;
+        continuationKey = result.continuation_key;
+      } while (continuationKey && periodPages < maximumPages);
+    }
     (raw.transactions as Record<string, unknown>)[stableAccountId] = pages;
     const rawHash = sha256(JSON.stringify(pages));
     for (const tx of pages.flatMap((page) => page.transactions ?? [])) {
