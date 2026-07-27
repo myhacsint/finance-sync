@@ -12,7 +12,10 @@ import { preflightInteractiveSource } from "./connectors/status-only.js";
 import { importBundle } from "./importer.js";
 import { exportAll } from "./exporter.js";
 import { pushToActual } from "./sinks/actual.js";
-import { pushToGhostfolio } from "./sinks/ghostfolio.js";
+import {
+  pushToGhostfolio,
+  reconcileGhostfolioHoldings
+} from "./sinks/ghostfolio.js";
 import {
   findInternalTransferPairs,
   markInternalTransfers
@@ -139,6 +142,10 @@ export class FinanceService {
         counts.ghostfolio = await pushToGhostfolio(
           this.config.ghostfolio,
           bundle.activities ?? []
+        );
+        counts.ghostfolioHoldings = await reconcileGhostfolioHoldings(
+          this.config.ghostfolio,
+          bundle.holdings ?? []
         );
       }
       if ((bundle.transactions?.length ?? 0) > 0) {
