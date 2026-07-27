@@ -1,6 +1,9 @@
 import type { AppConfig, ImportBundle, SourceConfig, SyncResult } from "./types.js";
 import type { FinanceDatabase } from "./database.js";
+import { join } from "node:path";
 import { paths } from "./config.js";
+import { archiveRaw } from "./archive.js";
+import { snapshotSqlite } from "./backup.js";
 import { fetchSolana } from "./connectors/solana.js";
 import { fetchEnableBanking } from "./connectors/enable-banking.js";
 import { fetchDkbCsv } from "./connectors/dkb-csv.js";
@@ -16,6 +19,7 @@ import {
   pushToGhostfolio,
   reconcileGhostfolioHoldings
 } from "./sinks/ghostfolio.js";
+import { manualSnapshotBundle, type ManualSnapshot } from "./connectors/manual.js";
 import {
   findInternalTransferPairs,
   markInternalTransfers
@@ -162,6 +166,58 @@ export class FinanceService {
       const state = waiting ? "WAITING_FOR_USER" : "ERROR";
       this.db.finishRun(runId, id, state, message);
       return { state, message };
+    } finally {
+      this.running.delete(id);
+    }
+  }
+
+  async importConfirmedManualSnapshot(
+    id: string,
+    snapshot: ManualSnapshot
+  ): Promise<SyncResult & { snapshotState?: "new" | "equivalent" }> {
+    const source = this.getSource(id);
+    if (!source || source.kind !== "manual") {
+      return { state: "ERROR", message: "Manuelle Quelle nicht gefunden" };
+    }
+    if (this.running.has(id)) {
+      return { state: "RUNNING", message: "Für diese Quelle läuft bereits ein Vorgang" };
+    }
+    this.running.add(id);
+    const runId = this.db.beginRun(id);
+    try {
+      const bundle = manualSnapshotBundle(source, snapshot);
+      const snapshotState = this.db.manualSnapshotState(id, bundle);
+      if (snapshotState === "conflict") {
+        throw new Error(
+          "Für dieses Stichtagsdatum existiert bereits ein abweichender Stand"
+        );
+      }
+      const backupName = `finance-before-manual-${new Date().toISOString().replace(/[:.]/g, "-")}.sqlite`;
+      snapshotSqlite(this.db, join(paths.archive, "normalized", "snapshots", backupName));
+      let counts: Record<string, number>;
+      if (snapshotState === "equivalent") {
+        archiveRaw(this.db, paths.archive, id, bundle.raw, bundle.rawMediaType);
+        counts = { transactions: 0, balances: 0, holdings: 0, activities: 0 };
+      } else {
+        counts = importBundle(this.db, paths.archive, id, bundle);
+      }
+      if (this.config.ghostfolio?.enabled) {
+        counts.ghostfolioHoldings = await reconcileGhostfolioHoldings(
+          this.config.ghostfolio,
+          bundle.holdings ?? [],
+          "Reconstructed confirmed pension position adjustment by FinanceSync; not tax cost basis"
+        );
+      }
+      exportAll(this.db, paths.archive);
+      const message = snapshotState === "equivalent"
+        ? `Stand war bereits vorhanden; Ghostfolio-Abgleich abgeschlossen`
+        : `Bestätigter Stand übernommen; ${counts.balances} Gesamtwert und ${counts.holdings} Positionen neu`;
+      this.db.finishRun(runId, id, "SUCCESS", message, counts);
+      return { state: "SUCCESS", message, counts, snapshotState };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.db.finishRun(runId, id, "ERROR", message);
+      return { state: "ERROR", message };
     } finally {
       this.running.delete(id);
     }
