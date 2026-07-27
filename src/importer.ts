@@ -8,7 +8,13 @@ export function importBundle(
   sourceId: string,
   bundle: ImportBundle
 ): Record<string, number> {
-  const archived = archiveRaw(db, archiveRoot, sourceId, bundle.raw);
+  const archived = archiveRaw(
+    db,
+    archiveRoot,
+    sourceId,
+    bundle.raw,
+    bundle.rawMediaType
+  );
   for (const item of bundle.transactions ?? []) item.rawHash ||= archived.hash;
   for (const item of bundle.balances ?? []) item.rawHash ||= archived.hash;
   for (const item of bundle.holdings ?? []) item.rawHash ||= archived.hash;

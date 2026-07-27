@@ -3,6 +3,7 @@ import type { FinanceDatabase } from "./database.js";
 import { paths } from "./config.js";
 import { fetchSolana } from "./connectors/solana.js";
 import { fetchEnableBanking } from "./connectors/enable-banking.js";
+import { fetchDkbCsv } from "./connectors/dkb-csv.js";
 import {
   completeAuthorization,
   startAuthorization
@@ -38,6 +39,8 @@ export class FinanceService {
       let bundle: ImportBundle;
       if (source.kind === "solana") {
         bundle = await fetchSolana(source);
+      } else if (source.kind === "dkb-csv") {
+        bundle = fetchDkbCsv(source, paths.inbox);
       } else if (source.kind === "enable-banking") {
         bundle = await fetchEnableBanking(
           source,
