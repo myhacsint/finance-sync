@@ -62,6 +62,31 @@ Beispiel für einen bestätigten Vertragswert:
 }
 ```
 
+Bei manuellen Depotständen können Positionen zusätzlich mit verlustfreiem
+Quellkurs und dem im Dokument ausgewiesenen Kurswert übergeben werden:
+
+```json
+{
+  "sourceId": "sutor-riester",
+  "accountId": "riester-1",
+  "amount": "18526.30",
+  "currency": "EUR",
+  "capturedAt": "2026-03-31",
+  "owner": "Person A",
+  "holdings": [{
+    "symbol": "IE00BL25JN58",
+    "name": "Xtrackers MSCI World Min Vol ETF",
+    "quantityAtomic": "4336642",
+    "atomicDecimals": 4,
+    "priceAtomic": "491199",
+    "priceDecimals": 4,
+    "priceCurrency": "USD",
+    "marketValueMinor": "1852630",
+    "marketValueCurrency": "EUR"
+  }]
+}
+```
+
 ## Absichtlich noch nicht automatisiert
 
 comdirect-Depot und DKB-FinTS gehen in `WAITING_FOR_USER`, bis echte API- und

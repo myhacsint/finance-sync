@@ -84,6 +84,11 @@ export interface NormalizedHolding {
   atomicDecimals: number;
   priceMinor?: bigint;
   currency?: string;
+  priceAtomic?: string;
+  priceDecimals?: number;
+  priceCurrency?: string;
+  marketValueMinor?: bigint;
+  marketValueCurrency?: string;
   owner?: string;
   rawHash: string;
 }

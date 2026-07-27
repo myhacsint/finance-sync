@@ -7,12 +7,24 @@ interface ManualSnapshot {
   amount: string | number;
   currency: string;
   owner?: string;
+  document?: {
+    relativePath: string;
+    sha256: string;
+    mediaType?: string;
+    createdAt?: string;
+  };
   holdings?: Array<{
     symbol: string;
     name?: string;
     quantityAtomic: string;
     atomicDecimals: number;
     priceMinor?: string | number;
+    currency?: string;
+    priceAtomic?: string;
+    priceDecimals?: number;
+    priceCurrency?: string;
+    marketValueMinor?: string | number;
+    marketValueCurrency?: string;
   }>;
 }
 
@@ -55,7 +67,14 @@ export function manualSnapshotBundle(
       quantityAtomic: holding.quantityAtomic,
       atomicDecimals: holding.atomicDecimals,
       priceMinor: holding.priceMinor === undefined ? undefined : BigInt(holding.priceMinor),
-      currency: snapshot.currency.toUpperCase(),
+      currency: (holding.currency ?? snapshot.currency).toUpperCase(),
+      priceAtomic: holding.priceAtomic,
+      priceDecimals: holding.priceDecimals,
+      priceCurrency: holding.priceCurrency?.toUpperCase(),
+      marketValueMinor: holding.marketValueMinor === undefined
+        ? undefined
+        : BigInt(holding.marketValueMinor),
+      marketValueCurrency: holding.marketValueCurrency?.toUpperCase(),
       owner: snapshot.owner,
       rawHash
     }))

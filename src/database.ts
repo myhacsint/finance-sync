@@ -127,6 +127,22 @@ export class FinanceDatabase {
       CREATE INDEX IF NOT EXISTS idx_balances_account_date
         ON balances(account_id, captured_at);
     `);
+    const holdingColumns = new Set(
+      (this.db.prepare("PRAGMA table_info(holdings)").all() as Array<{ name: string }>)
+        .map((column) => column.name)
+    );
+    const additions: Array<[string, string]> = [
+      ["price_atomic", "TEXT"],
+      ["price_decimals", "INTEGER"],
+      ["price_currency", "TEXT"],
+      ["market_value_minor", "INTEGER"],
+      ["market_value_currency", "TEXT"]
+    ];
+    for (const [name, type] of additions) {
+      if (!holdingColumns.has(name)) {
+        this.db.exec(`ALTER TABLE holdings ADD COLUMN ${name} ${type}`);
+      }
+    }
   }
 
   registerSource(id: string, kind: string, enabled: boolean): void {
@@ -228,16 +244,19 @@ export class FinanceDatabase {
     const stmt = this.db.prepare(`
       INSERT OR IGNORE INTO holdings(
         source_id, account_id, captured_at, symbol, name, quantity_atomic,
-        atomic_decimals, price_minor, currency, owner, raw_hash
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        atomic_decimals, price_minor, currency, price_atomic, price_decimals,
+        price_currency, market_value_minor, market_value_currency, owner, raw_hash
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     let inserted = 0;
     for (const item of items) {
       inserted += Number(stmt.run(
         item.sourceId, item.accountId, item.capturedAt, item.symbol,
         item.name ?? null, item.quantityAtomic, item.atomicDecimals,
-        item.priceMinor ?? null, item.currency ?? null, item.owner ?? null,
-        item.rawHash
+        item.priceMinor ?? null, item.currency ?? null,
+        item.priceAtomic ?? null, item.priceDecimals ?? null,
+        item.priceCurrency ?? null, item.marketValueMinor ?? null,
+        item.marketValueCurrency ?? null, item.owner ?? null, item.rawHash
       ).changes);
     }
     return inserted;

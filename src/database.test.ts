@@ -63,6 +63,42 @@ test("korrigierte Normalisierung aktualisiert denselben Saldo-Snapshot", () => {
   db.close();
 });
 
+test("manuelle Positionen bewahren exakten Quellkurs und ausgewiesenen Kurswert", () => {
+  const root = mkdtempSync(join(tmpdir(), "finance-sync-holding-value-"));
+  const db = new FinanceDatabase(join(root, "finance.sqlite"));
+
+  db.importHoldings([{
+    sourceId: "sutor-riester",
+    accountId: "riester",
+    capturedAt: "2026-03-31",
+    symbol: "IE00BL25JN58",
+    name: "Xtrackers MSCI World Min Vol ETF",
+    quantityAtomic: "4336642",
+    atomicDecimals: 4,
+    priceAtomic: "491199",
+    priceDecimals: 4,
+    priceCurrency: "USD",
+    marketValueMinor: 1852630n,
+    marketValueCurrency: "EUR",
+    owner: "Erik",
+    rawHash: "statement"
+  }]);
+
+  const row = db.query(`
+    SELECT price_atomic, price_decimals, price_currency,
+      market_value_minor, market_value_currency
+    FROM holdings
+  `)[0];
+  assert.deepEqual({ ...row }, {
+    price_atomic: "491199",
+    price_decimals: 4,
+    price_currency: "USD",
+    market_value_minor: 1852630,
+    market_value_currency: "EUR"
+  });
+  db.close();
+});
+
 test("interne Überträge werden paarweise markiert und exportiert", () => {
   const root = mkdtempSync(join(tmpdir(), "finance-sync-"));
   const db = new FinanceDatabase(join(root, "finance.sqlite"));
