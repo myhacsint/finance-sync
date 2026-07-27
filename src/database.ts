@@ -209,6 +209,10 @@ export class FinanceDatabase {
       INSERT OR IGNORE INTO balances(
         source_id, account_id, captured_at, amount_minor, currency, owner, raw_hash
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(source_id, account_id, captured_at, raw_hash) DO UPDATE SET
+        amount_minor=excluded.amount_minor,
+        currency=excluded.currency,
+        owner=excluded.owner
     `);
     let inserted = 0;
     for (const item of items) {
