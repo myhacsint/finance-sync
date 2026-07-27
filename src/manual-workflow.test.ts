@@ -33,6 +33,61 @@ Xtrackers MSCI World Min Vol ETF             446,6232      50,5809 US$*)   17.07
 *) Währungskurs (EUR/US$) 1,1435                                           Summe:                0,00         72.489,20
 `;
 
+const sutorColumnText = `
+Raisin-Pension Riester | Depotbestände
+Investment
+Konto
+Amundi Solution MSCI Europe Min Vol
+iShares Edge MSCI EM Min Vol ETF
+iShares Edge MSCI USA Min Vol ESG
+iShares Edge MSCI World Minimum V.
+iShares MSCI Europe Minimum Volat.
+Xtrackers MSCI World Min Vol ETF
+*) Währungskurs (EUR/US$) 1,1435
+Anteile
+Investment-
+Kurs
+Kursdatum
+52,2353
+178,6962
+664,6655
+221,7449
+235,6483
+446,6232
+167,8600 EUR
+42,9840 US$*)
+8,7207 US$*)
+75,4529 US$*)
+74,4650 EUR
+50,5809 US$*)
+17.07.2026
+17.07.2026
+17.07.2026
+17.07.2026
+17.07.2026
+17.07.2026
+Summe:
+Geldsaldo
+in EUR
+0,00
+0,00
+0,00
+0,00
+0,00
+0,00
+0,00
+0,00
+Depotwert
+in EUR
+8.768,22
+6.717,16
+5.068,95
+14.631,65
+17.547,55
+19.755,67
+72.489,20
+`;
+
 const alteSource: SourceConfig = {
   id: "alte-leipziger",
   kind: "manual",
@@ -105,6 +160,15 @@ test("Sutor-Depottext wird centgenau und verlustfrei erkannt", () => {
     marketValueMinor: "671716",
     marketValueCurrency: "EUR"
   });
+});
+
+test("spaltenweise kopierter Sutor-PDF-Text wird erkannt", () => {
+  const { snapshot } = parseManualWorkflowText(sutorSource, sutorColumnText);
+  assert.equal(snapshot.amount, "72489.20");
+  assert.equal(snapshot.capturedAt, "2026-07-17T23:59:59+02:00");
+  assert.equal(snapshot.holdings?.length, 6);
+  assert.equal(snapshot.holdings?.[5].quantityAtomic, "4466232");
+  assert.equal(snapshot.holdings?.[5].marketValueMinor, "1975567");
 });
 
 test("Alte-Leipziger-Portaltext trennt Fonds- und Vertragswerte", () => {
