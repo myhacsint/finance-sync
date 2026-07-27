@@ -218,6 +218,7 @@ function parseSutor(
   const holdings: NonNullable<ManualSnapshot["holdings"]> = [];
   const unknown: string[] = [];
   const dates = new Set<string>();
+  let columnTotalMinor: bigint | undefined;
   for (const match of text.matchAll(row)) {
     const fund = findFund(sutorFunds, match[1]);
     if (!fund) {
@@ -241,6 +242,55 @@ function parseSutor(
       marketValueCurrency: "EUR"
     });
   }
+  if (holdings.length === 0) {
+    const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
+    const names = sutorFunds.map((fund) =>
+      lines.find((line) => findFund([fund], line))
+    );
+    const quantities = lines.filter((line) => /^\d+(?:\.\d{3})*,\d{4}$/.test(line));
+    const prices = lines.flatMap((line) => {
+      const match = /^([\d.]+,\d{4})\s+(EUR|US\$\*\))$/.exec(line);
+      return match ? [{ value: match[1], currency: match[2] }] : [];
+    });
+    const courseDateIndex = lines.indexOf("Kursdatum");
+    const totalLabelIndex = lines.indexOf("Summe:");
+    const columnDates = courseDateIndex < 0 || totalLabelIndex < 0
+      ? []
+      : lines.slice(courseDateIndex + 1, totalLabelIndex)
+        .filter((line) => /^\d{2}\.\d{2}\.\d{4}$/.test(line));
+    const depotValueIndex = lines.lastIndexOf("Depotwert");
+    const marketValues = depotValueIndex < 0
+      ? []
+      : lines.slice(depotValueIndex + 1)
+        .filter((line) => /^[\d.]+,\d{2}$/.test(line));
+    if (
+      names.every(Boolean)
+      && quantities.length === sutorFunds.length
+      && prices.length === sutorFunds.length
+      && columnDates.length === sutorFunds.length
+      && marketValues.length === sutorFunds.length + 1
+    ) {
+      for (let index = 0; index < sutorFunds.length; index += 1) {
+        const quantity = decimalAtomic(quantities[index], ",");
+        const price = decimalAtomic(prices[index].value, ",");
+        const priceCurrency = prices[index].currency.startsWith("US$") ? "USD" : "EUR";
+        dates.add(columnDates[index]);
+        holdings.push({
+          symbol: sutorFunds[index].symbol,
+          name: sutorFunds[index].name,
+          quantityAtomic: quantity.atomic,
+          atomicDecimals: quantity.decimals,
+          currency: priceCurrency,
+          priceAtomic: price.atomic,
+          priceDecimals: price.decimals,
+          priceCurrency,
+          marketValueMinor: germanMinor(marketValues[index]).toString(),
+          marketValueCurrency: "EUR"
+        });
+      }
+      columnTotalMinor = germanMinor(marketValues.at(-1)!);
+    }
+  }
   if (unknown.length > 0) {
     throw new Error(`Unbekannte Sutor-Positionen: ${unknown.join(", ")}`);
   }
@@ -251,8 +301,10 @@ function parseSutor(
   }
   if (dates.size !== 1) throw new Error("Sutor-Positionen haben kein einheitliches Kursdatum");
   const totalMatch = /Summe:\s+[\d.]+,\d{2}\s+([\d.]+,\d{2})/.exec(text);
-  if (!totalMatch) throw new Error("Sutor-Gesamtsumme wurde nicht erkannt");
-  const amountMinor = germanMinor(totalMatch[1]);
+  const amountMinor = totalMatch
+    ? germanMinor(totalMatch[1])
+    : columnTotalMinor;
+  if (amountMinor === undefined) throw new Error("Sutor-Gesamtsumme wurde nicht erkannt");
   const holdingTotal = holdings.reduce(
     (sum, holding) => sum + BigInt(holding.marketValueMinor ?? 0),
     0n
