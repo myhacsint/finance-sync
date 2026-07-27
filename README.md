@@ -49,6 +49,38 @@ bereits angelegt.
 - `POST /api/backup`
 - `POST /api/manual-snapshot`
 
+In der Verwaltungsoberfläche gibt es zusätzlich den bestätigungspflichtigen
+Bereich **Vorsorge aktualisieren**. Er unterstützt kopierten Text aus dem
+Sutor-Depotbestand und der Alte-Leipziger-Vertragsansicht:
+
+1. Quelle auswählen und den vollständigen Text einfügen.
+2. Stichtag, Gesamtwert, Positionen und Ghostfolio-Zuordnungen in der Vorschau
+   prüfen. Dabei werden noch keine Daten verändert.
+3. Die Prüfung bestätigen und den Stand übernehmen.
+
+Vor der Übernahme wird ein konsistenter SQLite-Snapshot unter
+`normalized/snapshots/` angelegt. Danach werden Roharchiv, normalisierte
+Datenbank, CSV-Exporte und die rekonstruierte Ghostfolio-Position aktualisiert.
+Ein identischer Stichtag erzeugt keine Dubletten. Ein bereits vorhandener,
+abweichender Stand desselben Datums wird blockiert.
+
+Die Quelle benötigt dafür eine `settings.manualWorkflow`-Konfiguration mit
+`provider`, `accountId`, `owner` und einer frei wählbaren `label`. Die
+Ghostfolio-Ziele bleiben ausschließlich in der privaten `config.json`:
+
+```json
+{
+  "settings": {
+    "manualWorkflow": {
+      "provider": "sutor",
+      "accountId": "sutor-riester-person-a",
+      "owner": "Person A",
+      "label": "Sutor Riester"
+    }
+  }
+}
+```
+
 Beispiel für einen bestätigten Vertragswert:
 
 ```json

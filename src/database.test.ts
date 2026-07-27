@@ -10,6 +10,7 @@ import {
   findInternalTransferPairs,
   markInternalTransfers
 } from "./reconcile.js";
+import { manualSnapshotBundle } from "./connectors/manual.js";
 
 test("wiederholter Import erzeugt keine Dubletten", () => {
   const root = mkdtempSync(join(tmpdir(), "finance-sync-"));
@@ -96,6 +97,54 @@ test("manuelle Positionen bewahren exakten Quellkurs und ausgewiesenen Kurswert"
     market_value_minor: 1852630,
     market_value_currency: "EUR"
   });
+  db.close();
+});
+
+test("identischer manueller Stichtag wird auch bei anderem Rohbeleg erkannt", () => {
+  const root = mkdtempSync(join(tmpdir(), "finance-sync-manual-equivalent-"));
+  const db = new FinanceDatabase(join(root, "finance.sqlite"));
+  const source = {
+    id: "pension",
+    kind: "manual" as const,
+    enabled: true,
+    owners: ["Person A"]
+  };
+  const snapshot = {
+    accountId: "contract",
+    capturedAt: "2026-07-24T23:59:59+02:00",
+    amount: "100.00",
+    currency: "EUR",
+    owner: "Person A",
+    holdings: [{
+      symbol: "FUND",
+      name: "Fund",
+      quantityAtomic: "12345",
+      atomicDecimals: 3,
+      priceAtomic: "8100",
+      priceDecimals: 2,
+      priceCurrency: "EUR",
+      marketValueMinor: "10000",
+      marketValueCurrency: "EUR"
+    }]
+  };
+  const first = manualSnapshotBundle(source, snapshot);
+  importBundle(db, root, source.id, first);
+  const second = manualSnapshotBundle(source, {
+    ...snapshot,
+    evidence: {
+      type: "confirmed-pasted-text",
+      sha256: "different",
+      text: "different raw evidence"
+    }
+  });
+  assert.equal(db.manualSnapshotState(source.id, second), "equivalent");
+  assert.equal(
+    db.manualSnapshotState(source.id, manualSnapshotBundle(source, {
+      ...snapshot,
+      amount: "101.00"
+    })),
+    "conflict"
+  );
   db.close();
 });
 

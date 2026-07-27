@@ -135,7 +135,8 @@ async function waitForQuantity(
 
 export async function reconcileGhostfolioHoldings(
   config: NonNullable<AppConfig["ghostfolio"]>,
-  holdings: NormalizedHolding[]
+  holdings: NormalizedHolding[],
+  comment = "Reconstructed wallet position adjustment by FinanceSync; not tax cost basis"
 ): Promise<number> {
   if (!config.enabled || holdings.length === 0 || !config.holdingMap) return 0;
   const grouped = new Map<string, {
@@ -213,7 +214,7 @@ export async function reconcileGhostfolioHoldings(
       body: JSON.stringify({
         activities: [{
           accountId: group.accountId,
-          comment: "Reconstructed wallet position adjustment by FinanceSync; not tax cost basis",
+          comment,
           currency: group.currency ?? symbol.currency ?? "USD",
           dataSource: group.dataSource,
           date: group.capturedAt,

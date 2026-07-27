@@ -11,6 +11,7 @@ import { importBundle } from "./importer.js";
 import { snapshotSqlite } from "./backup.js";
 import { renderUi } from "./ui.js";
 import { buildHealth } from "./health.js";
+import { ManualPreviewStore } from "./manual-workflow.js";
 
 mkdirSync(paths.data, { recursive: true });
 mkdirSync(paths.archive, { recursive: true });
@@ -19,6 +20,7 @@ const config = loadConfig();
 const db = new FinanceDatabase(join(paths.data, "finance.sqlite"));
 const service = new FinanceService(db, config);
 const scheduler = service.startScheduler();
+const manualPreviews = new ManualPreviewStore();
 
 function json(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
@@ -67,6 +69,43 @@ const server = createServer(async (req, res) => {
     if (!authorized(req)) return json(res, 401, { error: "Nicht autorisiert" });
     if (req.method === "GET" && url.pathname === "/api/status") {
       return json(res, 200, { sources: db.listSources() });
+    }
+    if (req.method === "GET" && url.pathname === "/api/manual-workflow/sources") {
+      return json(res, 200, { sources: manualPreviews.listSources(config) });
+    }
+    if (req.method === "POST" && url.pathname === "/api/manual-workflow/preview") {
+      const payload = await body(req);
+      const sourceId = String((payload as { sourceId?: string }).sourceId ?? "");
+      const text = String((payload as { text?: string }).text ?? "");
+      const source = service.getSource(sourceId);
+      if (!source || source.kind !== "manual") {
+        return json(res, 400, { error: "Manuelle Quelle nicht gefunden" });
+      }
+      const preview = manualPreviews.create(source, text, config);
+      const stored = manualPreviews.take(preview.id);
+      const bundle = manualSnapshotBundle(source, stored.snapshot);
+      const snapshotState = db.manualSnapshotState(source.id, bundle);
+      return json(res, 200, {
+        ...preview,
+        snapshotState,
+        canConfirm: preview.ghostfolioReady && snapshotState !== "conflict"
+      });
+    }
+    if (req.method === "POST" && url.pathname === "/api/manual-workflow/confirm") {
+      const payload = await body(req);
+      const previewId = String((payload as { previewId?: string }).previewId ?? "");
+      const preview = manualPreviews.take(previewId);
+      if (!preview.ghostfolioReady) {
+        return json(res, 409, {
+          error: "Ghostfolio-Ziel oder Wertpapierzuordnung ist unvollständig"
+        });
+      }
+      const result = await service.importConfirmedManualSnapshot(
+        preview.sourceId,
+        preview.snapshot
+      );
+      if (result.state === "SUCCESS") manualPreviews.consume(previewId);
+      return json(res, result.state === "SUCCESS" ? 200 : 409, result);
     }
     const syncMatch = /^\/api\/sync\/([^/]+)$/.exec(url.pathname);
     if (req.method === "POST" && syncMatch) {

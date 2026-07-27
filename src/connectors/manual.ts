@@ -1,12 +1,18 @@
 import type { SourceConfig, ImportBundle } from "../types.js";
 import { sha256 } from "../archive.js";
 
-interface ManualSnapshot {
+export interface ManualSnapshot {
   accountId: string;
   capturedAt?: string;
   amount: string | number;
   currency: string;
   owner?: string;
+  evidence?: {
+    type: string;
+    sha256: string;
+    text?: string;
+  };
+  details?: Record<string, unknown>;
   document?: {
     relativePath: string;
     sha256: string;

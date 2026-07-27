@@ -6,6 +6,7 @@ import type {
   NormalizedBalance,
   NormalizedHolding,
   NormalizedTransaction,
+  ImportBundle,
   SyncState
 } from "./types.js";
 
@@ -284,6 +285,65 @@ export class FinanceDatabase {
       ).changes);
     }
     return inserted;
+  }
+
+  manualSnapshotState(
+    sourceId: string,
+    bundle: ImportBundle
+  ): "new" | "equivalent" | "conflict" {
+    const balance = bundle.balances?.[0];
+    if (!balance) throw new Error("Manueller Snapshot enthält keinen Gesamtwert");
+    const holdings = bundle.holdings ?? [];
+    const existingBalances = this.db.prepare(`
+      SELECT amount_minor, currency, owner
+      FROM balances
+      WHERE source_id=? AND account_id=? AND captured_at=?
+    `).all(sourceId, balance.accountId, balance.capturedAt) as Array<{
+      amount_minor: number | bigint;
+      currency: string;
+      owner: string | null;
+    }>;
+    const existingHoldings = this.db.prepare(`
+      SELECT symbol, name, quantity_atomic, atomic_decimals, price_minor,
+        currency, price_atomic, price_decimals, price_currency,
+        market_value_minor, market_value_currency, owner
+      FROM holdings
+      WHERE source_id=? AND account_id=? AND captured_at=?
+    `).all(sourceId, balance.accountId, balance.capturedAt) as Array<
+      Record<string, string | number | bigint | null>
+    >;
+    if (existingBalances.length === 0 && existingHoldings.length === 0) return "new";
+
+    const same = (
+      left: string | number | bigint | null | undefined,
+      right: string | number | bigint | null | undefined
+    ) => String(left ?? "") === String(right ?? "");
+    const balanceMatches = existingBalances.some((row) =>
+      same(row.amount_minor, balance.amountMinor)
+      && row.currency === balance.currency
+      && same(row.owner, balance.owner)
+    );
+    const symbols = new Set(holdings.map((holding) => holding.symbol));
+    const existingSymbols = new Set(
+      existingHoldings.map((holding) => String(holding.symbol))
+    );
+    const holdingsMatch = symbols.size === existingSymbols.size
+      && [...symbols].every((symbol) => existingSymbols.has(symbol))
+      && holdings.every((holding) => existingHoldings.some((row) =>
+        row.symbol === holding.symbol
+        && same(row.name, holding.name)
+        && same(row.quantity_atomic, holding.quantityAtomic)
+        && same(row.atomic_decimals, holding.atomicDecimals)
+        && same(row.price_minor, holding.priceMinor)
+        && same(row.currency, holding.currency)
+        && same(row.price_atomic, holding.priceAtomic)
+        && same(row.price_decimals, holding.priceDecimals)
+        && same(row.price_currency, holding.priceCurrency)
+        && same(row.market_value_minor, holding.marketValueMinor)
+        && same(row.market_value_currency, holding.marketValueCurrency)
+        && same(row.owner, holding.owner)
+      ));
+    return balanceMatches && holdingsMatch ? "equivalent" : "conflict";
   }
 
   listSources(): Record<string, unknown>[] {

@@ -70,13 +70,29 @@
       "id": "sutor-riester",
       "kind": "manual",
       "enabled": true,
-      "owners": ["Person A"]
+      "owners": ["Person A"],
+      "settings": {
+        "manualWorkflow": {
+          "provider": "sutor",
+          "accountId": "sutor-riester-person-a",
+          "owner": "Person A",
+          "label": "Sutor Riester"
+        }
+      }
     },
     {
       "id": "alte-leipziger",
       "kind": "manual",
       "enabled": true,
-      "owners": ["Person A"]
+      "owners": ["Person A"],
+      "settings": {
+        "manualWorkflow": {
+          "provider": "alte-leipziger",
+          "accountId": "alte-leipziger-person-a",
+          "owner": "Person A",
+          "label": "Alte Leipziger Fondsrente"
+        }
+      }
     }
   ],
   "actual": {
@@ -89,6 +105,7 @@
   "ghostfolio": {
     "enabled": false,
     "serverUrl": "http://Ghostfolio:3333",
-    "accountMap": {}
+    "accountMap": {},
+    "holdingMap": {}
   }
 }
