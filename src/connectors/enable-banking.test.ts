@@ -44,11 +44,18 @@ test("aktuelle Sitzung, Saldo, Vorzeichen und Folgeseiten werden verarbeitet", a
     }
     if (url.pathname === "/accounts/uid-1/balances") {
       return Response.json({
-        balances: [{
-          balance_type: "CLAV",
-          reference_date: "2026-07-26",
-          balance_amount: { amount: "123.45", currency: "EUR" }
-        }]
+        balances: [
+          {
+            balance_type: "ITAV",
+            reference_date: "2026-07-26",
+            balance_amount: { amount: "999.99", currency: "EUR" }
+          },
+          {
+            balance_type: "CLBD",
+            reference_date: "2026-07-26",
+            balance_amount: { amount: "123.45", currency: "EUR" }
+          }
+        ]
       });
     }
     if (

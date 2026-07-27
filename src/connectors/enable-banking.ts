@@ -223,7 +223,9 @@ export async function fetchEnableBanking(
     );
     (raw.balances as Record<string, unknown>)[stableAccountId] = balanceResult;
     const preferredBalance =
-      balanceResult.balances?.find((item) => item.balance_type === "CLAV")
+      balanceResult.balances?.find((item) => item.balance_type === "CLBD")
+      ?? balanceResult.balances?.find((item) => item.balance_type === "ITBD")
+      ?? balanceResult.balances?.find((item) => item.balance_type === "CLAV")
       ?? balanceResult.balances?.find((item) => item.balance_type === "ITAV")
       ?? balanceResult.balances?.[0];
     if (preferredBalance?.balance_amount?.amount) {
