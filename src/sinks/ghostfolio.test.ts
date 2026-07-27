@@ -80,7 +80,7 @@ test("liquides und gestaktes SOL werden als eine rekonstruierte Position abgegli
     if (url.includes("/api/v1/portfolio/details")) {
       detailCalls += 1;
       return Response.json({
-        holdings: detailCalls === 1
+        holdings: detailCalls <= 2
           ? {}
           : {
               solana: {
@@ -154,7 +154,7 @@ test("liquides und gestaktes SOL werden als eine rekonstruierte Position abgegli
       type: "BUY",
       unitPrice: 150
     });
-    assert.equal(detailCalls, 2);
+    assert.equal(detailCalls, 3);
   } finally {
     globalThis.fetch = originalFetch;
   }

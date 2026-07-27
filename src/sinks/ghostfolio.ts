@@ -107,6 +107,32 @@ async function currentQuantity(
   )?.quantity ?? 0;
 }
 
+async function waitForQuantity(
+  config: NonNullable<AppConfig["ghostfolio"]>,
+  authToken: string,
+  accountId: string,
+  dataSource: string,
+  symbol: string,
+  expected: number,
+  tolerance: number
+): Promise<number> {
+  let quantity = 0;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    quantity = await currentQuantity(
+      config,
+      authToken,
+      accountId,
+      dataSource,
+      symbol
+    );
+    if (Math.abs(quantity - expected) < tolerance) return quantity;
+    if (attempt < 5) {
+      await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** attempt));
+    }
+  }
+  return quantity;
+}
+
 export async function reconcileGhostfolioHoldings(
   config: NonNullable<AppConfig["ghostfolio"]>,
   holdings: NormalizedHolding[]
@@ -203,14 +229,17 @@ export async function reconcileGhostfolioHoldings(
     if (!importResponse.ok) {
       throw new Error(`Ghostfolio Positionsimport HTTP ${importResponse.status}`);
     }
-    const verified = await currentQuantity(
+    const tolerance = 0.5 / 10 ** group.decimals;
+    const verified = await waitForQuantity(
       config,
       authToken,
       group.accountId,
       group.dataSource,
-      group.symbol
+      group.symbol,
+      desired,
+      tolerance
     );
-    if (Math.abs(verified - desired) >= 0.5 / 10 ** group.decimals) {
+    if (Math.abs(verified - desired) >= tolerance) {
       throw new Error("Ghostfolio-Position stimmt nach dem Import nicht");
     }
     imported += 1;
