@@ -13,9 +13,16 @@ import { importBundle } from "./importer.js";
 import { exportAll } from "./exporter.js";
 import { pushToActual } from "./sinks/actual.js";
 import { pushToGhostfolio } from "./sinks/ghostfolio.js";
+import {
+  findInternalTransferPairs,
+  markInternalTransfers
+} from "./reconcile.js";
+import { linkActualTransfers } from "./sinks/actual-transfers.js";
 
 export class FinanceService {
   private running = new Set<string>();
+  private actualTail: Promise<void> = Promise.resolve();
+  private reconcileTail: Promise<void> = Promise.resolve();
 
   constructor(readonly db: FinanceDatabase, readonly config: AppConfig) {
     for (const source of config.sources) {
@@ -26,6 +33,67 @@ export class FinanceService {
 
   getSource(id: string): SourceConfig | undefined {
     return this.config.sources.find((source) => source.id === id);
+  }
+
+  private async withActual<T>(operation: () => Promise<T>): Promise<T> {
+    let release!: () => void;
+    const previous = this.actualTail;
+    this.actualTail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+    }
+  }
+
+  private async withReconcile<T>(operation: () => Promise<T>): Promise<T> {
+    let release!: () => void;
+    const previous = this.reconcileTail;
+    this.reconcileTail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+    }
+  }
+
+  async reconcileInternalTransfers(): Promise<SyncResult> {
+    return this.withReconcile<SyncResult>(async () => {
+      const owners = Array.from(new Set(
+        this.config.sources.flatMap((source) => source.owners ?? [])
+      ));
+      const pairs = findInternalTransferPairs(this.db, owners);
+      if (pairs.length === 0) {
+        return {
+          state: "SUCCESS",
+          message: "Keine neuen eindeutigen internen Überträge",
+          counts: { transfers: 0, actualTransfers: 0 }
+        };
+      }
+      let actual = 0;
+      if (this.config.actual?.enabled) {
+        const actualPairs = pairs.filter((pair) =>
+          this.config.actual!.accountMap[pair.left.accountId]
+          && this.config.actual!.accountMap[pair.right.accountId]
+        );
+        actual = await this.withActual(() =>
+          linkActualTransfers(this.config.actual!, actualPairs)
+        );
+      }
+      const transfers = markInternalTransfers(this.db, pairs);
+      exportAll(this.db, paths.archive);
+      return {
+        state: "SUCCESS",
+        message: `${transfers} eindeutige interne Überträge verknüpft`,
+        counts: { transfers, actualTransfers: actual }
+      };
+    });
   }
 
   async sync(id: string): Promise<SyncResult> {
@@ -60,9 +128,11 @@ export class FinanceService {
       }
       const counts = importBundle(this.db, paths.archive, id, bundle);
       if (this.config.actual?.enabled) {
-        counts.actual = await pushToActual(
-          this.config.actual,
-          bundle.transactions ?? []
+        counts.actual = await this.withActual(() =>
+          pushToActual(
+            this.config.actual!,
+            bundle.transactions ?? []
+          )
         );
       }
       if (this.config.ghostfolio?.enabled) {
@@ -70,6 +140,10 @@ export class FinanceService {
           this.config.ghostfolio,
           bundle.activities ?? []
         );
+      }
+      if ((bundle.transactions?.length ?? 0) > 0) {
+        const reconciled = await this.reconcileInternalTransfers();
+        counts.transfers = reconciled.counts?.transfers ?? 0;
       }
       exportAll(this.db, paths.archive);
       const message = `Abruf erfolgreich; ${Object.values(counts).reduce((a, b) => a + b, 0)} neue Datensätze`;
