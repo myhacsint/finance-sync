@@ -32,7 +32,8 @@ export function exportAll(db: FinanceDatabase, archiveRoot: string): void {
     `],
     ["holdings.csv", `
       SELECT source_id, account_id, captured_at, symbol, name, quantity_atomic,
-        atomic_decimals, price_minor, currency, owner, raw_hash
+        atomic_decimals, price_minor, currency, price_atomic, price_decimals,
+        price_currency, market_value_minor, market_value_currency, owner, raw_hash
       FROM holdings ORDER BY captured_at, account_id, symbol
     `],
     ["investment_activities.csv", `
