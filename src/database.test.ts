@@ -6,7 +6,10 @@ import { tmpdir } from "node:os";
 import { FinanceDatabase } from "./database.js";
 import { importBundle } from "./importer.js";
 import { exportAll } from "./exporter.js";
-import { markInternalTransfers } from "./reconcile.js";
+import {
+  findInternalTransferPairs,
+  markInternalTransfers
+} from "./reconcile.js";
 
 test("wiederholter Import erzeugt keine Dubletten", () => {
   const root = mkdtempSync(join(tmpdir(), "finance-sync-"));
@@ -71,6 +74,7 @@ test("interne Überträge werden paarweise markiert und exportiert", () => {
       bookedAt: "2026-07-01",
       amountMinor: -5000n,
       currency: "EUR",
+      payee: "Erik",
       rawHash: "one"
     },
     {
@@ -83,7 +87,8 @@ test("interne Überträge werden paarweise markiert und exportiert", () => {
       rawHash: "two"
     }
   ]);
-  assert.equal(markInternalTransfers(db), 1);
+  const pairs = findInternalTransferPairs(db, ["Erik"]);
+  assert.equal(markInternalTransfers(db, pairs), 1);
   exportAll(db, root);
   const csv = readFileSync(join(root, "exports", "transactions.csv"), "utf8");
   assert.match(csv, /internal_transfer_id/);
@@ -91,5 +96,102 @@ test("interne Überträge werden paarweise markiert und exportiert", () => {
     db.query("SELECT count(*) AS count FROM transactions WHERE internal_transfer_id IS NOT NULL")[0].count,
     2
   );
+  db.close();
+});
+
+test("mehrdeutige oder unbestätigte Transferkandidaten bleiben unmarkiert", () => {
+  const root = mkdtempSync(join(tmpdir(), "finance-sync-ambiguous-"));
+  const db = new FinanceDatabase(join(root, "finance.sqlite"));
+  const base = {
+    sourceId: "bank",
+    bookedAt: "2026-07-01",
+    currency: "EUR",
+    rawHash: "raw"
+  };
+  db.importTransactions([
+    {
+      ...base,
+      sourceTransactionId: "out",
+      accountId: "a",
+      amountMinor: -5000n,
+      payee: "Erik"
+    },
+    {
+      ...base,
+      sourceTransactionId: "in-one",
+      accountId: "b",
+      amountMinor: 5000n
+    },
+    {
+      ...base,
+      sourceTransactionId: "in-two",
+      accountId: "c",
+      amountMinor: 5000n
+    },
+    {
+      ...base,
+      sourceTransactionId: "unrelated-out",
+      accountId: "d",
+      bookedAt: "2026-07-10",
+      amountMinor: -3000n
+    },
+    {
+      ...base,
+      sourceTransactionId: "unrelated-in",
+      accountId: "e",
+      bookedAt: "2026-07-11",
+      amountMinor: 3000n
+    }
+  ]);
+  assert.equal(findInternalTransferPairs(db, ["Erik"]).length, 0);
+  db.close();
+});
+
+test("Übertragshinweis wird erkannt, unterschiedliche Währungen jedoch nicht", () => {
+  const root = mkdtempSync(join(tmpdir(), "finance-sync-transfer-word-"));
+  const db = new FinanceDatabase(join(root, "finance.sqlite"));
+  db.importTransactions([
+    {
+      sourceId: "bank",
+      sourceTransactionId: "eur-out",
+      accountId: "a",
+      bookedAt: "2026-07-01",
+      amountMinor: -5000n,
+      currency: "EUR",
+      memo: "Übertrag",
+      rawHash: "eur-out"
+    },
+    {
+      sourceId: "bank",
+      sourceTransactionId: "eur-in",
+      accountId: "b",
+      bookedAt: "2026-07-02",
+      amountMinor: 5000n,
+      currency: "EUR",
+      rawHash: "eur-in"
+    },
+    {
+      sourceId: "bank",
+      sourceTransactionId: "usd-out",
+      accountId: "c",
+      bookedAt: "2026-07-10",
+      amountMinor: -3000n,
+      currency: "USD",
+      memo: "Transfer",
+      rawHash: "usd-out"
+    },
+    {
+      sourceId: "bank",
+      sourceTransactionId: "eur-in-two",
+      accountId: "d",
+      bookedAt: "2026-07-11",
+      amountMinor: 3000n,
+      currency: "EUR",
+      rawHash: "eur-in-two"
+    }
+  ]);
+  const pairs = findInternalTransferPairs(db, []);
+  assert.equal(pairs.length, 1);
+  assert.equal(pairs[0].left.sourceTransactionId, "eur-out");
   db.close();
 });

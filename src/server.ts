@@ -8,7 +8,6 @@ import { FinanceService } from "./service.js";
 import { exportAll } from "./exporter.js";
 import { manualSnapshotBundle } from "./connectors/manual.js";
 import { importBundle } from "./importer.js";
-import { markInternalTransfers } from "./reconcile.js";
 import { snapshotSqlite } from "./backup.js";
 import { renderUi } from "./ui.js";
 import { buildHealth } from "./health.js";
@@ -84,9 +83,8 @@ const server = createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
     if (req.method === "POST" && url.pathname === "/api/reconcile") {
-      const count = markInternalTransfers(db);
-      exportAll(db, paths.archive);
-      return json(res, 200, { ok: true, message: `${count} Übertragungspaare markiert` });
+      const result = await service.reconcileInternalTransfers();
+      return json(res, 200, { ok: true, ...result });
     }
     if (req.method === "POST" && url.pathname === "/api/manual-snapshot") {
       const payload = await body(req);
