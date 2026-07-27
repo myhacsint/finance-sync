@@ -23,7 +23,13 @@ export function archiveRaw(
     : Buffer.from(typeof payload === "string" ? payload : JSON.stringify(payload, null, 2));
   const hash = sha256(body);
   const now = new Date();
-  const extension = mediaType.includes("json") ? "json" : mediaType.includes("pdf") ? "pdf" : "bin";
+  const extension = mediaType.includes("json")
+    ? "json"
+    : mediaType.includes("pdf")
+      ? "pdf"
+      : mediaType.includes("csv")
+        ? "csv"
+        : "bin";
   const path = join(
     archiveRoot,
     "raw",

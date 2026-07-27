@@ -1,5 +1,6 @@
 export type SourceKind =
   | "enable-banking"
+  | "dkb-csv"
   | "comdirect"
   | "dkb-fints"
   | "solana"
@@ -100,6 +101,7 @@ export interface NormalizedActivity {
 
 export interface ImportBundle {
   raw: unknown;
+  rawMediaType?: string;
   transactions?: NormalizedTransaction[];
   balances?: NormalizedBalance[];
   holdings?: NormalizedHolding[];
