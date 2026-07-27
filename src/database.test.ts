@@ -34,6 +34,32 @@ test("wiederholter Import erzeugt keine Dubletten", () => {
   db.close();
 });
 
+test("korrigierte Normalisierung aktualisiert denselben Saldo-Snapshot", () => {
+  const root = mkdtempSync(join(tmpdir(), "finance-sync-balance-"));
+  const db = new FinanceDatabase(join(root, "finance.sqlite"));
+  const base = {
+    sourceId: "bank",
+    accountId: "account",
+    capturedAt: "2026-07-27",
+    amountMinor: 100n,
+    currency: "EUR",
+    rawHash: "same-raw"
+  };
+
+  db.importBalances([base]);
+  db.importBalances([{ ...base, amountMinor: 200n }]);
+
+  assert.equal(
+    db.query("SELECT amount_minor FROM balances")[0].amount_minor,
+    200
+  );
+  assert.equal(
+    db.query("SELECT count(*) AS count FROM balances")[0].count,
+    1
+  );
+  db.close();
+});
+
 test("interne Überträge werden paarweise markiert und exportiert", () => {
   const root = mkdtempSync(join(tmpdir(), "finance-sync-"));
   const db = new FinanceDatabase(join(root, "finance.sqlite"));
