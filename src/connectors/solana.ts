@@ -33,6 +33,11 @@ interface HistoryTransaction {
   };
 }
 
+interface HistoryPage {
+  data: HistoryTransaction[];
+  paginationToken?: string | null;
+}
+
 async function rpc<T>(url: string, method: string, params: unknown[]): Promise<T> {
   const response = await fetch(url, {
     method: "POST",
@@ -45,6 +50,47 @@ async function rpc<T>(url: string, method: string, params: unknown[]): Promise<T
   if (json.error) throw new Error(json.error.message ?? "Solana RPC Fehler");
   if (json.result === undefined) throw new Error("Solana RPC lieferte kein Ergebnis");
   return json.result;
+}
+
+async function fetchHistory(
+  rpcUrl: string,
+  wallet: string,
+  source: SourceConfig
+): Promise<HistoryPage> {
+  const data: HistoryTransaction[] = [];
+  const seenTokens = new Set<string>();
+  const maxPages = Number(source.settings?.historyMaxPages ?? 100);
+  const limit = Math.min(Number(source.settings?.historyLimit ?? 100), 100);
+  let paginationToken: string | undefined;
+  let pages = 0;
+  do {
+    const page = await rpc<HistoryPage>(
+      rpcUrl,
+      "getTransactionsForAddress",
+      [
+        wallet,
+        {
+          transactionDetails: "full",
+          encoding: "jsonParsed",
+          maxSupportedTransactionVersion: 0,
+          sortOrder: "desc",
+          limit,
+          filters: { status: "succeeded", tokenAccounts: "balanceChanged" },
+          ...(paginationToken ? { paginationToken } : {})
+        }
+      ]
+    );
+    data.push(...page.data);
+    pages += 1;
+    const next = page.paginationToken ?? undefined;
+    if (!next) return { data };
+    if (seenTokens.has(next)) {
+      throw new Error("Solana-Historie lieferte einen wiederholten Seitencursor");
+    }
+    seenTokens.add(next);
+    paginationToken = next;
+  } while (pages < maxPages);
+  throw new Error(`Solana-Historie überschreitet ${maxPages} Seiten`);
 }
 
 export async function fetchSolana(source: SourceConfig): Promise<ImportBundle> {
@@ -89,21 +135,7 @@ export async function fetchSolana(source: SourceConfig): Promise<ImportBundle> {
           }
         ]
       ).catch(() => []),
-      rpc<{ data: HistoryTransaction[]; paginationToken?: string }>(
-        rpcUrl,
-        "getTransactionsForAddress",
-        [
-          wallet,
-          {
-            transactionDetails: "full",
-            encoding: "jsonParsed",
-            maxSupportedTransactionVersion: 0,
-            sortOrder: "desc",
-            limit: Number(source.settings?.historyLimit ?? 100),
-            filters: { status: "succeeded", tokenAccounts: "balanceChanged" }
-          }
-        ]
-      )
+      fetchHistory(rpcUrl, wallet, source)
     ]);
     const walletRaw = { native, tokenAccounts, token2022Accounts, stakeAccounts, history };
     (raw.wallets as Record<string, unknown>)[wallet] = walletRaw;

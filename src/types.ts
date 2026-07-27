@@ -39,6 +39,11 @@ export interface AppConfig {
     enabled: boolean;
     serverUrl: string;
     accountMap: Record<string, string>;
+    holdingMap?: Record<string, {
+      dataSource: string;
+      symbol: string;
+      currency?: string;
+    }>;
   };
 }
 
