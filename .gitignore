@@ -1,10 +1,12 @@
-node_modules/
 dist/
+node_modules/
+__pycache__/
+*.py[cod]
+outputs/
+work/
 coverage/
 .env
 data/
 archive/
 secrets/
 *.log
-outputs/
-work/

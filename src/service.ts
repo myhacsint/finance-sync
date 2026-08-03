@@ -12,6 +12,12 @@ import {
   startAuthorization
 } from "./connectors/enable-banking.js";
 import { preflightInteractiveSource } from "./connectors/status-only.js";
+import {
+  continueDkbFints,
+  fetchDkbFints,
+  preflightDkbFints,
+  type DkbFintsOutcome
+} from "./connectors/dkb-fints.js";
 import { importBundle } from "./importer.js";
 import { exportAll } from "./exporter.js";
 import { pushToActual } from "./sinks/actual.js";
@@ -70,6 +76,45 @@ export class FinanceService {
     }
   }
 
+  private async importSourceBundle(
+    source: SourceConfig,
+    bundle: ImportBundle
+  ): Promise<Record<string, number>> {
+    const counts = importBundle(this.db, paths.archive, source.id, bundle);
+    if (this.config.actual?.enabled) {
+      counts.actual = await this.withActual(() =>
+        pushToActual(this.config.actual!, bundle.transactions ?? [])
+      );
+    }
+    const publishDkbHoldings = source.kind !== "dkb-fints"
+      || source.settings?.publishToGhostfolio === true;
+    if (this.config.ghostfolio?.enabled && publishDkbHoldings) {
+      counts.ghostfolio = await pushToGhostfolio(
+        this.config.ghostfolio,
+        bundle.activities ?? []
+      );
+      counts.ghostfolioHoldings = await reconcileGhostfolioHoldings(
+        this.config.ghostfolio,
+        bundle.holdings ?? []
+      );
+    }
+    if ((bundle.transactions?.length ?? 0) > 0) {
+      const reconciled = await this.reconcileInternalTransfers();
+      counts.transfers = reconciled.counts?.transfers ?? 0;
+    }
+    exportAll(this.db, paths.archive);
+    return counts;
+  }
+
+  private storeDkbOutcome(id: string, outcome: DkbFintsOutcome): void {
+    if (outcome.state === "WAITING_FOR_USER") {
+      this.db.setSetting(`dkb-fints:${id}:continuation`, JSON.stringify(outcome.continuation));
+    } else if (outcome.clientData) {
+      this.db.setSetting(`dkb-fints:${id}:client`, outcome.clientData);
+      this.db.setSetting(`dkb-fints:${id}:continuation`, "");
+    }
+  }
+
   async reconcileInternalTransfers(): Promise<SyncResult> {
     return this.withReconcile<SyncResult>(async () => {
       const owners = Array.from(new Set(
@@ -121,7 +166,23 @@ export class FinanceService {
           source,
           this.db.getSetting(`enable-banking:${source.id}:session`)
         );
-      } else if (source.kind === "comdirect" || source.kind === "dkb-fints") {
+      } else if (source.kind === "dkb-fints") {
+        const outcome = await fetchDkbFints(
+          source,
+          this.db.getSetting(`dkb-fints:${source.id}:client`)
+        );
+        this.storeDkbOutcome(source.id, outcome);
+        if (outcome.state === "WAITING_FOR_USER") {
+          this.db.finishRun(runId, id, outcome.state, outcome.message);
+          return {
+            state: outcome.state,
+            message: outcome.message,
+            challenge: outcome.challenge,
+            decoupled: outcome.decoupled
+          };
+        }
+        bundle = outcome.bundle;
+      } else if (source.kind === "comdirect") {
         const result = preflightInteractiveSource(source);
         this.db.finishRun(runId, id, result.state, result.message);
         return result;
@@ -133,36 +194,63 @@ export class FinanceService {
         this.db.finishRun(runId, id, result.state, result.message);
         return result;
       }
-      const counts = importBundle(this.db, paths.archive, id, bundle);
-      if (this.config.actual?.enabled) {
-        counts.actual = await this.withActual(() =>
-          pushToActual(
-            this.config.actual!,
-            bundle.transactions ?? []
-          )
-        );
-      }
-      if (this.config.ghostfolio?.enabled) {
-        counts.ghostfolio = await pushToGhostfolio(
-          this.config.ghostfolio,
-          bundle.activities ?? []
-        );
-        counts.ghostfolioHoldings = await reconcileGhostfolioHoldings(
-          this.config.ghostfolio,
-          bundle.holdings ?? []
-        );
-      }
-      if ((bundle.transactions?.length ?? 0) > 0) {
-        const reconciled = await this.reconcileInternalTransfers();
-        counts.transfers = reconciled.counts?.transfers ?? 0;
-      }
-      exportAll(this.db, paths.archive);
+      const counts = await this.importSourceBundle(source, bundle);
       const message = `Abruf erfolgreich; ${Object.values(counts).reduce((a, b) => a + b, 0)} neue Datensätze`;
       this.db.finishRun(runId, id, "SUCCESS", message, counts);
       return { state: "SUCCESS", message, counts };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const waiting = /Secret|Zustimmung|TAN|SCA|fehlt/i.test(message);
+      const state = waiting ? "WAITING_FOR_USER" : "ERROR";
+      this.db.finishRun(runId, id, state, message);
+      return { state, message };
+    } finally {
+      this.running.delete(id);
+    }
+  }
+
+  async preflightDkbFints(id: string): Promise<SyncResult> {
+    const source = this.getSource(id);
+    if (!source || source.kind !== "dkb-fints") {
+      return { state: "ERROR", message: "DKB-FinTS-Quelle nicht gefunden" };
+    }
+    return preflightDkbFints(source);
+  }
+
+  async continueDkbFints(id: string, tan?: string): Promise<SyncResult> {
+    const source = this.getSource(id);
+    if (!source || source.kind !== "dkb-fints") {
+      return { state: "ERROR", message: "DKB-FinTS-Quelle nicht gefunden" };
+    }
+    if (!source.enabled) return { state: "DISABLED", message: "Quelle ist deaktiviert" };
+    if (this.running.has(id)) return { state: "RUNNING", message: "Abruf läuft bereits" };
+    const stored = this.db.getSetting(`dkb-fints:${id}:continuation`);
+    if (!stored) return { state: "ERROR", message: "Keine offene DKB-Freigabe vorhanden" };
+    this.running.add(id);
+    const runId = this.db.beginRun(id);
+    try {
+      const outcome = await continueDkbFints(
+        source,
+        JSON.parse(stored) as Record<string, unknown>,
+        tan
+      );
+      this.storeDkbOutcome(id, outcome);
+      if (outcome.state === "WAITING_FOR_USER") {
+        this.db.finishRun(runId, id, outcome.state, outcome.message);
+        return {
+          state: outcome.state,
+          message: outcome.message,
+          challenge: outcome.challenge,
+          decoupled: outcome.decoupled
+        };
+      }
+      const counts = await this.importSourceBundle(source, outcome.bundle);
+      const message = `DKB-FinTS-Abruf erfolgreich; ${counts.holdings ?? 0} neue Positionen`;
+      this.db.finishRun(runId, id, "SUCCESS", message, counts);
+      return { state: "SUCCESS", message, counts };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const waiting = /TAN|SCA|Freigabe/i.test(message);
       const state = waiting ? "WAITING_FOR_USER" : "ERROR";
       this.db.finishRun(runId, id, state, message);
       return { state, message };

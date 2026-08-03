@@ -117,6 +117,22 @@ const server = createServer(async (req, res) => {
       const result = await service.startEnableBanking(decodeURIComponent(authMatch[1]));
       return json(res, 200, result);
     }
+    const dkbPreflightMatch = /^\/api\/dkb-fints\/preflight\/([^/]+)$/.exec(url.pathname);
+    if (req.method === "POST" && dkbPreflightMatch) {
+      const result = await service.preflightDkbFints(
+        decodeURIComponent(dkbPreflightMatch[1])
+      );
+      return json(res, result.state === "ERROR" ? 400 : 200, result);
+    }
+    const dkbContinueMatch = /^\/api\/dkb-fints\/continue\/([^/]+)$/.exec(url.pathname);
+    if (req.method === "POST" && dkbContinueMatch) {
+      const payload = await body(req).catch(() => ({})) as { tan?: string };
+      const result = await service.continueDkbFints(
+        decodeURIComponent(dkbContinueMatch[1]),
+        payload.tan ? String(payload.tan) : undefined
+      );
+      return json(res, result.state === "ERROR" ? 400 : 200, result);
+    }
     if (req.method === "POST" && url.pathname === "/api/export") {
       exportAll(db, paths.archive);
       return json(res, 200, { ok: true });

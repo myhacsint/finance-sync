@@ -16,6 +16,10 @@ das Langzeitarchiv.
 - Enable Banking signiert kurzlebige API-JWTs lokal mit
   `/run/secrets/enable-banking-private-key.pem`; der private Schlüssel verlässt
   den Server nicht.
+- DKB-FinTS liest Produkt-ID, Anmeldename und PIN ausschließlich aus den Dateien
+  `dkb-fints-product-id`, `dkb-fints-user-id` und `dkb-fints-pin`. Die Werte
+  werden per Standardeingabe an den lokal im Container laufenden PyFinTS-Kernel
+  übergeben und weder in Argumenten noch in den Roharchiven gespeichert.
 
 ## Lokaler Test
 
@@ -44,6 +48,8 @@ bereits angelegt.
 - `GET /api/status`
 - `POST /api/sync/:source`
 - `POST /api/enable-banking/start/:source`
+- `POST /api/dkb-fints/preflight/:source` (rein lokale Prüfung, kein Bankkontakt)
+- `POST /api/dkb-fints/continue/:source` (App-Freigabe erneut prüfen)
 - `POST /api/export`
 - `POST /api/reconcile`
 - `POST /api/backup`
@@ -119,10 +125,23 @@ Quellkurs und dem im Dokument ausgewiesenen Kurswert übergeben werden:
 }
 ```
 
-## Absichtlich noch nicht automatisiert
+## DKB-Depot über FinTS
 
-comdirect-Depot und DKB-FinTS gehen in `WAITING_FOR_USER`, bis echte API- und
-SCA-Verfahren in Stufe 0 geprüft wurden. Das verhindert, dass eine theoretische
-Integration als funktionierend dargestellt wird. Enable Banking und Solana
-werden nach Hinterlegung der jeweiligen Zustimmung beziehungsweise des
-Helius-Schlüssels technisch abgerufen.
+Der DKB-Connector verwendet den nur lesenden Geschäftsvorfall HKWPD 5/6. Die
+registrierte 25-stellige Produkt-ID wird von PyFinTS als Produktbezeichnung in
+HKVVB gesetzt. Depotnummern und Eigentümer stehen nur in der privaten
+`config.json`; die Beispielkonfiguration enthält ausschließlich Platzhalter.
+
+Der erste Abruf wird bewusst in zwei Schritten durchgeführt: `sync` startet den
+Abruf und liefert bei notwendiger DKB-App-Freigabe `WAITING_FOR_USER`. Nach der
+Bestätigung in der App setzt `continue` denselben FinTS-Dialog fort. Der dafür
+benötigte opake Zustand liegt in der lokalen FinanceSync-Datenbank und enthält
+keine PIN.
+
+`publishToGhostfolio` bleibt für den ersten realen Abruf `false`. Damit werden
+Rohdaten, Positionen und Depotwerte zunächst nur im FinanceSync-Archiv erfasst
+und mit dem bestehenden Dokumentbestand verglichen. Erst nach erfolgreicher
+Abstimmung wird die Weitergabe an Ghostfolio separat freigeschaltet.
+
+Das comdirect-Depot bleibt bis zur Prüfung einer echten API- und
+PushTAN-Sitzung in `WAITING_FOR_USER`.

@@ -64,8 +64,12 @@ function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&l
 async function refresh(){try{const d=await call("/api/status");document.getElementById("sources").innerHTML=d.sources.map(s=>\`
   <section class="card"><div class="row"><strong>\${esc(s.id)}</strong><span class="state \${esc(s.state)}">\${esc(s.state)}</span></div>
   <p>\${esc(s.message||"Noch kein Abruf")}</p><div class="muted">Letzter Erfolg</div><code>\${esc(s.last_success_at||"–")}</code>
-  <p><button onclick="sync('\${encodeURIComponent(s.id)}')">Jetzt abrufen</button></p></section>\`).join("")||'<section class="card">Noch keine Quellen konfiguriert.</section>'}catch(e){msg(e.message,true)}}
-async function sync(id){try{msg("Abruf läuft …");const d=await call("/api/sync/"+id,{method:"POST"});msg(d.message);refresh()}catch(e){msg(e.message,true)}}
+  <div class="actions"><button onclick="sync('\${encodeURIComponent(s.id)}')" \${s.enabled?"":"disabled"}>Jetzt abrufen</button>
+  \${s.kind==="dkb-fints"?\`<button onclick="preflightDkb('\${encodeURIComponent(s.id)}')">Lokal prüfen</button>\`:""}
+  \${s.kind==="dkb-fints"&&s.enabled&&s.state==="WAITING_FOR_USER"?\`<button onclick="continueDkb('\${encodeURIComponent(s.id)}')">App-Freigabe prüfen</button>\`:""}</div></section>\`).join("")||'<section class="card">Noch keine Quellen konfiguriert.</section>'}catch(e){msg(e.message,true)}}
+async function sync(id){try{msg("Abruf läuft …");const d=await call("/api/sync/"+id,{method:"POST"});msg(d.state==="WAITING_FOR_USER"?d.message+" Bitte in der DKB-App bestätigen und danach die Freigabe prüfen.":d.message);refresh()}catch(e){msg(e.message,true)}}
+async function preflightDkb(id){try{msg("Lokale FinTS-Konfiguration wird geprüft …");const d=await call("/api/dkb-fints/preflight/"+id,{method:"POST"});msg(d.message);refresh()}catch(e){msg(e.message,true)}}
+async function continueDkb(id){try{msg("DKB-App-Freigabe wird geprüft …");const d=await call("/api/dkb-fints/continue/"+id,{method:"POST",body:"{}"});msg(d.state==="WAITING_FOR_USER"?d.message+" Die Bestätigung ist noch nicht abgeschlossen.":d.message);refresh()}catch(e){msg(e.message,true)}}
 async function exportNow(){try{await call("/api/export",{method:"POST"});msg("CSV-Dateien wurden aktualisiert.")}catch(e){msg(e.message,true)}}
 async function reconcile(){try{const d=await call("/api/reconcile",{method:"POST"});msg(d.message)}catch(e){msg(e.message,true)}}
 let currentPreview=null;
