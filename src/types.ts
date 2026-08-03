@@ -122,4 +122,6 @@ export interface SyncResult {
   state: SyncState;
   message: string;
   counts?: Record<string, number>;
+  challenge?: string;
+  decoupled?: boolean;
 }

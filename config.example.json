@@ -54,7 +54,26 @@
       "kind": "dkb-fints",
       "enabled": false,
       "scheduleHours": 24,
-      "owners": ["Person A", "Person B"]
+      "owners": ["Person A", "Person B"],
+      "settings": {
+        "serverUrl": "https://fints.dkb.de/fints",
+        "bankId": "12030000",
+        "bic": "BYLADEM1001",
+        "tanMechanism": "940",
+        "publishToGhostfolio": false,
+        "accounts": [
+          {
+            "accountId": "dkb-depot-person-a",
+            "accountNumber": "000000000",
+            "owner": "Person A"
+          },
+          {
+            "accountId": "dkb-depot-joint",
+            "accountNumber": "000000000",
+            "owner": "Person A, Person B"
+          }
+        ]
+      }
     },
     {
       "id": "solana",

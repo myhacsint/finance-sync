@@ -18,8 +18,10 @@ ENV NODE_ENV=production \
     PORT=8080 \
     TZ=Europe/Berlin
 WORKDIR /app
+COPY python/requirements-fints.txt /tmp/requirements-fints.txt
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl tini \
+    && apt-get install -y --no-install-recommends ca-certificates curl python3 python3-pip tini \
+    && pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements-fints.txt \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 finance \
     && useradd --uid 10001 --gid finance --home-dir /app --no-create-home finance \
@@ -28,6 +30,7 @@ RUN apt-get update \
 COPY --from=build --chown=finance:finance /build/package.json /app/package.json
 COPY --from=build --chown=finance:finance /build/node_modules /app/node_modules
 COPY --from=build --chown=finance:finance /build/dist /app/dist
+COPY --chown=finance:finance python /app/python
 USER finance
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

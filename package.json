@@ -1,6 +1,6 @@
 {
   "name": "finance-sync",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "private": true,
   "description": "Self-hosted finance ingestion, archive and export service for Unraid",
   "type": "module",
@@ -11,7 +11,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node --experimental-sqlite dist/server.js",
     "dev": "tsx --experimental-sqlite src/server.ts",
-    "test": "npm run build && node --experimental-sqlite --test dist/*.test.js dist/**/*.test.js",
+    "test": "npm run build && node --experimental-sqlite --test dist/*.test.js dist/**/*.test.js && PYTHONPATH=python python3 -m unittest python/test_dkb_fints_helper.py",
     "check": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
