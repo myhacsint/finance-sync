@@ -32,11 +32,19 @@ import {
   markInternalTransfers
 } from "./reconcile.js";
 import { linkActualTransfers } from "./sinks/actual-transfers.js";
+import {
+  buildDashboardOverview,
+  readActualOverview,
+  readInvestmentOverview,
+  type DashboardOverview
+} from "./dashboard-overview.js";
 
 export class FinanceService {
   private running = new Set<string>();
   private actualTail: Promise<void> = Promise.resolve();
   private reconcileTail: Promise<void> = Promise.resolve();
+  private overviewCache?: { expiresAt: number; value: DashboardOverview };
+  private overviewLoading?: Promise<DashboardOverview>;
 
   constructor(readonly db: FinanceDatabase, readonly config: AppConfig) {
     for (const source of config.sources) {
@@ -74,6 +82,44 @@ export class FinanceService {
       return await operation();
     } finally {
       release();
+    }
+  }
+
+  async getDashboardOverview(force = false): Promise<DashboardOverview> {
+    const now = Date.now();
+    if (!force && this.overviewCache && this.overviewCache.expiresAt > now) {
+      return this.overviewCache.value;
+    }
+    if (this.overviewLoading) return this.overviewLoading;
+    const load = async (): Promise<DashboardOverview> => {
+      const generatedAt = new Date();
+      const [actual, investments] = await Promise.allSettled([
+        this.config.actual?.enabled
+          ? this.withActual(() => readActualOverview(
+              this.config.actual!,
+              this.config.timezone,
+              generatedAt
+            ))
+          : Promise.reject(new Error("Actual ist deaktiviert")),
+        this.config.ghostfolio?.enabled
+          ? readInvestmentOverview(this.config, this.db)
+          : Promise.reject(new Error("Ghostfolio ist deaktiviert"))
+      ]);
+      const value = buildDashboardOverview(
+        this.db,
+        this.config,
+        actual,
+        investments,
+        generatedAt
+      );
+      this.overviewCache = { expiresAt: Date.now() + 5 * 60_000, value };
+      return value;
+    };
+    this.overviewLoading = load();
+    try {
+      return await this.overviewLoading;
+    } finally {
+      this.overviewLoading = undefined;
     }
   }
 
