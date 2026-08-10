@@ -127,7 +127,7 @@ function helperConfig(source: SourceConfig): DkbHelperInput["config"] {
   return {
     bankId,
     bic,
-    productVersion: String(source.settings?.productVersion ?? "0.6.0").slice(0, 5),
+    productVersion: String(source.settings?.productVersion ?? "0.6.1").slice(0, 5),
     serverUrl,
     tanMechanism: String(source.settings?.tanMechanism ?? DEFAULT_TAN_MECHANISM),
     tanMedium: String(source.settings?.tanMedium ?? "").trim() || undefined,
