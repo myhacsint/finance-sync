@@ -113,6 +113,10 @@ function sourceAccounts(source: SourceConfig): DkbAccountConfig[] {
   return accounts;
 }
 
+export function dkbAccountIds(source: SourceConfig): string[] {
+  return sourceAccounts(source).map((account) => account.accountId);
+}
+
 function helperConfig(source: SourceConfig): DkbHelperInput["config"] {
   const serverUrl = String(source.settings?.serverUrl ?? DKB_SERVER_URL);
   if (serverUrl !== DKB_SERVER_URL) {
@@ -167,6 +171,14 @@ export function normalizeDkbFintsBundle(
   const configured = new Map(helperConfig(source).accounts.map((account) => [account.accountId, account]));
   const portfolios = output.portfolios ?? [];
   if (portfolios.length === 0) throw new Error("DKB-FinTS lieferte keinen Depotbestand");
+  const receivedIds = portfolios.map((portfolio) => portfolio.accountId);
+  if (
+    new Set(receivedIds).size !== receivedIds.length
+    || receivedIds.length !== configured.size
+    || receivedIds.some((accountId) => !configured.has(accountId))
+  ) {
+    throw new Error("DKB-FinTS lieferte keinen vollständigen Depotbestand");
+  }
   const holdings: NormalizedHolding[] = [];
   const balances: NormalizedBalance[] = [];
   for (const portfolio of portfolios) {

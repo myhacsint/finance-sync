@@ -89,3 +89,33 @@ test("unvollständige Kurswerte erzeugen keinen erfundenen Depotsaldo", () => {
   assert.equal(bundle.holdings?.length, 1);
   assert.equal(bundle.balances?.length, 0);
 });
+
+test("fehlende konfigurierte Depots werden nicht als vollständiger Stand akzeptiert", () => {
+  const twoAccounts: SourceConfig = {
+    ...source,
+    settings: {
+      accounts: [
+        ...(source.settings?.accounts as unknown[]),
+        {
+          accountId: "dkb-depot-person-b",
+          accountNumber: "987654321",
+          owner: "Person B"
+        }
+      ]
+    }
+  };
+  const output: DkbHelperOutput = {
+    state: "SUCCESS",
+    message: "ok",
+    portfolios: [{
+      accountId: "dkb-depot-person-a",
+      capturedAt: "2026-08-10T12:00:00Z",
+      rawMt535: ["raw"],
+      positions: []
+    }]
+  };
+  assert.throws(
+    () => normalizeDkbFintsBundle(twoAccounts, output),
+    /keinen vollständigen Depotbestand/
+  );
+});

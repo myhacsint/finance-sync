@@ -79,6 +79,31 @@ interface GhostfolioPosition {
   };
 }
 
+export interface CompleteHoldingAccount {
+  accountId: string;
+  capturedAt: string;
+}
+
+async function currentPositions(
+  config: NonNullable<AppConfig["ghostfolio"]>,
+  authToken: string,
+  accountId: string
+): Promise<GhostfolioPosition[]> {
+  const url = new URL("/api/v1/portfolio/details", config.serverUrl);
+  url.searchParams.set("accounts", accountId);
+  const response = await fetch(url, {
+    headers: { authorization: `Bearer ${authToken}` },
+    signal: AbortSignal.timeout(60_000)
+  });
+  if (!response.ok) {
+    throw new Error(`Ghostfolio Positionsabfrage HTTP ${response.status}`);
+  }
+  const payload = await response.json() as {
+    holdings?: Record<string, GhostfolioPosition>;
+  };
+  return Object.values(payload.holdings ?? {});
+}
+
 async function currentQuantity(
   config: NonNullable<AppConfig["ghostfolio"]>,
   authToken: string,
@@ -136,9 +161,14 @@ async function waitForQuantity(
 export async function reconcileGhostfolioHoldings(
   config: NonNullable<AppConfig["ghostfolio"]>,
   holdings: NormalizedHolding[],
-  comment = "Reconstructed wallet position adjustment by FinanceSync; not tax cost basis"
+  comment = "Reconstructed wallet position adjustment by FinanceSync; not tax cost basis",
+  completeAccounts: CompleteHoldingAccount[] = []
 ): Promise<number> {
-  if (!config.enabled || holdings.length === 0 || !config.holdingMap) return 0;
+  if (
+    !config.enabled
+    || !config.holdingMap
+    || (holdings.length === 0 && completeAccounts.length === 0)
+  ) return 0;
   const grouped = new Map<string, {
     accountId: string;
     capturedAt: string;
@@ -169,9 +199,39 @@ export async function reconcileGhostfolioHoldings(
     if (holding.capturedAt > group.capturedAt) group.capturedAt = holding.capturedAt;
     grouped.set(key, group);
   }
+  if (grouped.size === 0 && completeAccounts.length === 0) return 0;
+  const authToken = await authenticate(config);
+  const mappedAssets = new Map(
+    Object.values(config.holdingMap).map((asset) => [
+      [asset.dataSource, asset.symbol].join(":"),
+      asset
+    ])
+  );
+  for (const account of completeAccounts) {
+    const ghostfolioAccountId = config.accountMap[account.accountId];
+    if (!ghostfolioAccountId) continue;
+    const positions = await currentPositions(config, authToken, ghostfolioAccountId);
+    for (const position of positions) {
+      const dataSource = position.assetProfile?.dataSource;
+      const symbol = position.assetProfile?.symbol;
+      if (!dataSource || !symbol || !Number(position.quantity)) continue;
+      const asset = mappedAssets.get([dataSource, symbol].join(":"));
+      if (!asset) continue;
+      const key = [ghostfolioAccountId, dataSource, symbol].join(":");
+      if (grouped.has(key)) continue;
+      grouped.set(key, {
+        accountId: ghostfolioAccountId,
+        capturedAt: account.capturedAt,
+        currency: asset.currency,
+        dataSource,
+        decimals: 12,
+        quantity: 0n,
+        symbol
+      });
+    }
+  }
   if (grouped.size === 0) return 0;
 
-  const authToken = await authenticate(config);
   let imported = 0;
   for (const group of grouped.values()) {
     const desired = Number(group.quantity) / 10 ** group.decimals;

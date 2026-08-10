@@ -159,3 +159,90 @@ test("liquides und gestaktes SOL werden als eine rekonstruierte Position abgegli
     globalThis.fetch = originalFetch;
   }
 });
+
+test("vollständig verkaufte Positionen werden in einem kompletten Depotstand auf null gesetzt", async () => {
+  const secrets = mkdtempSync(join(tmpdir(), "finance-sync-secrets-"));
+  writeFileSync(join(secrets, "ghostfolio-security-token"), "permanent-token\n", {
+    mode: 0o600
+  });
+  process.env.FINANCE_SECRETS_DIR = secrets;
+
+  const requests: Array<{ url: string; body?: string }> = [];
+  const originalFetch = globalThis.fetch;
+  let filteredDetailCalls = 0;
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    requests.push({ url, body: init?.body?.toString() });
+    if (url.endsWith("/api/v1/auth/anonymous")) {
+      return Response.json({ authToken: "temporary-bearer-token" });
+    }
+    if (url.includes("/api/v1/portfolio/details")) {
+      const parsed = new URL(url);
+      if (!parsed.searchParams.has("symbol")) {
+        return Response.json({
+          holdings: {
+            sap: {
+              quantity: 12,
+              assetProfile: { dataSource: "YAHOO", symbol: "SAP.DE" }
+            }
+          }
+        });
+      }
+      filteredDetailCalls += 1;
+      return Response.json({
+        holdings: filteredDetailCalls === 1
+          ? {
+              sap: {
+                quantity: 12,
+                assetProfile: { dataSource: "YAHOO", symbol: "SAP.DE" }
+              }
+            }
+          : {}
+      });
+    }
+    if (url.endsWith("/api/v1/symbol/YAHOO/SAP.DE")) {
+      return Response.json({ currency: "EUR", marketPrice: 190 });
+    }
+    if (url.endsWith("/api/v1/import")) {
+      return new Response(null, { status: 201 });
+    }
+    return new Response(null, { status: 404 });
+  };
+
+  try {
+    const { reconcileGhostfolioHoldings } = await import("./ghostfolio.js");
+    const imported = await reconcileGhostfolioHoldings(
+      {
+        enabled: true,
+        serverUrl: "http://Ghostfolio:3333",
+        accountMap: { depot: "ghostfolio-account" },
+        holdingMap: {
+          DE0007164600: { dataSource: "YAHOO", symbol: "SAP.DE", currency: "EUR" }
+        }
+      },
+      [],
+      "DKB adjustment",
+      [{ accountId: "depot", capturedAt: "2026-08-10T12:00:00.000Z" }]
+    );
+
+    assert.equal(imported, 1);
+    const importRequest = requests.find((request) =>
+      request.url.endsWith("/api/v1/import")
+    );
+    const body = JSON.parse(importRequest?.body ?? "{}");
+    assert.deepEqual(body.activities[0], {
+      accountId: "ghostfolio-account",
+      comment: "DKB adjustment",
+      currency: "EUR",
+      dataSource: "YAHOO",
+      date: "2026-08-10T12:00:00.000Z",
+      fee: 0,
+      quantity: 12,
+      symbol: "SAP.DE",
+      type: "SELL",
+      unitPrice: 190
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
