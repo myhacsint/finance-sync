@@ -200,7 +200,7 @@ export class FinanceService {
       return { state: "SUCCESS", message, counts };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const waiting = /Secret|Zustimmung|TAN|SCA|fehlt/i.test(message);
+      const waiting = requiresUserAction(message);
       const state = waiting ? "WAITING_FOR_USER" : "ERROR";
       this.db.finishRun(runId, id, state, message);
       return { state, message };
@@ -250,7 +250,7 @@ export class FinanceService {
       return { state: "SUCCESS", message, counts };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const waiting = /TAN|SCA|Freigabe/i.test(message);
+      const waiting = requiresUserAction(message);
       const state = waiting ? "WAITING_FOR_USER" : "ERROR";
       this.db.finishRun(runId, id, state, message);
       return { state, message };
@@ -359,4 +359,8 @@ export class FinanceService {
     this.db.setSetting(`enable-banking:${id}:state`, "");
     return id;
   }
+}
+
+export function requiresUserAction(message: string): boolean {
+  return /Secret|Zustimmung|Freigabe|fehlt|(?:^|\W)(?:TAN|SCA)(?:\W|$)/i.test(message);
 }

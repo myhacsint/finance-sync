@@ -61,9 +61,11 @@ def swift_decimal(value: str) -> str:
     value = value.strip()
     negative = value.startswith("N") or value.startswith("-")
     value = value[1:] if negative else value
-    if not re.fullmatch(r"\d+(?:,\d+)?", value):
+    # SWIFT permits a decimal marker without fractional digits (for example
+    # ``100,``). DKB uses this representation for whole-number quantities.
+    if not re.fullmatch(r"\d+(?:,\d*)?", value):
         raise ValueError("Ungültige Dezimalzahl im DKB-Depotbestand")
-    normalized = value.replace(",", ".")
+    normalized = value.removesuffix(",").replace(",", ".")
     return f"-{normalized}" if negative else normalized
 
 
@@ -164,9 +166,14 @@ def continuation(
     completed: list[dict[str, Any]],
 ) -> dict[str, Any]:
     return {
-        "clientData": b64(client.deconstruct(including_private=False)),
+        # PyFinTS only persists allowed_security_functions when private client
+        # data is included. The blob never contains the PIN and is stored only
+        # in the protected local FinanceSync database.
+        "clientData": b64(client.deconstruct(including_private=True)),
         "dialogData": b64(dialog_data),
         "tanData": b64(challenge.get_data()),
+        # PyFinTS 5.0.0 does not include this flag in NeedTANResponse.get_data().
+        "decoupled": bool(getattr(challenge, "decoupled", False)),
         "phase": phase,
         "accountIndex": account_index,
         "completed": completed,
@@ -229,6 +236,29 @@ def select_tan(client: Any, config: dict[str, Any]) -> None:
     tan_medium = str(config.get("tanMedium") or "").strip()
     if tan_medium:
         client.selected_tan_medium = tan_medium
+
+
+def restore_tan_for_resume(client: Any, config: dict[str, Any]) -> None:
+    """Restore the already negotiated TAN method without a new bank dialog.
+
+    Older continuation blobs created by FinanceSync omitted PyFinTS'
+    ``allowed_security_functions``. The BPD is still present, so restoring the
+    configured method is sufficient and avoids starting another SCA request.
+    """
+    requested = str(config.get("tanMechanism") or "")
+    if requested not in client.allowed_security_functions:
+        client.allowed_security_functions.append(requested)
+    client.set_tan_mechanism(requested)
+
+
+def restore_challenge_for_resume(
+    challenge: Any, state: dict[str, Any], config: dict[str, Any]
+) -> Any:
+    """Restore fields omitted by PyFinTS 5.0.0 challenge serialization."""
+    challenge.decoupled = bool(
+        state.get("decoupled", str(config.get("tanMechanism")) == "940")
+    )
+    return challenge
 
 
 def account_model(config: dict[str, Any], account: dict[str, Any]) -> Any:
@@ -318,7 +348,7 @@ def fetch_remaining(
         "state": "SUCCESS",
         "message": f"DKB-FinTS lieferte {sum(len(item['positions']) for item in completed)} Positionen",
         "portfolios": completed,
-        "clientData": b64(client.deconstruct(including_private=False)),
+        "clientData": b64(client.deconstruct(including_private=True)),
     }
 
 
@@ -342,8 +372,13 @@ def continue_fetch(payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(completed, list):
         raise ValueError("Ungültiger DKB-FinTS Zwischenstand")
     client = make_client(payload, require_text(state.get("clientData"), "FinTS Client-Zustand"))
-    challenge = NeedRetryResponse.from_data(
-        unb64(require_text(state.get("tanData"), "FinTS TAN-Zustand"))
+    restore_tan_for_resume(client, payload["config"])
+    challenge = restore_challenge_for_resume(
+        NeedRetryResponse.from_data(
+            unb64(require_text(state.get("tanData"), "FinTS TAN-Zustand"))
+        ),
+        state,
+        payload["config"],
     )
     dialog_data = unb64(require_text(state.get("dialogData"), "FinTS Dialog-Zustand"))
     result: Any
