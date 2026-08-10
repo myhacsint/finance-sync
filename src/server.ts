@@ -76,6 +76,13 @@ const server = createServer(async (req, res) => {
       return res.end(financeHubMark);
     }
     if (!authorized(req)) return json(res, 401, { error: "Nicht autorisiert" });
+    if (req.method === "GET" && url.pathname === "/api/dashboard/overview") {
+      return json(
+        res,
+        200,
+        await service.getDashboardOverview(url.searchParams.get("refresh") === "1")
+      );
+    }
     if (req.method === "GET" && url.pathname === "/api/dashboard/status") {
       const rows = db.listSources() as unknown as SourceStatusRow[];
       const manualValueDates = Object.fromEntries(

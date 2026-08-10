@@ -6,7 +6,7 @@ export function renderUi(): string {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#080d19">
   <link rel="icon" type="image/png" href="/assets/finance-hub-mark.png">
-  <title>Datenstatus · Finance Hub</title>
+  <title>Übersicht · Finance Hub</title>
   <style>
     :root {
       color-scheme: dark;
@@ -26,6 +26,8 @@ export function renderUi(): string {
       --green-soft: #12372f;
       --amber: #f5bd62;
       --amber-soft: #3f2f17;
+      --orange: #f47a4f;
+      --orange-soft: #4a271f;
       --red: #ff7b83;
       --red-soft: #442129;
       --radius: 16px;
@@ -88,13 +90,14 @@ export function renderUi(): string {
       text-align: left;
     }
     .nav-item svg { width: 19px; height: 19px; flex: 0 0 auto; }
+    .nav-item:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
     .nav-item[aria-current="page"] { background: var(--blue-soft); color: #dceaff; }
     .nav-item:disabled { cursor: not-allowed; opacity: .58; }
     .nav-spacer { flex: 1; }
     .side-links { display: grid; gap: 7px; border-top: 1px solid var(--line-soft); padding-top: 18px; }
     .side-links .nav-item { font-size: 13px; }
     .content { margin-left: 252px; min-height: 100vh; }
-    .content-inner { width: min(1180px, 100%); margin: 0 auto; padding: 52px 48px 72px; }
+    .content-inner { width: 100%; margin: 0 auto; padding: 30px 36px 54px 54px; }
     .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
     .eyebrow { margin: 0 0 5px; color: var(--blue); font-size: 12px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
     h1, h2, h3 { margin: 0; scroll-margin-top: 24px; line-height: 1.2; letter-spacing: -.025em; text-wrap: balance; }
@@ -134,7 +137,8 @@ export function renderUi(): string {
       font-size: 14px;
     }
     .notice.error { color: var(--red); }
-    .overview {
+    .notice:empty { display: none; }
+    .status-overview {
       display: grid;
       grid-template-columns: minmax(0, 1.7fr) minmax(360px, 1fr);
       gap: 1px;
@@ -144,8 +148,8 @@ export function renderUi(): string {
       background: var(--line);
       box-shadow: var(--shadow);
     }
-    .overview-main, .overview-stats { background: var(--surface); }
-    .overview-main { padding: 27px 30px; }
+    .status-overview .overview-main, .status-overview .overview-stats { background: var(--surface); }
+    .status-overview .overview-main { padding: 27px 30px; }
     .overall-line { display: flex; align-items: center; gap: 11px; }
     .overall-line h2 { font-size: clamp(19px, 2vw, 24px); }
     .status-icon {
@@ -280,16 +284,150 @@ export function renderUi(): string {
     .skeleton { position: relative; overflow: hidden; background: var(--surface-2); color: transparent; border-radius: 7px; }
     .skeleton::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.05), transparent); animation: shimmer 1.4s infinite; }
     @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    .wealth-overview {
+      display: grid;
+      grid-template-columns: minmax(300px, .7fr) minmax(420px, 1.3fr);
+      align-items: center;
+      gap: 42px;
+      min-height: 168px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      padding: 26px 30px;
+      box-shadow: var(--shadow);
+    }
+    .wealth-label { color: #dfe7f4; font-size: 16px; font-weight: 600; }
+    .wealth-value {
+      display: block;
+      margin-top: 4px;
+      font-size: clamp(38px, 5vw, 52px);
+      line-height: 1.05;
+      letter-spacing: -.045em;
+      font-variant-numeric: tabular-nums;
+    }
+    .wealth-date { margin-top: 8px; color: var(--muted); font-size: 13px; }
+    .wealth-composition { min-width: 0; }
+    .wealth-health { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 20px; color: var(--muted); font-size: 13px; }
+    .wealth-health .status-icon { width: 20px; height: 20px; }
+    .composition-bar { display: flex; width: 100%; height: 28px; overflow: hidden; border-radius: 4px; background: #405274; }
+    .composition-bar span { display: block; min-width: 2px; }
+    .composition-missing {
+      display: flex;
+      min-height: 28px;
+      align-items: center;
+      border: 1px dashed #405274;
+      border-radius: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      padding: 0 10px;
+    }
+    .composition-cash { background: var(--blue); }
+    .composition-investments { background: #526b96; }
+    .composition-legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 12px; color: var(--muted); }
+    .composition-legend span { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .composition-legend i { width: 10px; height: 10px; flex: 0 0 auto; border-radius: 2px; }
+    .composition-legend strong { color: var(--text); font-variant-numeric: tabular-nums; }
+    .overview-action {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 14px;
+      min-height: 74px;
+      margin-top: 14px;
+      border: 1px solid #7b5316;
+      border-radius: 13px;
+      background: #2b2115;
+      padding: 14px 18px;
+    }
+    .overview-action .task-mark { width: 38px; height: 38px; border-radius: 9px; }
+    .overview-action strong { display: block; font-size: 16px; }
+    .overview-action p { margin-top: 2px; color: #b9a98f; font-size: 13px; }
+    .text-action {
+      display: inline-flex;
+      min-height: 44px;
+      align-items: center;
+      gap: 7px;
+      border: 0;
+      background: transparent;
+      color: var(--amber);
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .text-action:hover { color: #ffd07d; }
+    .text-action svg { width: 16px; height: 16px; transform: rotate(-90deg); }
+    .overview-dashboard-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin-top: 14px; }
+    .overview-panel { min-width: 0; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); padding: 20px 22px; }
+    .panel-header { display: flex; min-height: 28px; align-items: flex-start; justify-content: space-between; gap: 16px; }
+    .panel-header h2 { font-size: 19px; }
+    .panel-meta, .panel-link { color: #7fb0ff; font-size: 13px; }
+    .panel-link[aria-disabled="true"] { cursor: not-allowed; opacity: .75; }
+    .chart-legend { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 8px; color: var(--muted); font-size: 13px; }
+    .legend-key { display: inline-flex; align-items: center; gap: 7px; }
+    .legend-key i { display: block; width: 10px; height: 10px; border-radius: 2px; }
+    .cashflow-chart {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      align-items: end;
+      gap: 16px;
+      min-height: 154px;
+      margin-top: 8px;
+      padding: 20px 8px 0;
+      border-bottom: 1px solid #51607a;
+    }
+    .cashflow-month { display: grid; grid-template-rows: 110px auto; align-items: end; min-width: 0; }
+    .bar-pair { display: flex; height: 110px; align-items: end; justify-content: center; gap: 6px; }
+    .chart-bar { position: relative; width: min(32px, 42%); height: max(2px, var(--bar-height)); border-radius: 3px 3px 0 0; }
+    .chart-bar.income { background: var(--blue); }
+    .chart-bar.spent { background: var(--orange); }
+    .chart-value { position: absolute; inset: auto 50% calc(100% + 4px) auto; transform: translateX(50%); color: var(--text); font-size: 11px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .chart-month-label { padding-top: 8px; color: var(--muted); text-align: center; font-size: 12px; }
+    .allocation-list, .spending-list { display: grid; gap: 18px; margin-top: 26px; }
+    .allocation-row { display: grid; grid-template-columns: 78px minmax(60px, 1fr) auto; align-items: center; gap: 14px; }
+    .allocation-track, .spending-track { height: 12px; overflow: hidden; border-radius: 3px; background: #1a263b; }
+    .allocation-track i { display: block; width: var(--width); height: 100%; border-radius: inherit; background: #6f88b4; }
+    .allocation-row strong, .spending-row strong { font-variant-numeric: tabular-nums; }
+    .spending-list { gap: 12px; margin-top: 22px; }
+    .spending-row { display: grid; grid-template-columns: minmax(130px, .9fr) minmax(80px, 1.6fr) auto; align-items: center; gap: 14px; font-size: 13px; }
+    .spending-track { height: 9px; }
+    .spending-track i { display: block; width: var(--width); height: 100%; border-radius: inherit; background: var(--orange); }
+    .spending-other { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line-soft); }
+    .spending-other .spending-track { visibility: hidden; }
+    .panel-footer { display: flex; justify-content: flex-end; margin-top: 14px; }
+    .freshness-list { margin-top: 16px; border: 1px solid var(--line-soft); border-radius: 9px; }
+    .freshness-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 46px; padding: 8px 12px; }
+    .freshness-row + .freshness-row { border-top: 1px solid var(--line-soft); }
+    .freshness-row > svg { width: 20px; height: 20px; color: #d2dbea; }
+    .freshness-label { display: flex; flex-wrap: wrap; gap: 6px; }
+    .freshness-label span { color: var(--muted); }
+    .freshness-status { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+    .freshness-status .status-icon { width: 20px; height: 20px; }
+    .freshness-status .status-icon svg { width: 13px; height: 13px; }
+    .data-checked { margin-top: 13px; color: var(--muted); font-size: 12px; }
+    .panel-unavailable { display: grid; min-height: 190px; place-items: center; color: var(--muted); text-align: center; }
+    .overview-warning { margin: 14px 0 0; border: 1px solid #7b5316; border-radius: 10px; padding: 12px 14px; background: #2b2115; color: #dcc8a6; }
     .mobile-nav { display: none; }
     @media (max-width: 980px) {
       .sidebar { width: 216px; }
       .content { margin-left: 216px; }
-      .content-inner { padding: 38px 28px 68px; }
-      .overview { grid-template-columns: 1fr; }
+      .content-inner { padding: 32px 28px 68px; }
+      .status-overview { grid-template-columns: 1fr; }
       .source-summary { grid-template-columns: minmax(170px, 1fr) minmax(120px, .6fr) auto; }
       .source-result { display: none; }
       .task-list { grid-template-columns: 1fr; }
       .system-band { grid-template-columns: repeat(2, 1fr); }
+      .wealth-overview { grid-template-columns: 1fr; gap: 24px; }
       .system-item:nth-child(3) { border-left: 0; border-top: 1px solid var(--line-soft); }
       .system-item:nth-child(4) { border-top: 1px solid var(--line-soft); }
     }
@@ -301,8 +439,8 @@ export function renderUi(): string {
       .page-header { align-items: center; }
       .page-header .subtitle { max-width: 270px; }
       .button .desktop-label { display: none; }
-      .overview-main { padding: 22px 20px; }
-      .overview-stats { grid-template-columns: repeat(3, 1fr); }
+      .status-overview .overview-main { padding: 22px 20px; }
+      .status-overview .overview-stats { grid-template-columns: repeat(3, 1fr); }
       .stat { min-height: 92px; padding: 14px 12px; }
       .stat strong { font-size: 23px; }
       .task-card { grid-template-columns: auto minmax(0, 1fr); }
@@ -316,6 +454,23 @@ export function renderUi(): string {
       .system-band { grid-template-columns: 1fr 1fr; }
       .system-item { min-height: 88px; padding: 15px; }
       .manual-grid { grid-template-columns: 1fr; }
+      .wealth-overview { min-height: 0; padding: 22px 20px; }
+      .wealth-composition { margin-top: 2px; }
+      .wealth-health { justify-content: flex-start; margin-bottom: 16px; }
+      .overview-action { gap: 10px; padding: 12px 14px; }
+      .overview-action .task-mark { width: 36px; height: 36px; }
+      .overview-action strong { font-size: 14px; white-space: nowrap; }
+      .overview-action p { font-size: 11px; white-space: nowrap; }
+      .overview-action .text-action { padding: 0; font-size: 12px; }
+      .overview-action .to-prefix { display: none; }
+      .overview-dashboard-grid { grid-template-columns: 1fr; }
+      .overview-panel { padding: 18px 16px; }
+      .overview-panel .panel-header { gap: 8px; }
+      .overview-panel .panel-header h2 { font-size: 18px; }
+      .overview-panel .panel-link { font-size: 12px; white-space: nowrap; }
+      .cashflow-chart { gap: 8px; padding-inline: 0; }
+      .allocation-row { grid-template-columns: 82px minmax(54px, 1fr) auto; gap: 10px; }
+      .spending-row { grid-template-columns: minmax(118px, 1fr) minmax(55px, 1fr) auto; gap: 8px; }
       .mobile-nav {
         position: fixed;
         inset: auto 0 0;
@@ -334,12 +489,21 @@ export function renderUi(): string {
     }
     @media (max-width: 420px) {
       .content-inner { padding-inline: 14px; }
-      .overview-stats { grid-template-columns: 1fr; }
+      .status-overview .overview-stats { grid-template-columns: 1fr; }
       .stat { min-height: 66px; border-left: 0; border-top: 1px solid var(--line-soft); grid-template-columns: 48px 1fr; align-items: center; }
       .stat span { margin-top: 0; }
       .system-band { grid-template-columns: 1fr; }
       .system-item + .system-item { border-left: 0; border-top: 1px solid var(--line-soft); }
       h1 { font-size: 30px; }
+      .wealth-value { font-size: 40px; }
+      .cashflow-chart { min-height: 154px; }
+      .cashflow-month { grid-template-rows: 110px auto; }
+      .bar-pair { height: 110px; }
+      .chart-value { font-size: 10px; }
+      .spending-row { grid-template-columns: minmax(0, 1fr) auto; }
+      .spending-track { display: none; }
+      .freshness-label { flex-wrap: nowrap; font-size: 12px; }
+      .freshness-status { font-size: 12px; }
     }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
@@ -361,16 +525,16 @@ export function renderUi(): string {
     <main class="content" id="main-content">
       <div class="content-inner">
         <header class="page-header">
-          <div><p class="eyebrow">Finance Hub</p><h1>Datenstatus</h1><p class="subtitle">Aktualität, offene Aufgaben und Systemzustand auf einen Blick.</p></div>
-          <button class="button quiet" id="refresh-button" type="button" onclick="refresh()" aria-label="Datenstatus aktualisieren">
+          <div><p class="eyebrow" id="page-eyebrow" hidden>Finance Hub</p><h1 id="page-title">Übersicht</h1><p class="subtitle" id="page-subtitle">Finanzen, Vermögen und offene Punkte auf einen Blick.</p></div>
+          <button class="button quiet" id="refresh-button" type="button" onclick="refresh(true)" aria-label="Übersicht aktualisieren">
             <span aria-hidden="true">↻</span><span class="desktop-label">Aktualisieren</span>
           </button>
         </header>
         <div id="message" class="notice" role="status" aria-live="polite"></div>
         <div id="dashboard" aria-busy="true">
-          <section class="overview" aria-label="Statusübersicht">
-            <div class="overview-main"><div class="skeleton" style="width:72%;height:28px">Lädt</div><div class="skeleton" style="width:42%;height:16px;margin-top:12px">Lädt</div></div>
-            <div class="overview-stats"><div class="stat"><strong>–</strong><span>Automatisch aktuell</span></div><div class="stat"><strong>–</strong><span>Aufgaben</span></div><div class="stat"><strong>–</strong><span>Historische Importe</span></div></div>
+          <section class="wealth-overview" aria-label="Vermögensübersicht">
+            <div><div class="skeleton" style="width:52%;height:18px">Lädt</div><div class="skeleton" style="width:72%;height:48px;margin-top:10px">Lädt</div></div>
+            <div class="skeleton" style="width:100%;height:28px">Lädt</div>
           </section>
         </div>
       </div>
@@ -393,15 +557,16 @@ const icons={
   warning:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 4 3 20h18L12 4Zm0 5v5m0 3v.1"/></svg>'
 };
 const navItems=[
-  {label:"Übersicht",icon:"overview"},
+  {label:"Übersicht",icon:"overview",view:"overview"},
   {label:"Ausgaben",icon:"expenses"},
   {label:"Vermögen",icon:"assets"},
   {label:"Analysen",icon:"analysis"},
-  {label:"Datenstatus",icon:"status",active:true}
+  {label:"Datenstatus",icon:"status",view:"status"}
 ];
-function navMarkup(){return navItems.map(item=>'<button class="nav-item" type="button" '+(item.active?'aria-current="page"':'disabled title="Folgt in einem späteren Schritt"')+'>'+icons[item.icon]+'<span>'+item.label+'</span></button>').join("")}
-document.getElementById("desktop-nav").innerHTML=navMarkup();
-document.getElementById("mobile-nav").innerHTML=navMarkup();
+function activeView(){return location.hash==="#\/data-status"?"status":"overview"}
+function navMarkup(){const current=activeView();return navItems.map(item=>item.view?'<a class="nav-item" href="'+(item.view==="status"?'#/data-status':'#/overview')+'"'+(item.view===current?' aria-current="page"':'')+'>'+icons[item.icon]+'<span>'+item.label+'</span></a>':'<button class="nav-item" type="button" disabled title="Folgt in einem späteren Schritt">'+icons[item.icon]+'<span>'+item.label+'</span></button>').join("")}
+function renderNavigation(){document.getElementById("desktop-nav").innerHTML=navMarkup();document.getElementById("mobile-nav").innerHTML=navMarkup()}
+renderNavigation();
 
 const legacyToken=localStorage.getItem("financeToken");
 if(legacyToken&&!sessionStorage.getItem("financeToken"))sessionStorage.setItem("financeToken",legacyToken);
@@ -451,6 +616,10 @@ function formatBytes(bytes){
   while(value>=1024&&index<units.length-1){value/=1024;index+=1}
   return new Intl.NumberFormat("de-DE",{maximumFractionDigits:value>=100?0:1}).format(value)+" "+units[index];
 }
+function moneyWhole(minor){if(!Number.isFinite(minor))return "Nicht verfügbar";return new Intl.NumberFormat("de-DE",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(Number(minor)/100)}
+function numberWhole(minor){if(!Number.isFinite(minor))return "–";return new Intl.NumberFormat("de-DE",{maximumFractionDigits:0}).format(Number(minor)/100)}
+function dayMonth(value){if(!value)return "kein Stand";const date=new Date(value);if(Number.isNaN(date.getTime()))return "kein Stand";return new Intl.DateTimeFormat("de-DE",{day:"2-digit",month:"2-digit"}).format(date)}
+function monthWord(value){if(!value)return "nicht bestätigt";const date=new Date(value);if(Number.isNaN(date.getTime()))return "nicht bestätigt";return new Intl.DateTimeFormat("de-DE",{month:"long"}).format(date)+" bestätigt"}
 function stateInfo(source){
   const map={
     current:{label:"Aktuell",tone:"ok"},
@@ -465,6 +634,69 @@ function statusIcon(tone){return '<span class="status-icon tone-'+tone+'">'+(ton
 function sourceIcon(source){return source.kind==="solana"?icons.wallet:source.kind==="manual"?icons.manual:icons.bank}
 function msg(text,isError=false){const element=document.getElementById("message");element.textContent=text;element.classList.toggle("error",isError)}
 function manualError(text=""){const element=document.getElementById("manual-error");if(element)element.textContent=text}
+
+function renderOverview(data){
+  const total=data.totalMinor;
+  const totalParts=Number(data.cash.amountMinor||0)+Number(data.investments.amountMinor||0);
+  const cashWidth=totalParts>0?Math.max(1,Number(data.cash.amountMinor||0)/totalParts*100):0;
+  const composition=Number.isFinite(total)?'<div class="composition-bar" aria-hidden="true"><span class="composition-cash" style="width:'+cashWidth+'%"></span><span class="composition-investments" style="width:'+(100-cashWidth)+'%"></span></div>':'<div class="composition-missing">Aufteilung teilweise nicht verfügbar</div>';
+  const automaticOk=data.automatic.total>0&&data.automatic.current===data.automatic.total;
+  const actionDetails=data.manualActions.map(action=>esc(action.label.replace(" Riester","").replace(" Fondsrente",""))+" "+esc(dayMonth(action.capturedAt))).join(" · ");
+  const action=data.manualActions.length?'\
+    <section class="overview-action" aria-label="Vorsorgewerte prüfen"><span class="task-mark">'+icons.manual+'</span><div><strong>'+data.manualActions.length+' Vorsorgewerte prüfen</strong><p>'+actionDetails+'</p></div><a class="text-action" href="#/data-status"><span><span class="to-prefix">Zum </span>Datenstatus</span>'+icons.chevron+'</a></section>':'';
+  const months=data.cashflow.months||[];
+  const chartMax=Math.max(1,...months.flatMap(month=>[month.incomeMinor,month.spentMinor]));
+  const chart=months.length?months.map(month=>'\
+    <div class="cashflow-month"><div class="bar-pair">\
+      <span class="chart-bar income" style="--bar-height:'+Math.max(2,month.incomeMinor/chartMax*100)+'%"><span class="chart-value">'+numberWhole(month.incomeMinor)+'</span></span>\
+      <span class="chart-bar spent" style="--bar-height:'+Math.max(2,month.spentMinor/chartMax*100)+'%"><span class="chart-value">'+numberWhole(month.spentMinor)+'</span></span>\
+    </div><span class="chart-month-label">'+esc(month.label)+(month.partial?'*':'')+'</span></div>').join(""):'';
+  const chartTable=months.map(month=>'<tr><th>'+esc(month.label)+(month.partial?' bis heute':'')+'</th><td>'+moneyWhole(month.incomeMinor)+'</td><td>'+moneyWhole(month.spentMinor)+'</td></tr>').join("");
+  const cashflow=data.cashflow.state==="current"?'\
+    <div class="chart-legend"><span class="legend-key"><i style="background:var(--blue)"></i>Einnahmen</span><span class="legend-key"><i style="background:var(--orange)"></i>Ausgaben</span></div>\
+    <div class="cashflow-chart" role="img" aria-label="Einnahmen und Ausgaben der letzten vier Monate">'+chart+'</div>\
+    <table class="sr-only"><caption>Geldfluss der letzten vier Monate</caption><thead><tr><th>Monat</th><th>Einnahmen</th><th>Ausgaben</th></tr></thead><tbody>'+chartTable+'</tbody></table>'
+    :'<div class="panel-unavailable"><p>Geldfluss ist momentan nicht verfügbar.<br>Beim Aktualisieren wird der Abruf erneut versucht.</p></div>';
+  const allocation=data.investments.allocation||[];
+  const allocationMax=Math.max(1,...allocation.map(item=>item.amountMinor));
+  const allocationRows=allocation.length?allocation.map(item=>'\
+    <div class="allocation-row"><span>'+esc(item.label)+'</span><span class="allocation-track" aria-hidden="true"><i style="--width:'+item.amountMinor/allocationMax*100+'%"></i></span><strong>'+moneyWhole(item.amountMinor)+'</strong></div>').join("")
+    :'<div class="panel-unavailable"><p>Die Vermögensaufteilung ist momentan nicht verfügbar.</p></div>';
+  const categories=data.spending.categories||[];
+  const spendingMax=Math.max(1,...categories.map(item=>item.amountMinor));
+  const categoryRows=categories.map(item=>'\
+    <div class="spending-row"><span>'+esc(item.label)+'</span><span class="spending-track" aria-hidden="true"><i style="--width:'+item.amountMinor/spendingMax*100+'%"></i></span><strong>'+moneyWhole(item.amountMinor)+'</strong></div>').join("");
+  const spending=data.spending.state==="current"?'\
+    <div class="spending-list">'+categoryRows+'<div class="spending-row spending-other"><span>Weitere Kategorien</span><span class="spending-track"></span><strong>'+moneyWhole(data.spending.remainingMinor)+'</strong></div></div>\
+    <div class="panel-footer"><span class="panel-link" aria-disabled="true" title="Der Ausgabenbereich folgt als nächster eigener Schritt">Alle Ausgaben ansehen</span></div>'
+    :'<div class="panel-unavailable"><p>Die Ausgabenübersicht ist momentan nicht verfügbar.</p></div>';
+  const freshnessStatus={
+    current:{tone:"ok",label:"Aktuell"},
+    confirmed:{tone:"warning",label:"Bestätigt"},
+    warning:{tone:"warning",label:"Hinweis"},
+    error:{tone:"critical",label:"Fehler"},
+    unavailable:{tone:"critical",label:"Nicht verfügbar"}
+  };
+  const freshnessRows=data.freshness.map(item=>{
+    const info=freshnessStatus[item.status]||freshnessStatus.warning;
+    const detail=item.status==="confirmed"?monthWord(item.capturedAt):(item.capturedAt&&new Date(item.capturedAt).toDateString()===new Date(data.generatedAt).toDateString()?"heute":formatDate(item.capturedAt));
+    const icon=item.key==="cash"?icons.bank:item.key==="solana"?icons.wallet:item.key==="pensions"?icons.status:icons.assets;
+    return '<div class="freshness-row">'+icon+'<div class="freshness-label"><strong>'+esc(item.label)+'</strong><span>· '+esc(detail)+'</span></div><div class="freshness-status tone-'+info.tone+'">'+statusIcon(info.tone)+'<span>'+(item.status==="confirmed"?esc(monthWord(item.capturedAt)):info.label)+'</span></div></div>';
+  }).join("");
+  const warning=data.warnings.length?'<div class="overview-warning" role="status">Die Übersicht ist teilweise verfügbar: '+data.warnings.map(esc).join(" · ")+'</div>':'';
+  document.getElementById("dashboard").innerHTML='\
+    <section class="wealth-overview" aria-label="Vermögensübersicht">\
+      <div><span class="wealth-label">Gesamtvermögen</span><strong class="wealth-value">'+moneyWhole(total)+'</strong><p class="wealth-date">Stand '+esc(formatDate(data.generatedAt))+' · Bankkonten und Anlagen</p></div>\
+      <div class="wealth-composition"><div class="wealth-health">'+statusIcon(automaticOk?"ok":"warning")+'<span>'+(automaticOk?'Automatische Quellen aktuell':'Quellenstatus mit Hinweisen')+'</span></div>'+composition+'<div class="composition-legend"><span><i class="composition-cash"></i>Liquidität <strong>'+moneyWhole(data.cash.amountMinor)+'</strong></span><span><i class="composition-investments"></i>Anlagen <strong>'+moneyWhole(data.investments.amountMinor)+'</strong></span></div></div>\
+    </section>'+warning+action+'\
+    <div class="overview-dashboard-grid">\
+      <section class="overview-panel" aria-labelledby="cashflow-title"><div class="panel-header"><h2 id="cashflow-title">Geldfluss</h2><span class="panel-meta">'+(months.at(-1)?.label?esc(months.at(-1).label)+' bis heute':'')+'</span></div>'+cashflow+'</section>\
+      <section class="overview-panel" aria-labelledby="allocation-title"><div class="panel-header"><h2 id="allocation-title">Vermögensaufteilung</h2><span class="panel-link" aria-disabled="true" title="Der Vermögensbereich folgt als eigener Schritt">Details in Vermögen</span></div><div class="allocation-list">'+allocationRows+'</div></section>\
+      <section class="overview-panel" aria-labelledby="spending-title"><div class="panel-header"><h2 id="spending-title">Ausgaben im '+esc(data.spending.monthLabel||"letzten Monat")+'</h2><strong>'+moneyWhole(data.spending.totalMinor)+'</strong></div>'+spending+'</section>\
+      <section class="overview-panel" aria-labelledby="freshness-title"><div class="panel-header"><h2 id="freshness-title">Datenbasis</h2></div><div class="freshness-list">'+freshnessRows+'</div><p class="data-checked">Zuletzt geprüft '+esc(formatDate(data.generatedAt,true))+'</p></section>\
+    </div>';
+  document.getElementById("dashboard").setAttribute("aria-busy","false");
+}
 
 function renderTask(task){
   return '<article class="task-card"><span class="task-mark">'+icons.manual+'</span><div><h3>'+esc(task.label)+'</h3><p>Letzter bestätigter Wert: '+esc(formatDate(task.valueDate))+'</p></div><button class="button secondary" type="button" onclick="openManual(&quot;'+encoded(task.id)+'&quot;)">Werte aktualisieren</button></article>';
@@ -487,7 +719,7 @@ function renderDashboard(data){
   const archiveDetail=data.system.archiveTotalBytes>0?formatBytes(data.system.archiveFreeBytes)+" frei":"Speicherstatus unbekannt";
   const backupDetail=data.system.backupLastSuccessAt?"Zuletzt "+relativeTime(data.system.backupLastSuccessAt):"Noch kein Lauf sichtbar";
   document.getElementById("dashboard").innerHTML='\
-    <section class="overview" aria-label="Statusübersicht">\
+    <section class="status-overview" aria-label="Statusübersicht">\
       <div class="overview-main"><div class="overall-line">'+statusIcon(overallTone)+'<h2>'+esc(data.headline)+'</h2></div><p class="checked-at">Zuletzt geprüft: '+esc(formatDate(data.generatedAt,true))+'</p></div>\
       <div class="overview-stats"><div class="stat"><strong>'+data.summary.automaticCurrent+'<span class="tone-'+(data.summary.automaticCurrent===data.summary.automaticTotal?'ok':'warning')+'"> / '+data.summary.automaticTotal+'</span></strong><span>Automatisch aktuell</span></div><div class="stat"><strong>'+data.summary.tasks+'</strong><span>Aufgaben</span></div><div class="stat"><strong>'+data.summary.historicalImports+'</strong><span>Historische Importe</span></div></div>\
     </section>\
@@ -499,10 +731,35 @@ function renderDashboard(data){
   document.getElementById("dashboard").setAttribute("aria-busy","false");
 }
 
-async function refresh(){
+function renderHeader(view){
+  const overview=view==="overview";
+  document.title=(overview?"Übersicht":"Datenstatus")+" · Finance Hub";
+  const eyebrow=document.getElementById("page-eyebrow");
+  eyebrow.hidden=overview;
+  document.getElementById("page-title").textContent=overview?"Übersicht":"Datenstatus";
+  document.getElementById("page-subtitle").textContent=overview?"Finanzen, Vermögen und offene Punkte auf einen Blick.":"Aktualität, offene Aufgaben und Systemzustand auf einen Blick.";
+  document.getElementById("refresh-button").setAttribute("aria-label",(overview?"Übersicht":"Datenstatus")+" aktualisieren");
+}
+function renderLoading(view){
+  document.getElementById("dashboard").setAttribute("aria-busy","true");
+  document.getElementById("dashboard").innerHTML=view==="overview"?'\
+    <section class="wealth-overview" aria-label="Vermögensübersicht wird geladen"><div><div class="skeleton" style="width:52%;height:18px">Lädt</div><div class="skeleton" style="width:72%;height:48px;margin-top:10px">Lädt</div></div><div class="skeleton" style="width:100%;height:28px">Lädt</div></section>'
+    :'\
+    <section class="status-overview" aria-label="Statusübersicht wird geladen"><div class="overview-main"><div class="skeleton" style="width:72%;height:28px">Lädt</div><div class="skeleton" style="width:42%;height:16px;margin-top:12px">Lädt</div></div><div class="overview-stats"><div class="stat"><strong>–</strong><span>Automatisch aktuell</span></div><div class="stat"><strong>–</strong><span>Aufgaben</span></div><div class="stat"><strong>–</strong><span>Historische Importe</span></div></div></section>';
+}
+async function refresh(force=false){
+  const view=activeView();
   const button=document.getElementById("refresh-button");
-  button.disabled=true;msg("Datenstatus wird aktualisiert …");
-  try{const data=await call("/api/dashboard/status");renderDashboard(data);await loadManualSources();msg("")}
+  renderHeader(view);renderNavigation();renderLoading(view);
+  button.disabled=true;msg((view==="overview"?"Übersicht":"Datenstatus")+" wird aktualisiert …");
+  try{
+    if(view==="overview"){
+      const data=await call("/api/dashboard/overview"+(force?"?refresh=1":""));renderOverview(data);
+    }else{
+      const data=await call("/api/dashboard/status");renderDashboard(data);await loadManualSources();
+    }
+    msg("");
+  }
   catch(error){msg(error.message,true);document.getElementById("dashboard").setAttribute("aria-busy","false")}
   finally{button.disabled=false}
 }
@@ -551,6 +808,14 @@ window.addEventListener("beforeunload",event=>{
   const textarea=document.getElementById("manual-text");
   if(textarea&&textarea.value.trim()){event.preventDefault();event.returnValue=""}
 });
+window.addEventListener("hashchange",()=>{
+  renderNavigation();
+  refresh();
+  const title=document.getElementById("page-title");
+  title.tabIndex=-1;
+  title.focus({preventScroll:true});
+});
+if(!location.hash)history.replaceState(null,"","#/overview");
 refresh();
 </script>
 </body>
