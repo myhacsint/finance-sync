@@ -11,6 +11,15 @@ export interface HealthReport {
   warnings: string[];
   critical: string[];
   freeBytes: number;
+  backup: {
+    status: "ok" | "warning" | "critical";
+    lastSuccessAt?: string;
+  };
+  archive: {
+    status: "ok" | "warning" | "critical";
+    freeBytes: number;
+    totalBytes: number;
+  };
   time: string;
 }
 
@@ -40,20 +49,33 @@ export function buildHealth(db: FinanceDatabase, config: AppConfig): HealthRepor
     }
   }
   const backupMarker = join(paths.backup, "last-success");
+  let backupStatus: HealthReport["backup"]["status"] = "ok";
+  let backupLastSuccessAt: string | undefined;
   if (!existsSync(backupMarker)) {
     warnings.push("Noch kein erfolgreicher Finance-Hub-Backup-Lauf sichtbar");
+    backupStatus = "warning";
   } else {
-    const backupDays = (now - statSync(backupMarker).mtimeMs) / 86_400_000;
-    if (backupDays > 2) critical.push(`Letztes Backup ist ${Math.floor(backupDays)} Tage alt`);
-    else if (backupDays > 1.25) warnings.push("Letztes Backup ist älter als 30 Stunden");
+    const backupMtime = statSync(backupMarker).mtimeMs;
+    backupLastSuccessAt = new Date(backupMtime).toISOString();
+    const backupDays = (now - backupMtime) / 86_400_000;
+    if (backupDays > 2) {
+      critical.push(`Letztes Backup ist ${Math.floor(backupDays)} Tage alt`);
+      backupStatus = "critical";
+    } else if (backupDays > 1.25) {
+      warnings.push("Letztes Backup ist älter als 30 Stunden");
+      backupStatus = "warning";
+    }
   }
   const fs = statfsSync(paths.archive);
   const freeBytes = Number(fs.bavail) * Number(fs.bsize);
   const totalBytes = Number(fs.blocks) * Number(fs.bsize);
+  let archiveStatus: HealthReport["archive"]["status"] = "ok";
   if (freeBytes < 10 * 1024 ** 3 || freeBytes / totalBytes < 0.05) {
     critical.push("Kritisch wenig freier Speicher im Finanzarchiv");
+    archiveStatus = "critical";
   } else if (freeBytes / totalBytes < 0.1) {
     warnings.push("Weniger als 10 Prozent freier Speicher im Finanzarchiv");
+    archiveStatus = "warning";
   }
   return {
     status: critical.length ? "critical" : warnings.length ? "warning" : "ok",
@@ -62,6 +84,15 @@ export function buildHealth(db: FinanceDatabase, config: AppConfig): HealthRepor
     warnings,
     critical,
     freeBytes,
+    backup: {
+      status: backupStatus,
+      lastSuccessAt: backupLastSuccessAt
+    },
+    archive: {
+      status: archiveStatus,
+      freeBytes,
+      totalBytes
+    },
     time: new Date().toISOString()
   };
 }

@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { timingSafeEqual } from "node:crypto";
 import { loadConfig, paths, readSecret } from "./config.js";
@@ -12,6 +12,7 @@ import { snapshotSqlite } from "./backup.js";
 import { renderUi } from "./ui.js";
 import { buildHealth } from "./health.js";
 import { ManualPreviewStore } from "./manual-workflow.js";
+import { buildDashboardStatus, type SourceStatusRow } from "./dashboard-status.js";
 
 mkdirSync(paths.data, { recursive: true });
 mkdirSync(paths.archive, { recursive: true });
@@ -21,6 +22,7 @@ const db = new FinanceDatabase(join(paths.data, "finance.sqlite"));
 const service = new FinanceService(db, config);
 const scheduler = service.startScheduler();
 const manualPreviews = new ManualPreviewStore();
+const financeHubMark = readFileSync(new URL("../assets/finance-hub-mark.png", import.meta.url));
 
 function json(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
@@ -66,7 +68,28 @@ const server = createServer(async (req, res) => {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       return res.end(renderUi());
     }
+    if (req.method === "GET" && url.pathname === "/assets/finance-hub-mark.png") {
+      res.writeHead(200, {
+        "content-type": "image/png",
+        "cache-control": "public, max-age=31536000, immutable"
+      });
+      return res.end(financeHubMark);
+    }
     if (!authorized(req)) return json(res, 401, { error: "Nicht autorisiert" });
+    if (req.method === "GET" && url.pathname === "/api/dashboard/status") {
+      const rows = db.listSources() as unknown as SourceStatusRow[];
+      const manualValueDates = Object.fromEntries(
+        config.sources
+          .filter((source) => source.kind === "manual")
+          .map((source) => [source.id, db.latestBalanceCapturedAt(source.id)])
+      );
+      return json(res, 200, buildDashboardStatus(
+        rows,
+        config,
+        buildHealth(db, config),
+        manualValueDates
+      ));
+    }
     if (req.method === "GET" && url.pathname === "/api/status") {
       return json(res, 200, { sources: db.listSources() });
     }

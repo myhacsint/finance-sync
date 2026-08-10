@@ -353,6 +353,13 @@ export class FinanceDatabase {
     `).all() as Record<string, unknown>[];
   }
 
+  latestBalanceCapturedAt(sourceId: string): string | undefined {
+    const row = this.db.prepare(`
+      SELECT max(captured_at) AS captured_at FROM balances WHERE source_id=?
+    `).get(sourceId) as { captured_at: string | null } | undefined;
+    return row?.captured_at ?? undefined;
+  }
+
   query(sql: string): Record<string, unknown>[] {
     return this.db.prepare(sql).all() as Record<string, unknown>[];
   }
