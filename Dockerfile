@@ -30,6 +30,7 @@ RUN apt-get update \
 COPY --from=build --chown=finance:finance /build/package.json /app/package.json
 COPY --from=build --chown=finance:finance /build/node_modules /app/node_modules
 COPY --from=build --chown=finance:finance /build/dist /app/dist
+COPY --chown=finance:finance assets /app/assets
 COPY --chown=finance:finance python /app/python
 USER finance
 EXPOSE 8080
