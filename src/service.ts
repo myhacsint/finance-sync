@@ -14,6 +14,7 @@ import {
 import { preflightInteractiveSource } from "./connectors/status-only.js";
 import {
   continueDkbFints,
+  dkbAccountIds,
   fetchDkbFints,
   preflightDkbFints,
   type DkbFintsOutcome
@@ -93,9 +94,28 @@ export class FinanceService {
         this.config.ghostfolio,
         bundle.activities ?? []
       );
+      const capturedAtByAccount = new Map<string, string>();
+      for (const item of [...(bundle.holdings ?? []), ...(bundle.balances ?? [])]) {
+        const current = capturedAtByAccount.get(item.accountId);
+        if (!current || item.capturedAt > current) {
+          capturedAtByAccount.set(item.accountId, item.capturedAt);
+        }
+      }
+      const dkbFallbackCapturedAt = [...capturedAtByAccount.values()]
+        .sort()
+        .at(-1) ?? new Date().toISOString();
       counts.ghostfolioHoldings = await reconcileGhostfolioHoldings(
         this.config.ghostfolio,
-        bundle.holdings ?? []
+        bundle.holdings ?? [],
+        source.kind === "dkb-fints"
+          ? "Reconstructed DKB position adjustment by FinanceSync; not tax cost basis"
+          : "Reconstructed wallet position adjustment by FinanceSync; not tax cost basis",
+        source.kind === "dkb-fints"
+          ? dkbAccountIds(source).map((accountId) => ({
+              accountId,
+              capturedAt: capturedAtByAccount.get(accountId) ?? dkbFallbackCapturedAt
+            }))
+          : []
       );
     }
     if ((bundle.transactions?.length ?? 0) > 0) {
