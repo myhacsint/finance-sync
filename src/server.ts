@@ -83,12 +83,16 @@ const server = createServer(async (req, res) => {
       const offset = Number.isInteger(requestedOffset)
         ? Math.max(0, Math.min(120, requestedOffset))
         : 0;
+      const requestedSpendingOffset = Number(url.searchParams.get("spendingOffset") ?? 0);
+      const spendingOffset = Number.isInteger(requestedSpendingOffset)
+        ? Math.max(0, Math.min(120, requestedSpendingOffset))
+        : 0;
       return json(
         res,
         200,
         await service.getDashboardOverview(
           url.searchParams.get("refresh") === "1",
-          { months, offset }
+          { months, offset, spendingOffset }
         )
       );
     }

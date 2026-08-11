@@ -14,12 +14,16 @@ test("Datenstatus enthält responsive Navigation und zugängliche Hauptbereiche"
   assert.match(html, /\/api\/dashboard\/overview/);
   assert.match(html, /cashflowMonths/);
   assert.match(html, /cashflowOffset/);
+  assert.match(html, /spendingOffset/);
   assert.match(html, />4 Monate</);
   assert.match(html, />6 Monate</);
   assert.match(html, />12 Monate</);
   assert.match(html, /Einen Monat zurück/);
   assert.match(html, /Einen Monat vor/);
   assert.match(html, /Vollständige Monate/);
+  assert.match(html, /Angezeigter Ausgabenmonat/);
+  assert.match(html, /Einen Ausgabenmonat zurück/);
+  assert.match(html, /Einen Ausgabenmonat vor/);
   assert.match(html, /Datenstatus/);
   assert.match(html, /Offene Aufgaben/);
   assert.match(html, /Automatische Quellen/);

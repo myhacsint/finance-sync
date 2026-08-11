@@ -375,8 +375,8 @@ export function renderUi(): string {
     .panel-link[aria-disabled="true"] { cursor: not-allowed; opacity: .75; }
     .cashflow-panel-header { align-items: center; }
     .cashflow-period { margin-top: 4px; color: var(--muted); font-size: 13px; }
-    .cashflow-controls { display: flex; align-items: center; gap: 6px; }
-    .cashflow-controls button, .cashflow-controls select {
+    .period-controls { display: flex; align-items: center; gap: 6px; }
+    .period-controls button, .period-controls select {
       min-width: 44px;
       min-height: 44px;
       border: 1px solid var(--line);
@@ -385,12 +385,12 @@ export function renderUi(): string {
       color: var(--text);
       font: inherit;
     }
-    .cashflow-controls button { display: grid; place-items: center; cursor: pointer; }
-    .cashflow-controls button:hover:not(:disabled), .cashflow-controls select:hover { border-color: #60769a; background: #17243a; }
-    .cashflow-controls button:disabled { cursor: not-allowed; opacity: .38; }
-    .cashflow-controls button svg { width: 18px; height: 18px; }
-    .cashflow-controls .range-previous svg { transform: rotate(90deg); }
-    .cashflow-controls .range-next svg { transform: rotate(-90deg); }
+    .period-controls button { display: grid; place-items: center; cursor: pointer; }
+    .period-controls button:hover:not(:disabled), .period-controls select:hover { border-color: #60769a; background: #17243a; }
+    .period-controls button:disabled { cursor: not-allowed; opacity: .38; }
+    .period-controls button svg { width: 18px; height: 18px; }
+    .period-controls .range-previous svg { transform: rotate(90deg); }
+    .period-controls .range-next svg { transform: rotate(-90deg); }
     .cashflow-window { min-width: 112px !important; padding: 0 34px 0 12px; cursor: pointer; }
     .chart-legend { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 8px; color: var(--muted); font-size: 13px; }
     .legend-key { display: inline-flex; align-items: center; gap: 7px; }
@@ -430,6 +430,10 @@ export function renderUi(): string {
     .allocation-track i { display: block; width: var(--width); height: 100%; border-radius: inherit; background: #6f88b4; }
     .allocation-row strong, .spending-row strong { font-variant-numeric: tabular-nums; }
     .spending-list { gap: 12px; margin-top: 22px; }
+    .spending-panel-header { align-items: center; }
+    .spending-summary { display: flex; align-items: baseline; gap: 12px; }
+    .spending-summary strong { font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .spending-window { min-width: 142px !important; padding: 0 34px 0 12px; cursor: pointer; }
     .spending-row { display: grid; grid-template-columns: minmax(130px, .9fr) minmax(80px, 1.6fr) auto; align-items: center; gap: 14px; font-size: 13px; }
     .spending-track { height: 9px; }
     .spending-track i { display: block; width: var(--width); height: 100%; border-radius: inherit; background: var(--orange); }
@@ -500,7 +504,7 @@ export function renderUi(): string {
       .overview-panel .panel-header h2 { font-size: 18px; }
       .overview-panel .panel-link { font-size: 12px; white-space: nowrap; }
       .cashflow-panel-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
-      .cashflow-controls button, .cashflow-controls select { min-height: 44px; }
+      .period-controls button, .period-controls select { min-height: 44px; }
       .cashflow-chart { gap: 8px; padding-inline: 0; }
       .allocation-row { grid-template-columns: 82px minmax(54px, 1fr) auto; gap: 10px; }
       .spending-row { grid-template-columns: minmax(118px, 1fr) minmax(55px, 1fr) auto; gap: 8px; }
@@ -530,8 +534,10 @@ export function renderUi(): string {
       h1 { font-size: 30px; }
       .wealth-value { font-size: 40px; }
       .cashflow-panel-header { grid-template-columns: 1fr; }
-      .cashflow-controls { margin-top: 10px; }
+      .period-controls { margin-top: 10px; }
       .cashflow-window { flex: 1; }
+      .spending-panel-header { display: grid; grid-template-columns: 1fr; }
+      .spending-window { flex: 1; }
       .cashflow-chart { min-height: 154px; }
       .cashflow-month { grid-template-rows: 110px auto; }
       .bar-pair { height: 110px; }
@@ -675,6 +681,34 @@ function setCashflowRange(months,offset){
 }
 function setCashflowMonths(value){const range=cashflowSelection();setCashflowRange(Number(value),range.offset)}
 function shiftCashflow(months){const range=cashflowSelection();setCashflowRange(range.months,range.offset+Number(months))}
+function spendingSelection(){
+  const requestedOffset=Number(new URLSearchParams(location.search).get("spendingOffset")||0);
+  return {offset:Number.isInteger(requestedOffset)?Math.max(0,Math.min(120,requestedOffset)):0};
+}
+function setSpendingOffset(offset){
+  const params=new URLSearchParams(location.search);
+  const safeOffset=Math.max(0,Math.min(120,Math.trunc(Number(offset)||0)));
+  if(safeOffset===0)params.delete("spendingOffset");else params.set("spendingOffset",String(safeOffset));
+  const query=params.toString();
+  history.pushState(null,"",(query?"?"+query:location.pathname)+location.hash);
+  refresh();
+}
+function shiftSpending(months){setSpendingOffset(spendingSelection().offset+Number(months))}
+function shiftMonthKey(key,offset){
+  const match=String(key||"").match(/^(\\d{4})-(\\d{2})$/);
+  if(!match)return "";
+  const date=new Date(Date.UTC(Number(match[1]),Number(match[2])-1+Number(offset),1));
+  return date.getUTCFullYear()+"-"+String(date.getUTCMonth()+1).padStart(2,"0");
+}
+function spendingMonthOptions(latestMonth,selectedOffset){
+  if(!latestMonth)return "";
+  const offsets=Array.from({length:36},(_,offset)=>offset);
+  if(selectedOffset>=36)offsets.push(selectedOffset);
+  return offsets.map(offset=>{
+    const key=shiftMonthKey(latestMonth,-offset);
+    return '<option value="'+offset+'"'+(offset===selectedOffset?' selected':'')+'>'+esc(rangeMonth(key,{month:"long",year:"numeric"}))+'</option>';
+  }).join("");
+}
 function rangeMonth(key,format){
   const match=String(key||"").match(/^(\\d{4})-(\\d{2})$/);
   if(!match)return "";
@@ -738,6 +772,10 @@ function renderOverview(data){
     <div class="allocation-row"><span>'+esc(item.label)+'</span><span class="allocation-track" aria-hidden="true"><i style="--width:'+item.amountMinor/allocationMax*100+'%"></i></span><strong>'+moneyWhole(item.amountMinor)+'</strong></div>').join("")
     :'<div class="panel-unavailable"><p>Die Vermögensaufteilung ist momentan nicht verfügbar.</p></div>';
   const categories=data.spending.categories||[];
+  const selectedSpendingOffset=Number.isInteger(data.spending.monthOffset)?data.spending.monthOffset:spendingSelection().offset;
+  const latestSpendingMonth=data.spending.latestMonth||shiftMonthKey(data.spending.month,selectedSpendingOffset);
+  const spendingControls=data.spending.state==="current"?'\
+    <div class="period-controls" aria-label="Monat für Ausgaben"><button class="range-previous" type="button" onclick="shiftSpending(1)" aria-label="Einen Ausgabenmonat zurück" title="Einen Monat zurück">'+icons.chevron+'</button><label class="sr-only" for="spending-month">Angezeigter Ausgabenmonat</label><select class="spending-window" id="spending-month" name="spending-month" autocomplete="off" onchange="setSpendingOffset(this.value)">'+spendingMonthOptions(latestSpendingMonth,selectedSpendingOffset)+'</select><button class="range-next" type="button" onclick="shiftSpending(-1)" aria-label="Einen Ausgabenmonat vor" title="Einen Monat vor"'+(selectedSpendingOffset===0?' disabled':'')+'>'+icons.chevron+'</button></div>':'';
   const spendingMax=Math.max(1,...categories.map(item=>item.amountMinor));
   const categoryRows=categories.map(item=>'\
     <div class="spending-row"><span>'+esc(item.label)+'</span><span class="spending-track" aria-hidden="true"><i style="--width:'+item.amountMinor/spendingMax*100+'%"></i></span><strong>'+moneyWhole(item.amountMinor)+'</strong></div>').join("");
@@ -765,9 +803,9 @@ function renderOverview(data){
       <div class="wealth-composition"><div class="wealth-health">'+statusIcon(automaticOk?"ok":"warning")+'<span>'+(automaticOk?'Automatische Quellen aktuell':'Quellenstatus mit Hinweisen')+'</span></div>'+composition+'<div class="composition-legend"><span><i class="composition-cash"></i>Liquidität <strong>'+moneyWhole(data.cash.amountMinor)+'</strong></span><span><i class="composition-investments"></i>Anlagen <strong>'+moneyWhole(data.investments.amountMinor)+'</strong></span></div></div>\
     </section>'+warning+action+'\
     <div class="overview-dashboard-grid">\
-      <section class="overview-panel" data-month-count="'+months.length+'" aria-labelledby="cashflow-title"><div class="panel-header cashflow-panel-header"><div><h2 id="cashflow-title">Geldfluss</h2><p class="cashflow-period">'+esc(rangeLabel)+' <span aria-hidden="true">·</span> '+esc(rangeDetail)+'</p></div><div class="cashflow-controls" aria-label="Zeitraum für Geldfluss"><button class="range-previous" type="button" onclick="shiftCashflow(1)" aria-label="Einen Monat zurück" title="Einen Monat zurück">'+icons.chevron+'</button><label class="sr-only" for="cashflow-window">Angezeigter Zeitraum</label><select class="cashflow-window" id="cashflow-window" name="cashflow-window" autocomplete="off" onchange="setCashflowMonths(this.value)"><option value="4"'+(range.months===4?' selected':'')+'>4 Monate</option><option value="6"'+(range.months===6?' selected':'')+'>6 Monate</option><option value="12"'+(range.months===12?' selected':'')+'>12 Monate</option></select><button class="range-next" type="button" onclick="shiftCashflow(-1)" aria-label="Einen Monat vor" title="Einen Monat vor"'+(range.offset===0?' disabled':'')+'>'+icons.chevron+'</button></div></div>'+cashflow+'</section>\
+      <section class="overview-panel" data-month-count="'+months.length+'" aria-labelledby="cashflow-title"><div class="panel-header cashflow-panel-header"><div><h2 id="cashflow-title">Geldfluss</h2><p class="cashflow-period">'+esc(rangeLabel)+' <span aria-hidden="true">·</span> '+esc(rangeDetail)+'</p></div><div class="period-controls" aria-label="Zeitraum für Geldfluss"><button class="range-previous" type="button" onclick="shiftCashflow(1)" aria-label="Einen Monat zurück" title="Einen Monat zurück">'+icons.chevron+'</button><label class="sr-only" for="cashflow-window">Angezeigter Zeitraum</label><select class="cashflow-window" id="cashflow-window" name="cashflow-window" autocomplete="off" onchange="setCashflowMonths(this.value)"><option value="4"'+(range.months===4?' selected':'')+'>4 Monate</option><option value="6"'+(range.months===6?' selected':'')+'>6 Monate</option><option value="12"'+(range.months===12?' selected':'')+'>12 Monate</option></select><button class="range-next" type="button" onclick="shiftCashflow(-1)" aria-label="Einen Monat vor" title="Einen Monat vor"'+(range.offset===0?' disabled':'')+'>'+icons.chevron+'</button></div></div>'+cashflow+'</section>\
       <section class="overview-panel" aria-labelledby="allocation-title"><div class="panel-header"><h2 id="allocation-title">Vermögensaufteilung</h2><span class="panel-link" aria-disabled="true" title="Der Vermögensbereich folgt als eigener Schritt">Details in Vermögen</span></div><div class="allocation-list">'+allocationRows+'</div></section>\
-      <section class="overview-panel" aria-labelledby="spending-title"><div class="panel-header"><h2 id="spending-title">Ausgaben im '+esc(data.spending.monthLabel||"letzten Monat")+'</h2><strong>'+moneyWhole(data.spending.totalMinor)+'</strong></div>'+spending+'</section>\
+      <section class="overview-panel" aria-labelledby="spending-title"><div class="panel-header spending-panel-header"><div class="spending-summary"><h2 id="spending-title">Ausgaben</h2><strong>'+moneyWhole(data.spending.totalMinor)+'</strong></div>'+spendingControls+'</div>'+spending+'</section>\
       <section class="overview-panel" aria-labelledby="freshness-title"><div class="panel-header"><h2 id="freshness-title">Datenbasis</h2></div><div class="freshness-list">'+freshnessRows+'</div><p class="data-checked">Zuletzt geprüft '+esc(formatDate(data.generatedAt,true))+'</p></section>\
     </div>';
   document.getElementById("dashboard").setAttribute("aria-busy","false");
@@ -831,6 +869,7 @@ async function refresh(force=false){
     if(view==="overview"){
       const range=cashflowSelection();
       const params=new URLSearchParams({months:String(range.months),offset:String(range.offset)});
+      params.set("spendingOffset",String(spendingSelection().offset));
       if(force)params.set("refresh","1");
       const data=await call("/api/dashboard/overview?"+params.toString());renderOverview(data);
     }else{
