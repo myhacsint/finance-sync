@@ -77,10 +77,19 @@ const server = createServer(async (req, res) => {
     }
     if (!authorized(req)) return json(res, 401, { error: "Nicht autorisiert" });
     if (req.method === "GET" && url.pathname === "/api/dashboard/overview") {
+      const requestedMonths = Number(url.searchParams.get("months") ?? 4);
+      const months = [4, 6, 12].includes(requestedMonths) ? requestedMonths : 4;
+      const requestedOffset = Number(url.searchParams.get("offset") ?? 0);
+      const offset = Number.isInteger(requestedOffset)
+        ? Math.max(0, Math.min(120, requestedOffset))
+        : 0;
       return json(
         res,
         200,
-        await service.getDashboardOverview(url.searchParams.get("refresh") === "1")
+        await service.getDashboardOverview(
+          url.searchParams.get("refresh") === "1",
+          { months, offset }
+        )
       );
     }
     if (req.method === "GET" && url.pathname === "/api/dashboard/status") {

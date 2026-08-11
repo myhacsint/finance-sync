@@ -43,8 +43,8 @@ export class FinanceService {
   private running = new Set<string>();
   private actualTail: Promise<void> = Promise.resolve();
   private reconcileTail: Promise<void> = Promise.resolve();
-  private overviewCache?: { expiresAt: number; value: DashboardOverview };
-  private overviewLoading?: Promise<DashboardOverview>;
+  private overviewCache = new Map<string, { expiresAt: number; value: DashboardOverview }>();
+  private overviewLoading = new Map<string, Promise<DashboardOverview>>();
 
   constructor(readonly db: FinanceDatabase, readonly config: AppConfig) {
     for (const source of config.sources) {
@@ -85,12 +85,18 @@ export class FinanceService {
     }
   }
 
-  async getDashboardOverview(force = false): Promise<DashboardOverview> {
+  async getDashboardOverview(
+    force = false,
+    range: { months: number; offset: number } = { months: 4, offset: 0 }
+  ): Promise<DashboardOverview> {
     const now = Date.now();
-    if (!force && this.overviewCache && this.overviewCache.expiresAt > now) {
-      return this.overviewCache.value;
+    const cacheKey = `${range.months}:${range.offset}`;
+    const cached = this.overviewCache.get(cacheKey);
+    if (!force && cached && cached.expiresAt > now) {
+      return cached.value;
     }
-    if (this.overviewLoading) return this.overviewLoading;
+    const pending = this.overviewLoading.get(cacheKey);
+    if (pending) return pending;
     const load = async (): Promise<DashboardOverview> => {
       const generatedAt = new Date();
       const [actual, investments] = await Promise.allSettled([
@@ -98,7 +104,8 @@ export class FinanceService {
           ? this.withActual(() => readActualOverview(
               this.config.actual!,
               this.config.timezone,
-              generatedAt
+              generatedAt,
+              { months: range.months, offset: range.offset }
             ))
           : Promise.reject(new Error("Actual ist deaktiviert")),
         this.config.ghostfolio?.enabled
@@ -112,14 +119,18 @@ export class FinanceService {
         investments,
         generatedAt
       );
-      this.overviewCache = { expiresAt: Date.now() + 5 * 60_000, value };
+      this.overviewCache.set(cacheKey, {
+        expiresAt: Date.now() + 5 * 60_000,
+        value
+      });
       return value;
     };
-    this.overviewLoading = load();
+    const loading = load();
+    this.overviewLoading.set(cacheKey, loading);
     try {
-      return await this.overviewLoading;
+      return await loading;
     } finally {
-      this.overviewLoading = undefined;
+      this.overviewLoading.delete(cacheKey);
     }
   }
 

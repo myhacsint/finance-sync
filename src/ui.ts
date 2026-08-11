@@ -373,12 +373,31 @@ export function renderUi(): string {
     .panel-header h2 { font-size: 19px; }
     .panel-meta, .panel-link { color: #7fb0ff; font-size: 13px; }
     .panel-link[aria-disabled="true"] { cursor: not-allowed; opacity: .75; }
+    .cashflow-panel-header { align-items: center; }
+    .cashflow-period { margin-top: 4px; color: var(--muted); font-size: 13px; }
+    .cashflow-controls { display: flex; align-items: center; gap: 6px; }
+    .cashflow-controls button, .cashflow-controls select {
+      min-width: 44px;
+      min-height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #111c30;
+      color: var(--text);
+      font: inherit;
+    }
+    .cashflow-controls button { display: grid; place-items: center; cursor: pointer; }
+    .cashflow-controls button:hover:not(:disabled), .cashflow-controls select:hover { border-color: #60769a; background: #17243a; }
+    .cashflow-controls button:disabled { cursor: not-allowed; opacity: .38; }
+    .cashflow-controls button svg { width: 18px; height: 18px; }
+    .cashflow-controls .range-previous svg { transform: rotate(90deg); }
+    .cashflow-controls .range-next svg { transform: rotate(-90deg); }
+    .cashflow-window { min-width: 112px !important; padding: 0 34px 0 12px; cursor: pointer; }
     .chart-legend { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 8px; color: var(--muted); font-size: 13px; }
     .legend-key { display: inline-flex; align-items: center; gap: 7px; }
     .legend-key i { display: block; width: 10px; height: 10px; border-radius: 2px; }
     .cashflow-chart {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(var(--month-count, 4), minmax(0, 1fr));
       align-items: end;
       gap: 16px;
       min-height: 154px;
@@ -393,6 +412,18 @@ export function renderUi(): string {
     .chart-bar.spent { background: var(--orange); }
     .chart-value { position: absolute; inset: auto 50% calc(100% + 4px) auto; transform: translateX(50%); color: var(--text); font-size: 11px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .chart-month-label { padding-top: 8px; color: var(--muted); text-align: center; font-size: 12px; }
+    @media (min-width: 981px) {
+      .overview-panel[data-month-count="12"] { grid-column: 1 / -1; }
+      .chart-legend { gap: 24px; margin-top: 18px; font-size: 15px; }
+      .legend-key { gap: 9px; }
+      .legend-key i { width: 12px; height: 12px; }
+      .cashflow-chart { min-height: 230px; margin-top: 12px; padding: 38px 12px 0; }
+      .cashflow-month { grid-template-rows: 166px auto; }
+      .bar-pair { height: 166px; gap: 14px; }
+      .chart-bar { width: clamp(18px, 36%, 88px); }
+      .chart-value { font-size: 15px; }
+      .chart-month-label { padding-top: 12px; font-size: 16px; }
+    }
     .allocation-list, .spending-list { display: grid; gap: 18px; margin-top: 26px; }
     .allocation-row { display: grid; grid-template-columns: 78px minmax(60px, 1fr) auto; align-items: center; gap: 14px; }
     .allocation-track, .spending-track { height: 12px; overflow: hidden; border-radius: 3px; background: #1a263b; }
@@ -468,6 +499,8 @@ export function renderUi(): string {
       .overview-panel .panel-header { gap: 8px; }
       .overview-panel .panel-header h2 { font-size: 18px; }
       .overview-panel .panel-link { font-size: 12px; white-space: nowrap; }
+      .cashflow-panel-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+      .cashflow-controls button, .cashflow-controls select { min-height: 44px; }
       .cashflow-chart { gap: 8px; padding-inline: 0; }
       .allocation-row { grid-template-columns: 82px minmax(54px, 1fr) auto; gap: 10px; }
       .spending-row { grid-template-columns: minmax(118px, 1fr) minmax(55px, 1fr) auto; gap: 8px; }
@@ -496,6 +529,9 @@ export function renderUi(): string {
       .system-item + .system-item { border-left: 0; border-top: 1px solid var(--line-soft); }
       h1 { font-size: 30px; }
       .wealth-value { font-size: 40px; }
+      .cashflow-panel-header { grid-template-columns: 1fr; }
+      .cashflow-controls { margin-top: 10px; }
+      .cashflow-window { flex: 1; }
       .cashflow-chart { min-height: 154px; }
       .cashflow-month { grid-template-rows: 110px auto; }
       .bar-pair { height: 110px; }
@@ -618,6 +654,40 @@ function formatBytes(bytes){
 }
 function moneyWhole(minor){if(!Number.isFinite(minor))return "Nicht verfügbar";return new Intl.NumberFormat("de-DE",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(Number(minor)/100)}
 function numberWhole(minor){if(!Number.isFinite(minor))return "–";return new Intl.NumberFormat("de-DE",{maximumFractionDigits:0}).format(Number(minor)/100)}
+function cashflowSelection(){
+  const params=new URLSearchParams(location.search);
+  const requestedMonths=Number(params.get("cashflowMonths")||4);
+  const requestedOffset=Number(params.get("cashflowOffset")||0);
+  return {
+    months:[4,6,12].includes(requestedMonths)?requestedMonths:4,
+    offset:Number.isInteger(requestedOffset)?Math.max(0,Math.min(120,requestedOffset)):0
+  };
+}
+function setCashflowRange(months,offset){
+  const params=new URLSearchParams(location.search);
+  const safeMonths=[4,6,12].includes(Number(months))?Number(months):4;
+  const safeOffset=Math.max(0,Math.min(120,Math.trunc(Number(offset)||0)));
+  if(safeMonths===4)params.delete("cashflowMonths");else params.set("cashflowMonths",String(safeMonths));
+  if(safeOffset===0)params.delete("cashflowOffset");else params.set("cashflowOffset",String(safeOffset));
+  const query=params.toString();
+  history.pushState(null,"",(query?"?"+query:location.pathname)+location.hash);
+  refresh();
+}
+function setCashflowMonths(value){const range=cashflowSelection();setCashflowRange(Number(value),range.offset)}
+function shiftCashflow(months){const range=cashflowSelection();setCashflowRange(range.months,range.offset+Number(months))}
+function rangeMonth(key,format){
+  const match=String(key||"").match(/^(\\d{4})-(\\d{2})$/);
+  if(!match)return "";
+  return new Intl.DateTimeFormat("de-DE",format).format(new Date(Date.UTC(Number(match[1]),Number(match[2])-1,1)));
+}
+function cashflowRangeLabel(range){
+  if(!range?.start||!range?.end)return "Gewählter Zeitraum";
+  const startYear=String(range.start).slice(0,4),endYear=String(range.end).slice(0,4);
+  const start=rangeMonth(range.start,{month:"long"});
+  const end=rangeMonth(range.end,{month:"long",year:"numeric"});
+  return startYear===endYear?start+"–"+end:rangeMonth(range.start,{month:"long",year:"numeric"})+"–"+end;
+}
+function cashflowRangeDetail(range){return range?.endPartial?rangeMonth(range.end,{month:"long"})+" bis heute":"Vollständige Monate"}
 function dayMonth(value){if(!value)return "kein Stand";const date=new Date(value);if(Number.isNaN(date.getTime()))return "kein Stand";return new Intl.DateTimeFormat("de-DE",{day:"2-digit",month:"2-digit"}).format(date)}
 function monthWord(value){if(!value)return "nicht bestätigt";const date=new Date(value);if(Number.isNaN(date.getTime()))return "nicht bestätigt";return new Intl.DateTimeFormat("de-DE",{month:"long"}).format(date)+" bestätigt"}
 function stateInfo(source){
@@ -645,6 +715,11 @@ function renderOverview(data){
   const action=data.manualActions.length?'\
     <section class="overview-action" aria-label="Vorsorgewerte prüfen"><span class="task-mark">'+icons.manual+'</span><div><strong>'+data.manualActions.length+' Vorsorgewerte prüfen</strong><p>'+actionDetails+'</p></div><a class="text-action" href="#/data-status"><span><span class="to-prefix">Zum </span>Datenstatus</span>'+icons.chevron+'</a></section>':'';
   const months=data.cashflow.months||[];
+  const selection=cashflowSelection();
+  const range=data.cashflow.range||{months:months.length||selection.months,offset:selection.offset,start:months.at(0)?.key,end:months.at(-1)?.key,endPartial:Boolean(months.at(-1)?.partial)};
+  const rangeLabel=cashflowRangeLabel(range);
+  const rangeDetail=cashflowRangeDetail(range);
+  const rangeAccessible=rangeLabel+". "+rangeDetail;
   const chartMax=Math.max(1,...months.flatMap(month=>[month.incomeMinor,month.spentMinor]));
   const chart=months.length?months.map(month=>'\
     <div class="cashflow-month"><div class="bar-pair">\
@@ -654,8 +729,8 @@ function renderOverview(data){
   const chartTable=months.map(month=>'<tr><th>'+esc(month.label)+(month.partial?' bis heute':'')+'</th><td>'+moneyWhole(month.incomeMinor)+'</td><td>'+moneyWhole(month.spentMinor)+'</td></tr>').join("");
   const cashflow=data.cashflow.state==="current"?'\
     <div class="chart-legend"><span class="legend-key"><i style="background:var(--blue)"></i>Einnahmen</span><span class="legend-key"><i style="background:var(--orange)"></i>Ausgaben</span></div>\
-    <div class="cashflow-chart" role="img" aria-label="Einnahmen und Ausgaben der letzten vier Monate">'+chart+'</div>\
-    <table class="sr-only"><caption>Geldfluss der letzten vier Monate</caption><thead><tr><th>Monat</th><th>Einnahmen</th><th>Ausgaben</th></tr></thead><tbody>'+chartTable+'</tbody></table>'
+    <div class="cashflow-chart" style="--month-count:'+months.length+'" role="img" aria-label="Einnahmen und Ausgaben. '+esc(rangeAccessible)+'">'+chart+'</div>\
+    <table class="sr-only"><caption>Geldfluss: '+esc(rangeAccessible)+'</caption><thead><tr><th>Monat</th><th>Einnahmen</th><th>Ausgaben</th></tr></thead><tbody>'+chartTable+'</tbody></table>'
     :'<div class="panel-unavailable"><p>Geldfluss ist momentan nicht verfügbar.<br>Beim Aktualisieren wird der Abruf erneut versucht.</p></div>';
   const allocation=data.investments.allocation||[];
   const allocationMax=Math.max(1,...allocation.map(item=>item.amountMinor));
@@ -690,7 +765,7 @@ function renderOverview(data){
       <div class="wealth-composition"><div class="wealth-health">'+statusIcon(automaticOk?"ok":"warning")+'<span>'+(automaticOk?'Automatische Quellen aktuell':'Quellenstatus mit Hinweisen')+'</span></div>'+composition+'<div class="composition-legend"><span><i class="composition-cash"></i>Liquidität <strong>'+moneyWhole(data.cash.amountMinor)+'</strong></span><span><i class="composition-investments"></i>Anlagen <strong>'+moneyWhole(data.investments.amountMinor)+'</strong></span></div></div>\
     </section>'+warning+action+'\
     <div class="overview-dashboard-grid">\
-      <section class="overview-panel" aria-labelledby="cashflow-title"><div class="panel-header"><h2 id="cashflow-title">Geldfluss</h2><span class="panel-meta">'+(months.at(-1)?.label?esc(months.at(-1).label)+' bis heute':'')+'</span></div>'+cashflow+'</section>\
+      <section class="overview-panel" data-month-count="'+months.length+'" aria-labelledby="cashflow-title"><div class="panel-header cashflow-panel-header"><div><h2 id="cashflow-title">Geldfluss</h2><p class="cashflow-period">'+esc(rangeLabel)+' <span aria-hidden="true">·</span> '+esc(rangeDetail)+'</p></div><div class="cashflow-controls" aria-label="Zeitraum für Geldfluss"><button class="range-previous" type="button" onclick="shiftCashflow(1)" aria-label="Einen Monat zurück" title="Einen Monat zurück">'+icons.chevron+'</button><label class="sr-only" for="cashflow-window">Angezeigter Zeitraum</label><select class="cashflow-window" id="cashflow-window" name="cashflow-window" autocomplete="off" onchange="setCashflowMonths(this.value)"><option value="4"'+(range.months===4?' selected':'')+'>4 Monate</option><option value="6"'+(range.months===6?' selected':'')+'>6 Monate</option><option value="12"'+(range.months===12?' selected':'')+'>12 Monate</option></select><button class="range-next" type="button" onclick="shiftCashflow(-1)" aria-label="Einen Monat vor" title="Einen Monat vor"'+(range.offset===0?' disabled':'')+'>'+icons.chevron+'</button></div></div>'+cashflow+'</section>\
       <section class="overview-panel" aria-labelledby="allocation-title"><div class="panel-header"><h2 id="allocation-title">Vermögensaufteilung</h2><span class="panel-link" aria-disabled="true" title="Der Vermögensbereich folgt als eigener Schritt">Details in Vermögen</span></div><div class="allocation-list">'+allocationRows+'</div></section>\
       <section class="overview-panel" aria-labelledby="spending-title"><div class="panel-header"><h2 id="spending-title">Ausgaben im '+esc(data.spending.monthLabel||"letzten Monat")+'</h2><strong>'+moneyWhole(data.spending.totalMinor)+'</strong></div>'+spending+'</section>\
       <section class="overview-panel" aria-labelledby="freshness-title"><div class="panel-header"><h2 id="freshness-title">Datenbasis</h2></div><div class="freshness-list">'+freshnessRows+'</div><p class="data-checked">Zuletzt geprüft '+esc(formatDate(data.generatedAt,true))+'</p></section>\
@@ -754,7 +829,10 @@ async function refresh(force=false){
   button.disabled=true;msg((view==="overview"?"Übersicht":"Datenstatus")+" wird aktualisiert …");
   try{
     if(view==="overview"){
-      const data=await call("/api/dashboard/overview"+(force?"?refresh=1":""));renderOverview(data);
+      const range=cashflowSelection();
+      const params=new URLSearchParams({months:String(range.months),offset:String(range.offset)});
+      if(force)params.set("refresh","1");
+      const data=await call("/api/dashboard/overview?"+params.toString());renderOverview(data);
     }else{
       const data=await call("/api/dashboard/status");renderDashboard(data);await loadManualSources();
     }
@@ -815,6 +893,7 @@ window.addEventListener("hashchange",()=>{
   title.tabIndex=-1;
   title.focus({preventScroll:true});
 });
+window.addEventListener("popstate",()=>refresh());
 if(!location.hash)history.replaceState(null,"","#/overview");
 refresh();
 </script>
