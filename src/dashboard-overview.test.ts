@@ -80,6 +80,8 @@ const actual: ActualOverviewSnapshot = {
   },
   categoryMonth: "2026-07",
   categoryMonthLabel: "Juli",
+  categoryMonthOffset: 0,
+  latestCategoryMonth: "2026-07",
   categoryTotalMinor: 1_480_000,
   categories: [{ label: "Lebensmittel", amountMinor: 150_000 }],
   remainingMinor: 1_330_000
@@ -182,7 +184,43 @@ test("Actual liefert vier Monate und die vier größten Kategorien des letzten v
     end: "2026-08",
     endPartial: true
   });
+  assert.equal(result.categoryMonthOffset, 0);
+  assert.equal(result.latestCategoryMonth, "2026-07");
   assert.deepEqual(calls, ["init", "download", "shutdown"]);
+});
+
+test("Ausgabenkategorien können unabhängig auf einen älteren Monat gesetzt werden", async () => {
+  const budgetData = {
+    "2026-05": { totalIncome: 100, totalSpent: -200, categoryGroups: [] },
+    "2026-06": {
+      totalIncome: 300,
+      totalSpent: -400,
+      categoryGroups: [{ categories: [{ name: "Reisen", spent: -250 }, { name: "Alltag", spent: -150 }] }]
+    },
+    "2026-07": { totalIncome: 500, totalSpent: -1500, categoryGroups: [] },
+    "2026-08": { totalIncome: 0, totalSpent: -50, categoryGroups: [] }
+  } as const;
+  const result = await readActualOverview(
+    config.actual!,
+    config.timezone,
+    new Date("2026-08-10T12:00:00Z"),
+    {
+      password: "secret",
+      spendingOffset: 1,
+      loadApi: async () => ({
+        async init() {},
+        async downloadBudget() {},
+        async getBudgetMonth(month) { return budgetData[month as keyof typeof budgetData] as never; },
+        async shutdown() {}
+      })
+    }
+  );
+  assert.equal(result.categoryMonth, "2026-06");
+  assert.equal(result.categoryMonthLabel, "Juni");
+  assert.equal(result.categoryMonthOffset, 1);
+  assert.equal(result.latestCategoryMonth, "2026-07");
+  assert.equal(result.categoryTotalMinor, 400);
+  assert.deepEqual(result.categories.map((category) => category.label), ["Reisen", "Alltag"]);
 });
 
 test("Geldfluss-Zeitraum kann erweitert und monatsweise zurückgesetzt werden", () => {

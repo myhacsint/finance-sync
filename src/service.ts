@@ -87,10 +87,14 @@ export class FinanceService {
 
   async getDashboardOverview(
     force = false,
-    range: { months: number; offset: number } = { months: 4, offset: 0 }
+    range: { months: number; offset: number; spendingOffset: number } = {
+      months: 4,
+      offset: 0,
+      spendingOffset: 0
+    }
   ): Promise<DashboardOverview> {
     const now = Date.now();
-    const cacheKey = `${range.months}:${range.offset}`;
+    const cacheKey = `${range.months}:${range.offset}:${range.spendingOffset}`;
     const cached = this.overviewCache.get(cacheKey);
     if (!force && cached && cached.expiresAt > now) {
       return cached.value;
@@ -105,7 +109,11 @@ export class FinanceService {
               this.config.actual!,
               this.config.timezone,
               generatedAt,
-              { months: range.months, offset: range.offset }
+              {
+                months: range.months,
+                offset: range.offset,
+                spendingOffset: range.spendingOffset
+              }
             ))
           : Promise.reject(new Error("Actual ist deaktiviert")),
         this.config.ghostfolio?.enabled

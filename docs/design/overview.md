@@ -19,3 +19,10 @@ zeigt keine Kontonummern, IBANs oder Namen von Privatpersonen.
 Der Geldfluss setzt diese Regeln mit 4-, 6- und 12-Monats-Fenstern als erste
 Zeitreihe um. Die geprüften Referenzen liegen in
 `cashflow-desktop-navigation.png` und `cashflow-mobile-navigation.png`.
+
+Die Ausgabenkarte verwendet eine davon unabhängige Monatsauswahl. Standard ist
+der letzte vollständig abgeschlossene Monat; 36 Monate sind direkt auswählbar,
+weitere Monate bleiben über die Pfeilnavigation erreichbar. Gesamtbetrag,
+Kategorien und Restbetrag werden gemeinsam für den ausgewählten Monat neu
+geladen. Die geprüften Referenzen liegen in `spending-month-desktop.png` und
+`spending-month-mobile.png`.

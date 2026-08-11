@@ -29,6 +29,8 @@ export interface ActualOverviewSnapshot {
   };
   categoryMonth: string;
   categoryMonthLabel: string;
+  categoryMonthOffset: number;
+  latestCategoryMonth: string;
   categoryTotalMinor: number;
   categories: OverviewCategory[];
   remainingMinor: number;
@@ -78,6 +80,8 @@ export interface DashboardOverview {
     source: "Actual";
     month?: string;
     monthLabel?: string;
+    monthOffset?: number;
+    latestMonth?: string;
     totalMinor: number | null;
     categories: OverviewCategory[];
     remainingMinor: number;
@@ -177,6 +181,7 @@ export async function readActualOverview(
     password?: string;
     months?: number;
     offset?: number;
+    spendingOffset?: number;
   } = {}
 ): Promise<ActualOverviewSnapshot> {
   if (!config.enabled) throw new Error("Actual ist deaktiviert");
@@ -192,7 +197,9 @@ export async function readActualOverview(
     await api.downloadBudget(config.budgetId);
     const keys = overviewMonthKeys(now, timezone, options.months, options.offset);
     const current = monthParts(now, timezone);
-    const categoryKey = monthKey(current.year, current.month, -1);
+    const categoryMonthOffset = Math.max(0, Math.min(120, Math.trunc(options.spendingOffset ?? 0)));
+    const latestCategoryMonth = monthKey(current.year, current.month, -1);
+    const categoryKey = monthKey(current.year, current.month, -1 - categoryMonthOffset);
     const requestedKeys = [...new Set([...keys.map((month) => month.key), categoryKey])];
     const budgetData = new Map(await Promise.all(requestedKeys.map(async (key) => [
       key,
@@ -235,6 +242,8 @@ export async function readActualOverview(
         timeZone: timezone,
         month: "long"
       }).format(new Date(`${completed.key}-15T12:00:00Z`)),
+      categoryMonthOffset,
+      latestCategoryMonth,
       categoryTotalMinor,
       categories: top,
       remainingMinor: Math.max(
@@ -435,6 +444,8 @@ export function buildDashboardOverview(
       source: "Actual",
       month: actualData?.categoryMonth,
       monthLabel: actualData?.categoryMonthLabel,
+      monthOffset: actualData?.categoryMonthOffset,
+      latestMonth: actualData?.latestCategoryMonth,
       totalMinor: actualData?.categoryTotalMinor ?? null,
       categories: actualData?.categories ?? [],
       remainingMinor: actualData?.remainingMinor ?? 0
