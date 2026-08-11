@@ -34,10 +34,31 @@ test("Datenstatus enthält responsive Navigation und zugängliche Hauptbereiche"
 test("Übersicht und Datenstatus sind als tiefe Links erreichbar", () => {
   const html = renderUi();
   assert.match(html, /#\/overview/);
+  assert.match(html, /#\/spending/);
   assert.match(html, /#\/data-status/);
   assert.match(html, /window\.addEventListener\("hashchange"/);
   assert.match(html, /window\.addEventListener\("popstate"/);
   assert.match(html, /href="#\/data-status"/);
+  assert.match(html, /href="#\/spending">Alle Ausgaben ansehen/);
+});
+
+test("Ausgabenansicht besitzt Navigation, Filter, Pagination und mobile Buchungen", () => {
+  const html = renderUi();
+  assert.match(html, /\/api\/dashboard\/spending/);
+  assert.match(html, /expenseMonth/);
+  assert.match(html, /expenseCategory/);
+  assert.match(html, /expenseAccount/);
+  assert.match(html, /expenseSearch/);
+  assert.match(html, /expenseCategorySearch/);
+  assert.match(html, /expenseCategoriesExpanded/);
+  assert.match(html, /expensePage/);
+  assert.match(html, /Kategorie suchen …/);
+  assert.match(html, /Händler oder Buchung suchen …/);
+  assert.match(html, /Alle Konten/);
+  assert.match(html, /expense-pagination/);
+  assert.match(html, /expense-mobile-list/);
+  assert.match(html, /Kategorisiert/);
+  assert.match(html, /new Intl\.DateTimeFormat\("de-DE",\{day:"2-digit",month:"2-digit",year:"numeric",timeZone:"UTC"\}\)/);
 });
 
 test("Verwaltungstoken bleibt nur für die Browsersitzung gespeichert", () => {

@@ -38,6 +38,13 @@ import {
   readInvestmentOverview,
   type DashboardOverview
 } from "./dashboard-overview.js";
+import {
+  buildDashboardSpending,
+  readActualSpendingMonth,
+  type ActualSpendingMonthSnapshot,
+  type DashboardSpending,
+  type SpendingQuery
+} from "./dashboard-spending.js";
 
 export class FinanceService {
   private running = new Set<string>();
@@ -45,6 +52,8 @@ export class FinanceService {
   private reconcileTail: Promise<void> = Promise.resolve();
   private overviewCache = new Map<string, { expiresAt: number; value: DashboardOverview }>();
   private overviewLoading = new Map<string, Promise<DashboardOverview>>();
+  private spendingCache = new Map<string, { expiresAt: number; value: ActualSpendingMonthSnapshot }>();
+  private spendingLoading = new Map<string, Promise<ActualSpendingMonthSnapshot>>();
 
   constructor(readonly db: FinanceDatabase, readonly config: AppConfig) {
     for (const source of config.sources) {
@@ -140,6 +149,35 @@ export class FinanceService {
     } finally {
       this.overviewLoading.delete(cacheKey);
     }
+  }
+
+  async getDashboardSpending(
+    force = false,
+    request: SpendingQuery & { month?: string } = {}
+  ): Promise<DashboardSpending> {
+    if (!this.config.actual?.enabled) throw new Error("Actual ist deaktiviert");
+    const cacheKey = request.month ?? "latest";
+    const now = Date.now();
+    let snapshot = this.spendingCache.get(cacheKey);
+    if (force || !snapshot || snapshot.expiresAt <= now) {
+      let loading = this.spendingLoading.get(cacheKey);
+      if (!loading) {
+        loading = this.withActual(() => readActualSpendingMonth(
+          this.config.actual!,
+          this.config.timezone,
+          request.month
+        ));
+        this.spendingLoading.set(cacheKey, loading);
+      }
+      try {
+        const value = await loading;
+        snapshot = { expiresAt: Date.now() + 5 * 60_000, value };
+        this.spendingCache.set(cacheKey, snapshot);
+      } finally {
+        this.spendingLoading.delete(cacheKey);
+      }
+    }
+    return buildDashboardSpending(snapshot.value, request);
   }
 
   private async importSourceBundle(

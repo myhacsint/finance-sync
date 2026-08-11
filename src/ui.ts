@@ -283,6 +283,7 @@ export function renderUi(): string {
     .empty { border: 1px dashed var(--line); border-radius: 14px; padding: 22px; color: var(--muted); text-align: center; }
     .skeleton { position: relative; overflow: hidden; background: var(--surface-2); color: transparent; border-radius: 7px; }
     .skeleton::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.05), transparent); animation: shimmer 1.4s infinite; }
+    .expense-loading .skeleton::after { display: none; }
     @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
     .sr-only {
       position: absolute;
@@ -452,6 +453,113 @@ export function renderUi(): string {
     .data-checked { margin-top: 13px; color: var(--muted); font-size: 12px; }
     .panel-unavailable { display: grid; min-height: 190px; place-items: center; color: var(--muted); text-align: center; }
     .overview-warning { margin: 14px 0 0; border: 1px solid #7b5316; border-radius: 10px; padding: 12px 14px; background: #2b2115; color: #dcc8a6; }
+    .expense-summary-band {
+      display: grid;
+      grid-template-columns: minmax(290px, 1.2fr) repeat(3, minmax(150px, .8fr));
+      align-items: stretch;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .expense-period { display: flex; align-items: center; padding: 20px; }
+    .expense-period .period-controls { width: 100%; }
+    .expense-period select { flex: 1; min-width: 150px; cursor: pointer; }
+    .expense-summary-stat { display: grid; align-content: center; min-height: 104px; border-left: 1px solid var(--line-soft); padding: 18px 22px; }
+    .expense-summary-stat span { color: var(--muted); font-size: 13px; }
+    .expense-summary-stat strong { margin-top: 5px; font-size: 25px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+    .expense-workspace {
+      display: grid;
+      grid-template-columns: minmax(300px, .75fr) minmax(620px, 1.9fr);
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .expense-pane { min-width: 0; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
+    .expense-category-pane { padding: 18px 16px; }
+    .expense-transactions-pane { padding: 18px 16px 12px; }
+    .expense-pane-heading { margin-bottom: 12px; }
+    .expense-pane-heading h2 { font-size: 19px; }
+    .expense-pane-heading p { margin-top: 3px; color: var(--muted); font-size: 13px; }
+    .expense-search { position: relative; display: block; margin: 0; }
+    .expense-search svg { position: absolute; top: 50%; left: 12px; width: 18px; height: 18px; color: var(--muted); transform: translateY(-50%); pointer-events: none; }
+    .expense-search input {
+      width: 100%;
+      min-height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #0d1525;
+      color: var(--text);
+      padding: 10px 12px 10px 39px;
+    }
+    .expense-search input::placeholder { color: var(--muted); opacity: 1; }
+    .expense-category-list { display: grid; gap: 4px; margin-top: 12px; }
+    .expense-category {
+      display: grid;
+      width: 100%;
+      min-height: 58px;
+      gap: 6px;
+      border: 1px solid transparent;
+      border-radius: 9px;
+      padding: 9px 10px;
+      background: transparent;
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+    }
+    .expense-category:hover { background: var(--surface-2); }
+    .expense-category[aria-current="true"] { border-color: #4f91ff; background: #162b4c; }
+    .expense-category-main { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+    .expense-category-check { display: none; width: 20px; height: 20px; place-items: center; border-radius: 50%; background: var(--blue); color: #07111f; }
+    .expense-category-check svg { width: 13px; height: 13px; }
+    .expense-category[aria-current="true"] .expense-category-check { display: grid; }
+    .expense-category-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .expense-category strong { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .expense-category-track { height: 7px; overflow: hidden; border-radius: 3px; background: #1a263b; }
+    .expense-category-track i { display: block; width: var(--width); height: 100%; border-radius: inherit; background: var(--orange); }
+    .expense-category-all { min-height: 46px; align-content: center; }
+    .expense-category-all .expense-category-track { display: none; }
+    .expense-category-more { display: none; width: 100%; min-height: 44px; border: 0; background: transparent; color: #7fb0ff; cursor: pointer; }
+    .expense-category-more:hover { background: var(--surface-2); }
+    .expense-category-more svg { width: 16px; height: 16px; margin-left: 4px; vertical-align: middle; }
+    .expense-toolbar { display: grid; grid-template-columns: minmax(260px, 1.5fr) minmax(160px, .65fr); gap: 10px; margin-bottom: 12px; }
+    .expense-toolbar label { margin: 0; }
+    .expense-toolbar select { min-height: 44px; cursor: pointer; }
+    .expense-table-wrap { overflow-x: auto; border: 1px solid var(--line-soft); border-radius: 9px; }
+    .expense-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .expense-table th, .expense-table td { padding: 9px 12px; border-bottom: 1px solid var(--line-soft); text-align: left; }
+    .expense-table tr:last-child td { border-bottom: 0; }
+    .expense-table th { color: var(--muted); font-size: 12px; font-weight: 500; }
+    .expense-table th:nth-child(1) { width: 16%; }
+    .expense-table th:nth-child(2) { width: 24%; }
+    .expense-table th:nth-child(3) { width: 23%; }
+    .expense-table th:nth-child(4) { width: 22%; }
+    .expense-table th:nth-child(5) { width: 15%; }
+    .expense-table th:last-child, .expense-table td:last-child { text-align: right; }
+    .expense-table td { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+    .expense-amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .expense-refund { color: var(--green); }
+    .expense-mobile-list { display: none; overflow: hidden; border: 1px solid var(--line-soft); border-radius: 9px; }
+    .expense-mobile-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; min-height: 78px; align-content: center; padding: 11px 12px; }
+    .expense-mobile-row + .expense-mobile-row { border-top: 1px solid var(--line-soft); }
+    .expense-mobile-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .expense-mobile-row .expense-date { color: var(--muted); font-size: 12px; }
+    .expense-mobile-meta { overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+    .expense-pagination { display: flex; min-height: 52px; align-items: center; justify-content: space-between; gap: 14px; padding-top: 9px; color: var(--muted); }
+    .expense-pagination span { font-variant-numeric: tabular-nums; }
+    .expense-pagination-actions { display: flex; gap: 7px; }
+    .expense-pagination button { display: grid; width: 44px; height: 44px; place-items: center; border: 1px solid var(--line); border-radius: 9px; background: #111c30; cursor: pointer; }
+    .expense-pagination button:disabled { cursor: not-allowed; opacity: .38; }
+    .expense-pagination button:hover:not(:disabled) { border-color: #3b4d6a; background: var(--surface-2); }
+    .expense-pagination svg { width: 17px; height: 17px; }
+    .expense-pagination .page-previous svg { transform: rotate(90deg); }
+    .expense-pagination .page-next svg { transform: rotate(-90deg); }
+    .expense-state { display: grid; min-height: 390px; place-items: center; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); padding: 32px; text-align: center; }
+    .expense-state-inner { max-width: 440px; }
+    .expense-state .status-icon { width: 48px; height: 48px; margin: 0 auto 18px; }
+    .expense-state .status-icon svg { width: 24px; height: 24px; }
+    .expense-state h2 { font-size: 20px; }
+    .expense-state p { margin: 7px 0 18px; color: var(--muted); }
     .mobile-nav { display: none; }
     @media (max-width: 980px) {
       .sidebar { width: 216px; }
@@ -463,6 +571,10 @@ export function renderUi(): string {
       .task-list { grid-template-columns: 1fr; }
       .system-band { grid-template-columns: repeat(2, 1fr); }
       .wealth-overview { grid-template-columns: 1fr; gap: 24px; }
+      .expense-summary-band { grid-template-columns: 1fr repeat(3, 1fr); }
+      .expense-period { grid-column: 1 / -1; border-bottom: 1px solid var(--line-soft); }
+      .expense-summary-stat:first-of-type { border-left: 0; }
+      .expense-workspace { grid-template-columns: minmax(250px, .8fr) minmax(460px, 1.4fr); }
       .system-item:nth-child(3) { border-left: 0; border-top: 1px solid var(--line-soft); }
       .system-item:nth-child(4) { border-top: 1px solid var(--line-soft); }
     }
@@ -499,6 +611,19 @@ export function renderUi(): string {
       .overview-action .text-action { padding: 0; font-size: 12px; }
       .overview-action .to-prefix { display: none; }
       .overview-dashboard-grid { grid-template-columns: 1fr; }
+      .expense-summary-band { grid-template-columns: repeat(3, 1fr); }
+      .expense-period { padding: 16px; }
+      .expense-summary-stat { min-height: 88px; padding: 14px 12px; }
+      .expense-summary-stat strong { font-size: 21px; }
+      .expense-workspace { grid-template-columns: 1fr; }
+      .expense-category-pane, .expense-transactions-pane { padding: 18px 16px; }
+      .expense-category:nth-of-type(n+7) { display: none; }
+      .categories-expanded .expense-category:nth-of-type(n+7) { display: grid; }
+      .expense-category-more { display: block; }
+      .categories-expanded .expense-category-more svg { transform: rotate(180deg); }
+      .expense-table-wrap { display: none; }
+      .expense-mobile-list { display: block; }
+      .expense-toolbar { grid-template-columns: 1fr; }
       .overview-panel { padding: 18px 16px; }
       .overview-panel .panel-header { gap: 8px; }
       .overview-panel .panel-header h2 { font-size: 18px; }
@@ -544,6 +669,12 @@ export function renderUi(): string {
       .chart-value { font-size: 10px; }
       .spending-row { grid-template-columns: minmax(0, 1fr) auto; }
       .spending-track { display: none; }
+      .expense-summary-band { grid-template-columns: 1fr; }
+      .expense-summary-stat { min-height: 68px; border-left: 0; border-top: 1px solid var(--line-soft); grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+      .expense-summary-stat strong { margin-top: 0; }
+      .expense-period .period-controls { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; }
+      .expense-category { min-height: 62px; }
+      .expense-mobile-row { grid-template-columns: minmax(0, 1fr) auto; }
       .freshness-label { flex-wrap: nowrap; font-size: 12px; }
       .freshness-status { font-size: 12px; }
     }
@@ -595,18 +726,20 @@ const icons={
   manual:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 3h9l4 4v14H6zM15 3v5h5M9 13h6M9 17h4"/></svg>',
   archive:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7h16v13H4zM3 3h18v4H3zM9 11h6"/></svg>',
   chevron:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>',
+  search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg>',
   check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m6 12 4 4 8-9"/></svg>',
   warning:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 4 3 20h18L12 4Zm0 5v5m0 3v.1"/></svg>'
 };
 const navItems=[
   {label:"Übersicht",icon:"overview",view:"overview"},
-  {label:"Ausgaben",icon:"expenses"},
+  {label:"Ausgaben",icon:"expenses",view:"spending"},
   {label:"Vermögen",icon:"assets"},
   {label:"Analysen",icon:"analysis"},
   {label:"Datenstatus",icon:"status",view:"status"}
 ];
-function activeView(){return location.hash==="#\/data-status"?"status":"overview"}
-function navMarkup(){const current=activeView();return navItems.map(item=>item.view?'<a class="nav-item" href="'+(item.view==="status"?'#/data-status':'#/overview')+'"'+(item.view===current?' aria-current="page"':'')+'>'+icons[item.icon]+'<span>'+item.label+'</span></a>':'<button class="nav-item" type="button" disabled title="Folgt in einem späteren Schritt">'+icons[item.icon]+'<span>'+item.label+'</span></button>').join("")}
+function activeView(){return location.hash==="#\/data-status"?"status":location.hash==="#\/spending"?"spending":"overview"}
+function viewHref(view){return view==="status"?'#/data-status':view==="spending"?'#/spending':'#/overview'}
+function navMarkup(){const current=activeView();return navItems.map(item=>item.view?'<a class="nav-item" href="'+viewHref(item.view)+'"'+(item.view===current?' aria-current="page"':'')+'>'+icons[item.icon]+'<span>'+item.label+'</span></a>':'<button class="nav-item" type="button" disabled title="Folgt in einem späteren Schritt">'+icons[item.icon]+'<span>'+item.label+'</span></button>').join("")}
 function renderNavigation(){document.getElementById("desktop-nav").innerHTML=navMarkup();document.getElementById("mobile-nav").innerHTML=navMarkup()}
 renderNavigation();
 
@@ -615,6 +748,7 @@ if(legacyToken&&!sessionStorage.getItem("financeToken"))sessionStorage.setItem("
 localStorage.removeItem("financeToken");
 let token=sessionStorage.getItem("financeToken")||"";
 let currentPreview=null;
+let currentExpenseMonth="";
 
 function requestToken(){
   const supplied=prompt("Finance Hub Verwaltungstoken eingeben");
@@ -624,7 +758,7 @@ function requestToken(){
   return Boolean(token);
 }
 async function call(path,options={},retry=true){
-  if(!token&&!requestToken())throw new Error("Für den Datenstatus wird das Verwaltungstoken benötigt.");
+  if(!token&&!requestToken())throw new Error("Für die Finance-Hub-Daten wird das Verwaltungstoken benötigt.");
   const response=await fetch(path,{...options,headers:{authorization:"Bearer "+token,"content-type":"application/json",...options.headers}});
   let result={};
   try{result=await response.json()}catch{}
@@ -709,6 +843,70 @@ function spendingMonthOptions(latestMonth,selectedOffset){
     return '<option value="'+offset+'"'+(offset===selectedOffset?' selected':'')+'>'+esc(rangeMonth(key,{month:"long",year:"numeric"}))+'</option>';
   }).join("");
 }
+function expenseSelection(){
+  const params=new URLSearchParams(location.search);
+  const page=Number(params.get("expensePage")||1);
+  return {
+    month:params.get("expenseMonth")||"",
+    category:params.get("expenseCategory")||"all",
+    account:params.get("expenseAccount")||"all",
+    search:(params.get("expenseSearch")||"").slice(0,80),
+    categorySearch:(params.get("expenseCategorySearch")||"").slice(0,80),
+    expanded:params.get("expenseCategoriesExpanded")==="1",
+    page:Number.isInteger(page)?Math.max(1,Math.min(100000,page)):1
+  };
+}
+function setExpenseParams(changes,replace=false){
+  const params=new URLSearchParams(location.search);
+  const names={month:"expenseMonth",category:"expenseCategory",account:"expenseAccount",search:"expenseSearch",page:"expensePage"};
+  Object.entries(changes).forEach(([key,value])=>{
+    const name=names[key];if(!name)return;
+    const text=String(value??"").trim();
+    if(!text||text==="all"||(key==="page"&&text==="1"))params.delete(name);else params.set(name,text);
+  });
+  const query=params.toString();
+  const url=(query?"?"+query:location.pathname)+location.hash;
+  history[replace?"replaceState":"pushState"](null,"",url);
+  refresh();
+}
+function setExpenseMonth(value){setExpenseParams({month:value,category:"",page:1})}
+function shiftExpenseMonth(offset){
+  const current=expenseSelection().month||currentExpenseMonth;
+  if(!current)return;
+  setExpenseMonth(shiftMonthKey(current,Number(offset)));
+}
+function setExpenseCategory(value){setExpenseParams({category:value,page:1})}
+function setExpenseAccount(value){setExpenseParams({account:value,category:"",page:1})}
+function setExpensePage(value){setExpenseParams({page:value})}
+let expenseSearchTimer;
+function updateExpenseSearch(value){
+  clearTimeout(expenseSearchTimer);
+  expenseSearchTimer=setTimeout(()=>setExpenseParams({search:String(value).slice(0,80),category:"",page:1},true),300);
+}
+function expenseMonthOptions(latestMonth,oldestMonth,selectedMonth){
+  if(!latestMonth)return "";
+  const keys=Array.from({length:36},(_,offset)=>shiftMonthKey(latestMonth,-offset)).filter(key=>!oldestMonth||key>=oldestMonth);
+  if(selectedMonth&&!keys.includes(selectedMonth))keys.push(selectedMonth);
+  return keys.sort().reverse().map(key=>'<option value="'+key+'"'+(key===selectedMonth?' selected':'')+'>'+esc(rangeMonth(key,{month:"long",year:"numeric"}))+'</option>').join("");
+}
+function filterExpenseCategories(value){
+  const needle=String(value||"").trim().toLocaleLowerCase("de-DE");
+  document.querySelectorAll(".expense-category").forEach(row=>{row.hidden=Boolean(needle)&&!String(row.dataset.label||"").toLocaleLowerCase("de-DE").includes(needle)});
+  const params=new URLSearchParams(location.search);
+  if(needle)params.set("expenseCategorySearch",String(value).slice(0,80));else params.delete("expenseCategorySearch");
+  const query=params.toString();
+  history.replaceState(null,"",(query?"?"+query:location.pathname)+location.hash);
+}
+function toggleExpenseCategories(button){
+  const list=document.getElementById("expense-category-pane");
+  const expanded=list.classList.toggle("categories-expanded");
+  button.setAttribute("aria-expanded",String(expanded));
+  button.firstChild.textContent=expanded?"Weniger anzeigen":"Weitere anzeigen";
+  const params=new URLSearchParams(location.search);
+  if(expanded)params.set("expenseCategoriesExpanded","1");else params.delete("expenseCategoriesExpanded");
+  const query=params.toString();
+  history.replaceState(null,"",(query?"?"+query:location.pathname)+location.hash);
+}
 function rangeMonth(key,format){
   const match=String(key||"").match(/^(\\d{4})-(\\d{2})$/);
   if(!match)return "";
@@ -781,7 +979,7 @@ function renderOverview(data){
     <div class="spending-row"><span>'+esc(item.label)+'</span><span class="spending-track" aria-hidden="true"><i style="--width:'+item.amountMinor/spendingMax*100+'%"></i></span><strong>'+moneyWhole(item.amountMinor)+'</strong></div>').join("");
   const spending=data.spending.state==="current"?'\
     <div class="spending-list">'+categoryRows+'<div class="spending-row spending-other"><span>Weitere Kategorien</span><span class="spending-track"></span><strong>'+moneyWhole(data.spending.remainingMinor)+'</strong></div></div>\
-    <div class="panel-footer"><span class="panel-link" aria-disabled="true" title="Der Ausgabenbereich folgt als nächster eigener Schritt">Alle Ausgaben ansehen</span></div>'
+    <div class="panel-footer"><a class="panel-link" href="#/spending">Alle Ausgaben ansehen</a></div>'
     :'<div class="panel-unavailable"><p>Die Ausgabenübersicht ist momentan nicht verfügbar.</p></div>';
   const freshnessStatus={
     current:{tone:"ok",label:"Aktuell"},
@@ -808,6 +1006,52 @@ function renderOverview(data){
       <section class="overview-panel" aria-labelledby="spending-title"><div class="panel-header spending-panel-header"><div class="spending-summary"><h2 id="spending-title">Ausgaben</h2><strong>'+moneyWhole(data.spending.totalMinor)+'</strong></div>'+spendingControls+'</div>'+spending+'</section>\
       <section class="overview-panel" aria-labelledby="freshness-title"><div class="panel-header"><h2 id="freshness-title">Datenbasis</h2></div><div class="freshness-list">'+freshnessRows+'</div><p class="data-checked">Zuletzt geprüft '+esc(formatDate(data.generatedAt,true))+'</p></section>\
     </div>';
+  document.getElementById("dashboard").setAttribute("aria-busy","false");
+}
+
+function expenseDate(value){
+  const match=String(value||"").match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
+  if(!match)return esc(value);
+  return new Intl.DateTimeFormat("de-DE",{day:"2-digit",month:"2-digit",year:"numeric",timeZone:"UTC"}).format(new Date(Date.UTC(Number(match[1]),Number(match[2])-1,Number(match[3]))));
+}
+function expenseAmount(minor){
+  const value=Number(minor)||0;
+  return new Intl.NumberFormat("de-DE",{style:"currency",currency:"EUR",signDisplay:value<0?"always":"auto"}).format(-value/100);
+}
+function expenseState(title,text,action,label,tone="critical"){
+  return '<section class="expense-state" role="status"><div class="expense-state-inner">'+statusIcon(tone)+'<h2>'+esc(title)+'</h2><p>'+esc(text)+'</p>'+(action?'<button class="button secondary" type="button" onclick="'+action+'">'+esc(label)+'</button>':'')+'</div></section>';
+}
+function renderSpendingError(error){
+  document.getElementById("dashboard").innerHTML=expenseState("Nicht verfügbar","Die Buchungen konnten nicht geladen werden. Bitte versuche es erneut.","refresh(true)","Erneut versuchen");
+  document.getElementById("dashboard").setAttribute("aria-busy","false");
+  msg(error?.message||"Die Ausgaben konnten nicht geladen werden.",true);
+}
+function renderSpending(data){
+  currentExpenseMonth=data.month;
+  const uiState=expenseSelection();
+  const empty=data.summary.bookings===0;
+  const monthControls='<div class="period-controls" aria-label="Ausgabenmonat"><button class="range-previous" type="button" onclick="shiftExpenseMonth(-1)" aria-label="Einen Ausgabenmonat zurück" title="Einen Ausgabenmonat zurück"'+(data.month<=data.oldestMonth?' disabled':'')+'>'+icons.chevron+'</button><label class="sr-only" for="expense-month">Angezeigter Ausgabenmonat</label><select id="expense-month" name="expense-month" autocomplete="off" onchange="setExpenseMonth(this.value)">'+expenseMonthOptions(data.latestMonth,data.oldestMonth,data.month)+'</select><button class="range-next" type="button" onclick="shiftExpenseMonth(1)" aria-label="Einen Ausgabenmonat vor" title="Einen Ausgabenmonat vor"'+(data.month>=data.latestMonth?' disabled':'')+'>'+icons.chevron+'</button></div>';
+  const summary='<section class="expense-summary-band" aria-label="Ausgabenübersicht für '+esc(data.monthLabel)+'"><div class="expense-period">'+monthControls+'</div><div class="expense-summary-stat"><span>Gesamtausgaben</span><strong>'+(empty?'–':moneyWhole(data.summary.totalMinor))+'</strong></div><div class="expense-summary-stat"><span>Buchungen</span><strong>'+(empty?'–':esc(data.summary.bookings))+'</strong></div><div class="expense-summary-stat"><span>Kategorisiert</span><strong>'+(empty?'–':esc(data.summary.categorizedPercent)+' %')+'</strong></div></section>';
+  if(empty){
+    document.getElementById("dashboard").innerHTML=summary+'<div style="margin-top:12px">'+expenseState("Keine Buchungen","Für diesen Monat liegen keine Buchungen vor. Wähle einen anderen Monat.","document.getElementById(&quot;expense-month&quot;).focus()","Monat wechseln","warning")+'</div>';
+    document.getElementById("dashboard").setAttribute("aria-busy","false");
+    return;
+  }
+  const selectedCategory=data.categories.find(category=>category.selected)?.label||"Alle Kategorien";
+  const maxCategory=Math.max(1,...data.categories.filter(category=>category.key!=="all").map(category=>Math.max(0,category.amountMinor)));
+  const categoryRows=data.categories.map((category,index)=>{
+    const width=category.key==="all"?0:Math.max(1,Math.round(Math.max(0,category.amountMinor)/maxCategory*100));
+    return '<button class="expense-category'+(category.key==="all"?' expense-category-all':'')+'" type="button" data-label="'+esc(category.label)+'" aria-current="'+String(category.selected)+'" onclick="setExpenseCategory(&quot;'+esc(category.key)+'&quot;)"><span class="expense-category-main"><span class="expense-category-check">'+icons.check+'</span><span class="expense-category-name">'+esc(category.label)+'</span><strong>'+moneyWhole(category.amountMinor)+'</strong></span><span class="expense-category-track" aria-hidden="true"><i style="--width:'+width+'%"></i></span></button>';
+  }).join("");
+  const more=data.categories.length>6?'<button class="expense-category-more" type="button" aria-expanded="'+String(uiState.expanded)+'" onclick="toggleExpenseCategories(this)"><span>'+(uiState.expanded?'Weniger anzeigen':'Weitere anzeigen')+'</span>'+icons.chevron+'</button>':'';
+  const accounts='<option value="all"'+(data.selection.account==="all"?' selected':'')+'>Alle Konten</option>'+data.accounts.map(account=>'<option value="'+esc(account.key)+'"'+(account.key===data.selection.account?' selected':'')+'>'+esc(account.label)+'</option>').join("");
+  const desktopRows=data.transactions.map(row=>'<tr><td>'+expenseDate(row.date)+'</td><td title="'+esc(row.merchant)+'">'+esc(row.merchant)+'</td><td title="'+esc(row.account)+'">'+esc(row.account)+'</td><td title="'+esc(row.category)+'">'+esc(row.category)+'</td><td class="expense-amount'+(row.amountMinor<0?' expense-refund':'')+'">'+expenseAmount(row.amountMinor)+'</td></tr>').join("");
+  const mobileRows=data.transactions.map(row=>'<article class="expense-mobile-row"><span class="expense-date">'+expenseDate(row.date)+'</span><span class="expense-amount'+(row.amountMinor<0?' expense-refund':'')+'">'+expenseAmount(row.amountMinor)+'</span><strong>'+esc(row.merchant)+'</strong><span></span><span class="expense-mobile-meta">'+esc(row.account)+' · '+esc(row.category)+'</span></article>').join("");
+  const transactionBody=data.transactions.length?'<div class="expense-table-wrap"><table class="expense-table"><thead><tr><th>Datum</th><th>Händler</th><th>Konto</th><th>Kategorie</th><th>Betrag</th></tr></thead><tbody>'+desktopRows+'</tbody></table></div><div class="expense-mobile-list">'+mobileRows+'</div>':expenseState("Keine Treffer","Für diese Filter liegen keine Buchungen vor.","setExpenseParams({category:&quot;&quot;,account:&quot;&quot;,search:&quot;&quot;,page:1})","Filter zurücksetzen","warning");
+  const page=data.pagination;
+  const pagination='<div class="expense-pagination"><span>'+page.from+'–'+page.to+' von '+page.total+'</span><div class="expense-pagination-actions"><button class="page-previous" type="button" onclick="setExpensePage('+(page.page-1)+')" aria-label="Vorherige Buchungsseite"'+(page.page<=1?' disabled':'')+'>'+icons.chevron+'</button><button class="page-next" type="button" onclick="setExpensePage('+(page.page+1)+')" aria-label="Nächste Buchungsseite"'+(page.page>=page.pages?' disabled':'')+'>'+icons.chevron+'</button></div></div>';
+  document.getElementById("dashboard").innerHTML=summary+'<div class="expense-workspace"><section class="expense-pane expense-category-pane'+(uiState.expanded?' categories-expanded':'')+'" id="expense-category-pane" aria-labelledby="expense-categories-title"><div class="expense-pane-heading"><h2 id="expense-categories-title">Kategorien</h2></div><label class="expense-search"><span class="sr-only">Kategorie suchen</span>'+icons.search+'<input type="search" name="expense-category-search" value="'+esc(uiState.categorySearch)+'" autocomplete="off" placeholder="Kategorie suchen …" oninput="filterExpenseCategories(this.value)"></label><div class="expense-category-list">'+categoryRows+'</div>'+more+'</section><section class="expense-pane expense-transactions-pane" aria-labelledby="expense-transactions-title"><div class="expense-pane-heading"><h2 id="expense-transactions-title">Buchungen</h2><p>'+esc(selectedCategory)+' · '+data.filtered.bookings+' Buchungen</p></div><div class="expense-toolbar"><label class="expense-search"><span class="sr-only">Händler oder Buchung suchen</span>'+icons.search+'<input type="search" name="expense-transaction-search" value="'+esc(data.selection.search)+'" autocomplete="off" placeholder="Händler oder Buchung suchen …" oninput="updateExpenseSearch(this.value)"></label><label><span class="sr-only">Konto filtern</span><select name="expense-account" autocomplete="off" onchange="setExpenseAccount(this.value)">'+accounts+'</select></label></div>'+transactionBody+pagination+'</section></div>';
+  if(uiState.categorySearch)filterExpenseCategories(uiState.categorySearch);
   document.getElementById("dashboard").setAttribute("aria-busy","false");
 }
 
@@ -845,18 +1089,24 @@ function renderDashboard(data){
 }
 
 function renderHeader(view){
-  const overview=view==="overview";
-  document.title=(overview?"Übersicht":"Datenstatus")+" · Finance Hub";
+  const content={
+    overview:{title:"Übersicht",subtitle:"Finanzen, Vermögen und offene Punkte auf einen Blick."},
+    spending:{title:"Ausgaben",subtitle:"Kategorien und zugehörige Buchungen nachvollziehen."},
+    status:{title:"Datenstatus",subtitle:"Aktualität, offene Aufgaben und Systemzustand auf einen Blick."}
+  }[view];
+  document.title=content.title+" · Finance Hub";
   const eyebrow=document.getElementById("page-eyebrow");
-  eyebrow.hidden=overview;
-  document.getElementById("page-title").textContent=overview?"Übersicht":"Datenstatus";
-  document.getElementById("page-subtitle").textContent=overview?"Finanzen, Vermögen und offene Punkte auf einen Blick.":"Aktualität, offene Aufgaben und Systemzustand auf einen Blick.";
-  document.getElementById("refresh-button").setAttribute("aria-label",(overview?"Übersicht":"Datenstatus")+" aktualisieren");
+  eyebrow.hidden=view!=="status";
+  document.getElementById("page-title").textContent=content.title;
+  document.getElementById("page-subtitle").textContent=content.subtitle;
+  document.getElementById("refresh-button").setAttribute("aria-label",content.title+" aktualisieren");
 }
 function renderLoading(view){
   document.getElementById("dashboard").setAttribute("aria-busy","true");
   document.getElementById("dashboard").innerHTML=view==="overview"?'\
     <section class="wealth-overview" aria-label="Vermögensübersicht wird geladen"><div><div class="skeleton" style="width:52%;height:18px">Lädt</div><div class="skeleton" style="width:72%;height:48px;margin-top:10px">Lädt</div></div><div class="skeleton" style="width:100%;height:28px">Lädt</div></section>'
+    :view==="spending"?'\
+    <div class="expense-loading" aria-label="Ausgaben werden geladen"><section class="expense-summary-band"><div class="expense-period"><div class="skeleton" style="width:100%;height:44px">Lädt</div></div><div class="expense-summary-stat"><div class="skeleton" style="width:76%;height:16px">Lädt</div><div class="skeleton" style="width:58%;height:28px;margin-top:8px">Lädt</div></div><div class="expense-summary-stat"><div class="skeleton" style="width:68%;height:16px">Lädt</div><div class="skeleton" style="width:42%;height:28px;margin-top:8px">Lädt</div></div><div class="expense-summary-stat"><div class="skeleton" style="width:68%;height:16px">Lädt</div><div class="skeleton" style="width:42%;height:28px;margin-top:8px">Lädt</div></div></section><div class="expense-workspace"><section class="expense-pane expense-category-pane"><div class="skeleton" style="width:45%;height:24px">Lädt</div><div class="skeleton" style="width:100%;height:44px;margin-top:16px">Lädt</div><div class="skeleton" style="width:100%;height:250px;margin-top:12px">Lädt</div></section><section class="expense-pane expense-transactions-pane"><div class="skeleton" style="width:35%;height:24px">Lädt</div><div class="skeleton" style="width:100%;height:44px;margin-top:16px">Lädt</div><div class="skeleton" style="width:100%;height:330px;margin-top:12px">Lädt</div></section></div></div>'
     :'\
     <section class="status-overview" aria-label="Statusübersicht wird geladen"><div class="overview-main"><div class="skeleton" style="width:72%;height:28px">Lädt</div><div class="skeleton" style="width:42%;height:16px;margin-top:12px">Lädt</div></div><div class="overview-stats"><div class="stat"><strong>–</strong><span>Automatisch aktuell</span></div><div class="stat"><strong>–</strong><span>Aufgaben</span></div><div class="stat"><strong>–</strong><span>Historische Importe</span></div></div></section>';
 }
@@ -864,7 +1114,8 @@ async function refresh(force=false){
   const view=activeView();
   const button=document.getElementById("refresh-button");
   renderHeader(view);renderNavigation();renderLoading(view);
-  button.disabled=true;msg((view==="overview"?"Übersicht":"Datenstatus")+" wird aktualisiert …");
+  const loadingLabel=view==="overview"?"Übersicht":view==="spending"?"Ausgaben":"Datenstatus";
+  button.disabled=true;msg(loadingLabel+" wird aktualisiert …");
   try{
     if(view==="overview"){
       const range=cashflowSelection();
@@ -872,12 +1123,22 @@ async function refresh(force=false){
       params.set("spendingOffset",String(spendingSelection().offset));
       if(force)params.set("refresh","1");
       const data=await call("/api/dashboard/overview?"+params.toString());renderOverview(data);
+    }else if(view==="spending"){
+      const selection=expenseSelection();
+      const params=new URLSearchParams();
+      if(selection.month)params.set("month",selection.month);
+      if(selection.category!=="all")params.set("category",selection.category);
+      if(selection.account!=="all")params.set("account",selection.account);
+      if(selection.search)params.set("search",selection.search);
+      if(selection.page>1)params.set("page",String(selection.page));
+      if(force)params.set("refresh","1");
+      const data=await call("/api/dashboard/spending?"+params.toString());renderSpending(data);
     }else{
       const data=await call("/api/dashboard/status");renderDashboard(data);await loadManualSources();
     }
     msg("");
   }
-  catch(error){msg(error.message,true);document.getElementById("dashboard").setAttribute("aria-busy","false")}
+  catch(error){if(view==="spending")renderSpendingError(error);else{msg(error.message,true);document.getElementById("dashboard").setAttribute("aria-busy","false")}}
   finally{button.disabled=false}
 }
 async function syncSource(id){try{msg("Abruf läuft …");const result=await call("/api/sync/"+id,{method:"POST"});msg(result.message);await refresh()}catch(error){msg(error.message,true)}}

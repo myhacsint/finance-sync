@@ -96,6 +96,30 @@ const server = createServer(async (req, res) => {
         )
       );
     }
+    if (req.method === "GET" && url.pathname === "/api/dashboard/spending") {
+      const requestedMonth = url.searchParams.get("month") ?? undefined;
+      const month = requestedMonth && /^\d{4}-(0[1-9]|1[0-2])$/.test(requestedMonth)
+        ? requestedMonth
+        : undefined;
+      const requestedPage = Number(url.searchParams.get("page") ?? 1);
+      const page = Number.isInteger(requestedPage)
+        ? Math.max(1, Math.min(100_000, requestedPage))
+        : 1;
+      const requestedPageSize = Number(url.searchParams.get("pageSize") ?? 20);
+      const pageSize = [20, 50, 100].includes(requestedPageSize) ? requestedPageSize : 20;
+      return json(
+        res,
+        200,
+        await service.getDashboardSpending(url.searchParams.get("refresh") === "1", {
+          month,
+          category: (url.searchParams.get("category") ?? "").slice(0, 80),
+          account: (url.searchParams.get("account") ?? "").slice(0, 80),
+          search: (url.searchParams.get("search") ?? "").slice(0, 80),
+          page,
+          pageSize
+        })
+      );
+    }
     if (req.method === "GET" && url.pathname === "/api/dashboard/status") {
       const rows = db.listSources() as unknown as SourceStatusRow[];
       const manualValueDates = Object.fromEntries(
