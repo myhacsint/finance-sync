@@ -127,6 +127,18 @@ const server = createServer(async (req, res) => {
         await service.getDashboardAssets(url.searchParams.get("refresh") === "1")
       );
     }
+    if (req.method === "GET" && url.pathname === "/api/dashboard/analyses") {
+      const periodYear = Number(url.searchParams.get("period") ?? "");
+      const comparisonYear = Number(url.searchParams.get("comparison") ?? "");
+      return json(
+        res,
+        200,
+        await service.getDashboardAnalyses(url.searchParams.get("refresh") === "1", {
+          periodYear: Number.isInteger(periodYear) ? periodYear : undefined,
+          comparisonYear: Number.isInteger(comparisonYear) ? comparisonYear : undefined
+        })
+      );
+    }
     if (req.method === "GET" && url.pathname === "/api/dashboard/status") {
       const rows = db.listSources() as unknown as SourceStatusRow[];
       const manualValueDates = Object.fromEntries(

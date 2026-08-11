@@ -64,6 +64,7 @@ test("Ausgabenansicht besitzt Navigation, Filter, Pagination und mobile Buchunge
 test("Vermögensansicht besitzt Aufteilung, Bereichsfilter und mobile Bestände", () => {
   const html = renderUi();
   assert.match(html, /#\/assets/);
+  assert.match(html, /#\/analyses/);
   assert.match(html, /\/api\/dashboard\/assets/);
   assert.match(html, /assets-summary/);
   assert.match(html, /assets-bar/);
@@ -74,6 +75,21 @@ test("Vermögensansicht besitzt Aufteilung, Bereichsfilter und mobile Bestände"
   assert.match(html, /assets-mobile-list/);
   assert.match(html, /Basis: letzte verfügbare Werte/);
   assert.match(html, /Konten, Anlagen und Vorsorge mit nachvollziehbaren Stichtagen/);
+});
+
+test("Analysenansicht besitzt Jahresvergleich, Schätzungsmarker, Drilldown und CSV-Export", () => {
+  const html = renderUi();
+  assert.match(html, /\/api\/dashboard\/analyses/);
+  assert.match(html, /Ausgaben verstehen und Veränderungen nachvollziehen/);
+  assert.match(html, /analysisPeriod/);
+  assert.match(html, /analysisComparison/);
+  assert.match(html, /analysisPosition/);
+  assert.match(html, /Ausgaben nach Kategorie/);
+  assert.match(html, /Ausgabenklassen/);
+  assert.match(html, /Größte Positionen/);
+  assert.match(html, /\[SCHÄTZUNG\]/);
+  assert.match(html, /CSV exportieren/);
+  assert.match(html, /analysis-mobile-positions/);
 });
 
 test("Verwaltungstoken bleibt nur für die Browsersitzung gespeichert", () => {

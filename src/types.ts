@@ -14,6 +14,36 @@ export type SyncState =
   | "WAITING_FOR_USER"
   | "ERROR";
 
+export type ExpenseClass =
+  | "VERTRAGLICH"
+  | "STRUKTURELL"
+  | "GRUNDBEDARF"
+  | "DISPOSITIV"
+  | "UNBEKANNT";
+
+export interface ExpenseAnalysisAdjustment {
+  id: string;
+  label: string;
+  category: string;
+  class: ExpenseClass;
+  year: number;
+  amountMinor?: number;
+  annualAmountMinor?: number;
+  prorateCompletedMonths?: boolean;
+  estimate?: boolean;
+  note?: string;
+}
+
+export interface ExpenseAnalysisOverride {
+  merchantContains?: string;
+  notesContains?: string;
+  categoryEquals?: string;
+  dateEquals?: string;
+  amountMinor?: number;
+  category?: string;
+  class?: ExpenseClass;
+}
+
 export interface SourceConfig {
   id: string;
   kind: SourceKind;
@@ -44,6 +74,14 @@ export interface AppConfig {
       symbol: string;
       currency?: string;
     }>;
+  };
+  analysis?: {
+    expenseStructure?: {
+      oldestYear?: number;
+      categoryClasses?: Record<string, ExpenseClass>;
+      overrides?: ExpenseAnalysisOverride[];
+      adjustments?: ExpenseAnalysisAdjustment[];
+    };
   };
 }
 

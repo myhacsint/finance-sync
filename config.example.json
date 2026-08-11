@@ -121,6 +121,14 @@
     "dataDir": "/app/data/actual-cache",
     "accountMap": {}
   },
+  "analysis": {
+    "expenseStructure": {
+      "oldestYear": 2024,
+      "categoryClasses": {},
+      "overrides": [],
+      "adjustments": []
+    }
+  },
   "ghostfolio": {
     "enabled": false,
     "serverUrl": "http://Ghostfolio:3333",

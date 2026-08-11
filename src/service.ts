@@ -40,11 +40,18 @@ import {
 } from "./dashboard-overview.js";
 import {
   buildDashboardSpending,
+  readActualSpendingRange,
   readActualSpendingMonth,
   type ActualSpendingMonthSnapshot,
   type DashboardSpending,
   type SpendingQuery
 } from "./dashboard-spending.js";
+import {
+  analysesRange,
+  analysesSelection,
+  buildDashboardAnalyses,
+  type DashboardAnalyses
+} from "./dashboard-analyses.js";
 import {
   buildDashboardAssets,
   readGhostfolioAssets,
@@ -59,6 +66,8 @@ export class FinanceService {
   private overviewLoading = new Map<string, Promise<DashboardOverview>>();
   private spendingCache = new Map<string, { expiresAt: number; value: ActualSpendingMonthSnapshot }>();
   private spendingLoading = new Map<string, Promise<ActualSpendingMonthSnapshot>>();
+  private analysesCache = new Map<string, { expiresAt: number; value: DashboardAnalyses }>();
+  private analysesLoading = new Map<string, Promise<DashboardAnalyses>>();
   private assetsCache?: { expiresAt: number; value: DashboardAssets };
   private assetsLoading?: Promise<DashboardAssets>;
 
@@ -209,6 +218,54 @@ export class FinanceService {
       return await this.assetsLoading;
     } finally {
       this.assetsLoading = undefined;
+    }
+  }
+
+  async getDashboardAnalyses(
+    force = false,
+    request: { periodYear?: number; comparisonYear?: number } = {}
+  ): Promise<DashboardAnalyses> {
+    if (!this.config.actual?.enabled) throw new Error("Actual ist deaktiviert");
+    const selected = analysesSelection(
+      this.config,
+      new Date(),
+      request.periodYear,
+      request.comparisonYear
+    );
+    const cacheKey = `${selected.periodYear}:${selected.comparisonYear}`;
+    const cached = this.analysesCache.get(cacheKey);
+    if (!force && cached && cached.expiresAt > Date.now()) return cached.value;
+    const pending = this.analysesLoading.get(cacheKey);
+    if (pending) return pending;
+    const load = async (): Promise<DashboardAnalyses> => {
+      const generatedAt = new Date();
+      const currentYear = Number(new Intl.DateTimeFormat("en-CA", {
+        timeZone: this.config.timezone,
+        year: "numeric"
+      }).format(generatedAt));
+      const range = analysesRange(selected, currentYear);
+      const snapshot = await this.withActual(() => readActualSpendingRange(
+        this.config.actual!,
+        range.startDate,
+        range.endDate,
+        generatedAt
+      ));
+      const value = buildDashboardAnalyses(
+        snapshot,
+        this.config,
+        selected.periodYear,
+        selected.comparisonYear,
+        generatedAt
+      );
+      this.analysesCache.set(cacheKey, { expiresAt: Date.now() + 5 * 60_000, value });
+      return value;
+    };
+    const loading = load();
+    this.analysesLoading.set(cacheKey, loading);
+    try {
+      return await loading;
+    } finally {
+      this.analysesLoading.delete(cacheKey);
     }
   }
 

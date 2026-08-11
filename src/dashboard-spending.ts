@@ -61,7 +61,7 @@ interface ActualSpendingApi {
 
 export type ActualSpendingApiLoader = () => Promise<ActualSpendingApi>;
 
-interface SpendingLine {
+export interface SpendingLine {
   id: string;
   date: string;
   merchant: string;
@@ -72,6 +72,14 @@ interface SpendingLine {
   categoryLabel: string;
   categorized: boolean;
   amountMinor: number;
+}
+
+export interface ActualSpendingRangeSnapshot {
+  startDate: string;
+  endDate: string;
+  generatedAt: string;
+  lines: SpendingLine[];
+  accounts: Array<{ key: string; label: string }>;
 }
 
 export interface ActualSpendingMonthSnapshot {
@@ -211,7 +219,7 @@ function safeAccountLabel(value: unknown): string {
 }
 
 function likelyPrivatePerson(value: string): boolean {
-  const business = /(?:gmbh|\bag\b|kg\b|e\.?v\.?|bank|kasse|markt|shop|store|restaurant|café|cafe|apotheke|versicherung|stadtwerke|telekom|amazon|paypal|bahn|hotel|reisen|verlag|buch|schule|praxis|arzt|klinik|service|energie|media|digital|software)/i;
+  const business = /(?:gmbh|\bag\b|kg\b|e\.?v\.?|bank|kasse|markt|shop|store|restaurant|café|cafe|apotheke|versicherung|stadtwerke|telekom|amazon|paypal|lidl|bahn|hotel|reisen|verlag|buch|schule|praxis|arzt|klinik|service|energie|media|digital|software)/i;
   if (business.test(value)) return false;
   const parts = value.trim().split(/\s+/);
   return parts.length >= 2 && parts.length <= 4
@@ -287,10 +295,41 @@ export async function readActualSpendingMonth(
   now = new Date(),
   options: { loadApi?: ActualSpendingApiLoader; password?: string } = {}
 ): Promise<ActualSpendingMonthSnapshot> {
+  const selected = spendingMonthSelection(now, timezone, requestedMonth);
+  const snapshot = await readActualSpendingRange(
+    config,
+    `${selected.month}-01`,
+    monthEnd(selected.month),
+    now,
+    options
+  );
+  return {
+    ...selected,
+    monthLabel: new Intl.DateTimeFormat("de-DE", {
+      timeZone: timezone,
+      month: "long",
+      year: "numeric"
+    }).format(new Date(`${selected.month}-15T12:00:00Z`)),
+    generatedAt: snapshot.generatedAt,
+    lines: snapshot.lines,
+    accounts: snapshot.accounts
+  };
+}
+
+export async function readActualSpendingRange(
+  config: NonNullable<AppConfig["actual"]>,
+  startDate: string,
+  endDate: string,
+  now = new Date(),
+  options: { loadApi?: ActualSpendingApiLoader; password?: string } = {}
+): Promise<ActualSpendingRangeSnapshot> {
   if (!config.enabled) throw new Error("Actual ist deaktiviert");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)
+    || startDate > endDate) {
+    throw new Error("Ungültiger Ausgabenzeitraum");
+  }
   const password = options.password ?? readSecret("actual-password");
   if (!password) throw new Error("Actual-Zugang ist nicht verfügbar");
-  const selected = spendingMonthSelection(now, timezone, requestedMonth);
   const dataDir = mkdtempSync(join(tmpdir(), "finance-spending-actual-"));
   const api = await (options.loadApi ?? (async () =>
     await import("@actual-app/api") as unknown as ActualSpendingApi))();
@@ -318,8 +357,6 @@ export async function readActualSpendingMonth(
         key: publicKey("account", account.id),
         label: safeAccountLabel(account.name)
       }));
-    const startDate = `${selected.month}-01`;
-    const endDate = monthEnd(selected.month);
     const accountTransactions = await Promise.all(accounts.map(async (account) => ({
       account,
       transactions: await api.getTransactions(account.id, startDate, endDate)
@@ -328,12 +365,8 @@ export async function readActualSpendingMonth(
       .flatMap(({ account, transactions }) => normalizeTransactions(transactions, account, categories, payees))
       .sort((left, right) => right.date.localeCompare(left.date) || right.id.localeCompare(left.id));
     return {
-      ...selected,
-      monthLabel: new Intl.DateTimeFormat("de-DE", {
-        timeZone: timezone,
-        month: "long",
-        year: "numeric"
-      }).format(new Date(`${selected.month}-15T12:00:00Z`)),
+      startDate,
+      endDate,
       generatedAt: now.toISOString(),
       lines,
       accounts: accounts.map(({ key, label }) => ({ key, label }))

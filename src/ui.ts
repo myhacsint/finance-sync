@@ -636,6 +636,79 @@ export function renderUi(): string {
     .assets-mobile-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .assets-mobile-row .asset-mobile-value { font-size: 17px; font-variant-numeric: tabular-nums; }
     .asset-mobile-meta { color: var(--muted); font-size: 12px; }
+    .analysis-toolbar {
+      display: grid;
+      grid-template-columns: minmax(220px, 1.4fr) repeat(2, minmax(150px, .7fr)) auto;
+      gap: 12px;
+      align-items: end;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      padding: 16px;
+    }
+    .analysis-toolbar label { margin: 0; }
+    .analysis-toolbar select { cursor: pointer; }
+    .analysis-summary {
+      display: grid;
+      grid-template-columns: minmax(280px, 1.4fr) repeat(2, minmax(170px, .7fr));
+      overflow: hidden;
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .analysis-summary > div { min-height: 122px; padding: 22px 24px; }
+    .analysis-summary > div + div { border-left: 1px solid var(--line-soft); }
+    .analysis-summary span { color: var(--muted); font-size: 13px; }
+    .analysis-summary strong { display: block; margin-top: 5px; font-size: 29px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+    .analysis-summary .analysis-total { font-size: clamp(38px, 4vw, 48px); }
+    .analysis-basis { margin-top: 9px; color: var(--muted); font-size: 12px; }
+    .analysis-estimate { color: var(--amber); font-weight: 800; letter-spacing: .02em; }
+    .analysis-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(320px, .7fr); gap: 12px; margin-top: 12px; }
+    .analysis-panel { min-width: 0; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); padding: 20px 22px; }
+    .analysis-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 19px; }
+    .analysis-panel-head p { margin-top: 4px; color: var(--muted); font-size: 13px; }
+    .analysis-legend { display: flex; flex-wrap: wrap; gap: 15px; color: var(--muted); font-size: 12px; }
+    .analysis-legend i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 2px; }
+    .analysis-bars { display: grid; gap: 17px; }
+    .analysis-category { display: grid; grid-template-columns: minmax(135px, .6fr) minmax(180px, 1.4fr) minmax(84px, auto); align-items: center; gap: 14px; }
+    .analysis-category-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .analysis-bar-pair { display: grid; gap: 5px; }
+    .analysis-bar { height: 8px; overflow: hidden; border-radius: 3px; background: #1a263b; }
+    .analysis-bar i { display: block; width: var(--width); height: 100%; border-radius: inherit; background: var(--blue); }
+    .analysis-bar.comparison i { background: #53647f; }
+    .analysis-category-values { display: grid; gap: 2px; text-align: right; font-size: 12px; font-variant-numeric: tabular-nums; }
+    .analysis-category-values span:last-child { color: var(--muted); }
+    .analysis-more { width: 100%; min-height: 44px; margin-top: 12px; border: 0; background: transparent; color: #7fb0ff; cursor: pointer; }
+    .analysis-class-list { display: grid; gap: 14px; }
+    .analysis-class-row { display: grid; grid-template-columns: minmax(110px, 1fr) auto; gap: 6px 14px; }
+    .analysis-class-row strong { font-variant-numeric: tabular-nums; }
+    .analysis-class-track { grid-column: 1 / -1; height: 9px; overflow: hidden; border-radius: 3px; background: #1a263b; }
+    .analysis-class-track i { display: block; width: var(--width); height: 100%; border-radius: inherit; background: #6d86b1; }
+    .analysis-positions { margin-top: 12px; }
+    .analysis-position-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .analysis-position-table th, .analysis-position-table td { padding: 12px 14px; border-bottom: 1px solid var(--line-soft); text-align: left; }
+    .analysis-position-table th { color: var(--muted); font-size: 12px; font-weight: 500; }
+    .analysis-position-table th:nth-child(1) { width: 34%; }
+    .analysis-position-table th:nth-child(2) { width: 22%; }
+    .analysis-position-table th:nth-child(3) { width: 20%; }
+    .analysis-position-table th:nth-child(4) { width: 18%; }
+    .analysis-position-table th:last-child { width: 6%; }
+    .analysis-position-table td:nth-child(4) { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .analysis-position-button { display: contents; }
+    .analysis-position-row { cursor: pointer; }
+    .analysis-position-row:hover { background: var(--surface-2); }
+    .analysis-position-row td:last-child { text-align: right; color: var(--muted); }
+    .analysis-position-row td:last-child svg { width: 17px; height: 17px; transform: rotate(-90deg); transition: transform .16s ease; }
+    .analysis-position-row[aria-expanded="true"] td:last-child svg { transform: rotate(0); }
+    .analysis-position-detail[hidden] { display: none; }
+    .analysis-position-detail td { padding: 14px 18px 18px; background: #0e1728; }
+    .analysis-months { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--muted); font-size: 12px; }
+    .analysis-months strong { margin-left: 4px; color: var(--text); }
+    .analysis-mobile-positions { display: none; }
+    .analysis-warning { display: flex; gap: 11px; margin-top: 12px; border: 1px solid #7b5316; border-radius: 11px; background: #2b2115; padding: 13px 15px; color: #e6d3af; }
+    .analysis-warning svg { width: 19px; height: 19px; flex: 0 0 auto; color: var(--amber); }
     .mobile-nav { display: none; }
     @media (max-width: 980px) {
       .sidebar { width: 216px; }
@@ -654,6 +727,7 @@ export function renderUi(): string {
       .assets-summary { grid-template-columns: 1fr; gap: 20px; }
       .assets-status-line { text-align: left; }
       .assets-workspace { grid-template-columns: minmax(230px, .7fr) minmax(480px, 1.5fr); }
+      .analysis-grid { grid-template-columns: 1fr; }
       .system-item:nth-child(3) { border-left: 0; border-top: 1px solid var(--line-soft); }
       .system-item:nth-child(4) { border-top: 1px solid var(--line-soft); }
     }
@@ -709,6 +783,22 @@ export function renderUi(): string {
       .assets-mobile-filter { display: block; }
       .assets-table-wrap { display: none; }
       .assets-mobile-list { display: block; }
+      .analysis-toolbar { grid-template-columns: 1fr 1fr; }
+      .analysis-toolbar > label:first-child { grid-column: 1 / -1; }
+      .analysis-toolbar .button { width: 100%; }
+      .analysis-summary { grid-template-columns: 1fr 1fr; }
+      .analysis-summary > div:first-child { grid-column: 1 / -1; }
+      .analysis-summary > div:nth-child(2) { border-left: 0; border-top: 1px solid var(--line-soft); }
+      .analysis-summary > div:nth-child(3) { border-top: 1px solid var(--line-soft); }
+      .analysis-position-table { display: none; }
+      .analysis-mobile-positions { display: grid; overflow: hidden; border: 1px solid var(--line-soft); border-radius: 9px; }
+      .analysis-mobile-row { border: 0; border-bottom: 1px solid var(--line-soft); background: transparent; color: var(--text); padding: 14px; text-align: left; cursor: pointer; }
+      .analysis-mobile-row:last-child { border-bottom: 0; }
+      .analysis-mobile-main { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; }
+      .analysis-mobile-main strong:last-child { font-variant-numeric: tabular-nums; }
+      .analysis-mobile-meta { color: var(--muted); font-size: 12px; }
+      .analysis-mobile-detail { display: none; margin-top: 10px; }
+      .analysis-mobile-row[aria-expanded="true"] .analysis-mobile-detail { display: flex; }
       .overview-panel { padding: 18px 16px; }
       .overview-panel .panel-header { gap: 8px; }
       .overview-panel .panel-header h2 { font-size: 18px; }
@@ -764,6 +854,14 @@ export function renderUi(): string {
       .assets-legend { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
       .assets-pane-header { align-items: start; }
       .assets-notice { align-items: flex-start; flex-direction: column; gap: 5px; }
+      .analysis-toolbar { grid-template-columns: 1fr; }
+      .analysis-toolbar > label:first-child { grid-column: auto; }
+      .analysis-summary { grid-template-columns: 1fr; }
+      .analysis-summary > div:first-child { grid-column: auto; }
+      .analysis-summary > div + div { border-left: 0; border-top: 1px solid var(--line-soft); }
+      .analysis-category { grid-template-columns: minmax(0, 1fr) auto; gap: 7px 10px; }
+      .analysis-bar-pair { grid-column: 1 / -1; grid-row: 2; }
+      .analysis-category-values { grid-column: 2; grid-row: 1; }
       .freshness-label { flex-wrap: nowrap; font-size: 12px; }
       .freshness-status { font-size: 12px; }
     }
@@ -788,7 +886,7 @@ export function renderUi(): string {
       <div class="content-inner">
         <header class="page-header">
           <div><p class="eyebrow" id="page-eyebrow" hidden>Finance Hub</p><h1 id="page-title">Übersicht</h1><p class="subtitle" id="page-subtitle">Finanzen, Vermögen und offene Punkte auf einen Blick.</p></div>
-          <button class="button quiet" id="refresh-button" type="button" onclick="refresh(true)" aria-label="Übersicht aktualisieren">
+          <button class="button quiet" id="refresh-button" type="button" onclick="headerAction()" aria-label="Übersicht aktualisieren">
             <span aria-hidden="true">↻</span><span class="desktop-label">Aktualisieren</span>
           </button>
         </header>
@@ -823,11 +921,11 @@ const navItems=[
   {label:"Übersicht",icon:"overview",view:"overview"},
   {label:"Ausgaben",icon:"expenses",view:"spending"},
   {label:"Vermögen",icon:"assets",view:"assets"},
-  {label:"Analysen",icon:"analysis"},
+  {label:"Analysen",icon:"analysis",view:"analyses"},
   {label:"Datenstatus",icon:"status",view:"status"}
 ];
-function activeView(){return location.hash==="#\/data-status"?"status":location.hash==="#\/spending"?"spending":location.hash==="#\/assets"?"assets":"overview"}
-function viewHref(view){return view==="status"?'#/data-status':view==="spending"?'#/spending':view==="assets"?'#/assets':'#/overview'}
+function activeView(){return location.hash==="#\/data-status"?"status":location.hash==="#\/spending"?"spending":location.hash==="#\/assets"?"assets":location.hash==="#\/analyses"?"analyses":"overview"}
+function viewHref(view){return view==="status"?'#/data-status':view==="spending"?'#/spending':view==="assets"?'#/assets':view==="analyses"?'#/analyses':'#/overview'}
 function navMarkup(){const current=activeView();return navItems.map(item=>item.view?'<a class="nav-item" href="'+viewHref(item.view)+'"'+(item.view===current?' aria-current="page"':'')+'>'+icons[item.icon]+'<span>'+item.label+'</span></a>':'<button class="nav-item" type="button" disabled title="Folgt in einem späteren Schritt">'+icons[item.icon]+'<span>'+item.label+'</span></button>').join("")}
 function renderNavigation(){document.getElementById("desktop-nav").innerHTML=navMarkup();document.getElementById("mobile-nav").innerHTML=navMarkup()}
 renderNavigation();
@@ -838,6 +936,9 @@ localStorage.removeItem("financeToken");
 let token=sessionStorage.getItem("financeToken")||"";
 let currentPreview=null;
 let currentExpenseMonth="";
+let currentAnalysisData=null;
+
+function headerAction(){if(activeView()==="analyses")exportAnalysisCsv();else refresh(true)}
 
 function requestToken(){
   const supplied=prompt("Finance Hub Verwaltungstoken eingeben");
@@ -1007,6 +1108,56 @@ function setAssetArea(value){
   const query=params.toString();
   history.pushState(null,"",(query?"?"+query:location.pathname)+location.hash);
   refresh();
+}
+function analysisSelection(){
+  const params=new URLSearchParams(location.search);
+  const period=Number(params.get("analysisPeriod")||0);
+  const comparison=Number(params.get("analysisComparison")||0);
+  return {
+    period:Number.isInteger(period)&&period>0?period:0,
+    comparison:Number.isInteger(comparison)&&comparison>0?comparison:0,
+    expanded:params.get("analysisCategoriesExpanded")==="1",
+    position:params.get("analysisPosition")||""
+  };
+}
+function applyAnalysisFilters(){
+  const period=Number(document.getElementById("analysis-period")?.value||0);
+  const comparison=Number(document.getElementById("analysis-comparison")?.value||0);
+  const params=new URLSearchParams(location.search);
+  if(period)params.set("analysisPeriod",String(period));else params.delete("analysisPeriod");
+  if(comparison)params.set("analysisComparison",String(comparison));else params.delete("analysisComparison");
+  params.delete("analysisPosition");
+  const query=params.toString();
+  history.pushState(null,"",(query?"?"+query:location.pathname)+location.hash);
+  refresh();
+}
+function toggleAnalysisCategories(){
+  const params=new URLSearchParams(location.search);
+  if(params.get("analysisCategoriesExpanded")==="1")params.delete("analysisCategoriesExpanded");else params.set("analysisCategoriesExpanded","1");
+  const query=params.toString();
+  history.replaceState(null,"",(query?"?"+query:location.pathname)+location.hash);
+  if(currentAnalysisData)renderAnalyses(currentAnalysisData);
+}
+function toggleAnalysisPosition(key){
+  const params=new URLSearchParams(location.search);
+  if(params.get("analysisPosition")===key)params.delete("analysisPosition");else params.set("analysisPosition",key);
+  const query=params.toString();
+  history.replaceState(null,"",(query?"?"+query:location.pathname)+location.hash);
+  if(currentAnalysisData)renderAnalyses(currentAnalysisData);
+}
+function csvCell(value){const text=String(value??"");return /[";\\n]/.test(text)?'"'+text.replaceAll('"','""')+'"':text}
+function exportAnalysisCsv(){
+  if(!currentAnalysisData){msg("Die Analyse ist noch nicht geladen.",true);return}
+  const data=currentAnalysisData;
+  const rows=[["Bereich","Position","Kategorie","Klasse","Zeitraum","Betrag EUR","Status"]];
+  data.categories.forEach(row=>rows.push(["Kategorie",row.label,"","",String(data.period.year),(row.periodMinor/100).toFixed(2).replace(".",","),data.period.estimate?"[SCHÄTZUNG]":"gemessen"]));
+  data.positions.forEach(row=>rows.push(["Position",row.label,row.category,row.class,String(data.period.year),(row.amountMinor/100).toFixed(2).replace(".",","),row.estimate?"[SCHÄTZUNG]":"gemessen"]));
+  const csv="\ufeff"+rows.map(row=>row.map(csvCell).join(";")).join("\\n");
+  const link=document.createElement("a");
+  link.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  link.download="ausgabenstruktur-"+data.period.year+"-vergleich-"+data.comparison.year+".csv";
+  link.click();setTimeout(()=>URL.revokeObjectURL(link.href),0);
+  msg("CSV für die aktuelle Auswahl wurde erstellt.");
 }
 function rangeMonth(key,format){
   const match=String(key||"").match(/^(\\d{4})-(\\d{2})$/);
@@ -1209,6 +1360,59 @@ function renderAssets(data){
   document.getElementById("dashboard").setAttribute("aria-busy","false");
 }
 
+function renderAnalysesError(error){
+  currentAnalysisData=null;
+  document.getElementById("dashboard").innerHTML=expenseState("Nicht verfügbar","Die Ausgabenstruktur konnte nicht geladen werden. Bitte versuche es erneut.","refresh(true)","Erneut versuchen");
+  document.getElementById("dashboard").setAttribute("aria-busy","false");
+  msg(error?.message||"Die Analyse konnte nicht geladen werden.",true);
+}
+function analysisYearOptions(years,selected,excluded){
+  return years.map(year=>'<option value="'+year+'"'+(year===selected?' selected':'')+(year===excluded?' disabled':'')+'>'+year+'</option>').join("");
+}
+function analysisEstimate(value){return value?'<span class="analysis-estimate">[SCHÄTZUNG]</span>':''}
+function analysisMonthLabel(value){
+  const match=String(value||"").match(/^(\d{4})-(\d{2})$/);
+  if(!match)return esc(value);
+  return new Intl.DateTimeFormat("de-DE",{month:"short",year:"numeric",timeZone:"UTC"}).format(new Date(Date.UTC(Number(match[1]),Number(match[2])-1,1)));
+}
+function renderAnalyses(data){
+  currentAnalysisData=data;
+  const state=analysisSelection();
+  const periodOptions=analysisYearOptions(data.availableYears,data.selection.periodYear,0);
+  const comparisonOptions=analysisYearOptions(data.availableYears,data.selection.comparisonYear,data.selection.periodYear);
+  const toolbar='<section class="analysis-toolbar" aria-label="Analysefilter"><label>Ansicht<select name="analysis-view" disabled><option>Ausgabenstruktur</option></select></label><label>Zeitraum<select id="analysis-period" name="analysis-period" autocomplete="off">'+periodOptions+'</select></label><label>Vergleich<select id="analysis-comparison" name="analysis-comparison" autocomplete="off">'+comparisonOptions+'</select></label><button class="button" type="button" onclick="applyAnalysisFilters()">Anwenden</button></section>';
+  const change=data.changePercent===null?'–':new Intl.NumberFormat("de-DE",{signDisplay:"always",maximumFractionDigits:1}).format(data.changePercent)+' %';
+  const changeTone=data.changePercent===null?'':data.changePercent<=0?' tone-ok':' tone-warning';
+  const summary='<section class="analysis-summary" aria-label="Zusammenfassung Ausgabenstruktur"><div><span>Wirtschaftliche Ausgaben '+esc(data.period.label)+'</span><strong class="analysis-total">'+(data.state==="empty"?'–':moneyWhole(data.period.totalMinor))+'</strong><p class="analysis-basis">Gebucht, Zusatzwerte einbezogen, interne Überträge ausgeschlossen '+analysisEstimate(data.period.estimate)+'</p></div><div><span>Veränderung zu '+esc(data.comparison.label)+' '+analysisEstimate(data.comparison.estimate)+'</span><strong class="'+changeTone+'">'+change+'</strong></div><div><span>Nicht zuordenbar</span><strong>'+new Intl.NumberFormat("de-DE",{maximumFractionDigits:1}).format(data.unknownPercent)+' %</strong><p class="analysis-basis">'+moneyWhole(data.unknownMinor)+'</p></div></section>';
+  if(data.state==="empty"){
+    document.getElementById("dashboard").innerHTML=toolbar+summary+'<div style="margin-top:12px">'+expenseState("Keine Ausgaben","Für den gewählten Zeitraum liegen keine auswertbaren Ausgaben vor.","document.getElementById(&quot;analysis-period&quot;).focus()","Zeitraum wechseln","warning")+'</div>';
+    document.getElementById("dashboard").setAttribute("aria-busy","false");return;
+  }
+  const visibleCategories=state.expanded?data.categories:data.categories.slice(0,8);
+  const maxCategory=Math.max(1,...visibleCategories.flatMap(row=>[Math.max(0,row.periodMinor),Math.max(0,row.comparisonMinor)]));
+  const categoryRows=visibleCategories.map(row=>'<div class="analysis-category"><span class="analysis-category-label" title="'+esc(row.label)+'">'+esc(row.label)+'</span><span class="analysis-bar-pair" aria-hidden="true"><span class="analysis-bar"><i style="--width:'+Math.max(1,Math.max(0,row.periodMinor)/maxCategory*100)+'%"></i></span><span class="analysis-bar comparison"><i style="--width:'+Math.max(1,Math.max(0,row.comparisonMinor)/maxCategory*100)+'%"></i></span></span><span class="analysis-category-values"><span>'+moneyWhole(row.periodMinor)+'</span><span>'+moneyWhole(row.comparisonMinor)+'</span></span></div>').join("");
+  const categoryMore=data.categories.length>8?'<button class="analysis-more" type="button" onclick="toggleAnalysisCategories()">'+(state.expanded?'Weniger Kategorien':'Alle '+data.categories.length+' Kategorien anzeigen')+'</button>':'';
+  const categories='<section class="analysis-panel" aria-labelledby="analysis-categories-title"><div class="analysis-panel-head"><div><h2 id="analysis-categories-title">Ausgaben nach Kategorie</h2><p>Direkter Vergleich der gewählten Zeiträume</p></div><div class="analysis-legend"><span><i style="background:var(--blue)"></i>'+esc(data.period.label)+'</span><span><i style="background:#53647f"></i>'+esc(data.comparison.label)+analysisEstimate(data.comparison.estimate)+'</span></div></div><div class="analysis-bars">'+categoryRows+'</div>'+categoryMore+'</section>';
+  const maxClass=Math.max(1,...data.classes.map(row=>Math.max(0,row.amountMinor)));
+  const classRows=data.classes.map(row=>'<div class="analysis-class-row"><span>'+esc(row.label)+'</span><strong>'+moneyWhole(row.amountMinor)+' · '+new Intl.NumberFormat("de-DE",{maximumFractionDigits:1}).format(row.percent)+' %</strong><span class="analysis-class-track" aria-hidden="true"><i style="--width:'+Math.max(1,Math.max(0,row.amountMinor)/maxClass*100)+'%"></i></span></div>').join("");
+  const classes='<section class="analysis-panel" aria-labelledby="analysis-classes-title"><div class="analysis-panel-head"><div><h2 id="analysis-classes-title">Ausgabenklassen</h2><p>Veränderbarkeit der Positionen</p></div></div><div class="analysis-class-list">'+classRows+'</div></section>';
+  const positions=data.positions.slice(0,12);
+  const desktopRows=positions.map(row=>{
+    const open=state.position===row.key;
+    const months=row.months.length?row.months.map(month=>'<span>'+analysisMonthLabel(month.month)+' <strong>'+moneyWhole(month.amountMinor)+'</strong></span>').join(""):'<span>Keine Monatswerte verfügbar</span>';
+    return '<tr class="analysis-position-row" tabindex="0" role="button" aria-expanded="'+String(open)+'" onclick="toggleAnalysisPosition(&quot;'+esc(row.key)+'&quot;)" onkeydown="if(event.key===&quot;Enter&quot;||event.key===&quot; &quot;){event.preventDefault();toggleAnalysisPosition(&quot;'+esc(row.key)+'&quot;)}"><td>'+esc(row.label)+' '+analysisEstimate(row.estimate)+'</td><td>'+esc(row.category)+'</td><td>'+esc(row.class)+'</td><td>'+moneyWhole(row.amountMinor)+'</td><td>'+icons.chevron+'</td></tr><tr class="analysis-position-detail"'+(open?'':' hidden')+'><td colspan="5"><div class="analysis-months">'+months+'</div></td></tr>';
+  }).join("");
+  const mobileRows=positions.map(row=>{
+    const open=state.position===row.key;
+    const months=row.months.map(month=>'<span>'+analysisMonthLabel(month.month)+' <strong>'+moneyWhole(month.amountMinor)+'</strong></span>').join("");
+    return '<button class="analysis-mobile-row" type="button" aria-expanded="'+String(open)+'" onclick="toggleAnalysisPosition(&quot;'+esc(row.key)+'&quot;)"><span class="analysis-mobile-main"><strong>'+esc(row.label)+' '+analysisEstimate(row.estimate)+'</strong><strong>'+moneyWhole(row.amountMinor)+'</strong><span class="analysis-mobile-meta">'+esc(row.category)+' · '+esc(row.class)+'</span></span><span class="analysis-mobile-detail analysis-months">'+months+'</span></button>';
+  }).join("");
+  const positionPanel='<section class="analysis-panel analysis-positions" aria-labelledby="analysis-positions-title"><div class="analysis-panel-head"><div><h2 id="analysis-positions-title">Größte Positionen</h2><p>Die zwölf größten Positionen im gewählten Zeitraum · Zeile öffnen für Monatswerte</p></div></div><table class="analysis-position-table"><thead><tr><th>Position</th><th>Kategorie</th><th>Klasse</th><th>Betrag</th><th><span class="sr-only">Details</span></th></tr></thead><tbody>'+desktopRows+'</tbody></table><div class="analysis-mobile-positions">'+mobileRows+'</div></section>';
+  const warnings=data.warnings.map(warning=>'<div class="analysis-warning" role="status">'+icons.warning+'<span>'+esc(warning)+'</span></div>').join("");
+  document.getElementById("dashboard").innerHTML=toolbar+summary+'<div class="analysis-grid">'+categories+classes+'</div>'+positionPanel+warnings;
+  document.getElementById("dashboard").setAttribute("aria-busy","false");
+}
+
 function renderTask(task){
   return '<article class="task-card"><span class="task-mark">'+icons.manual+'</span><div><h3>'+esc(task.label)+'</h3><p>Letzter bestätigter Wert: '+esc(formatDate(task.valueDate))+'</p></div><button class="button secondary" type="button" onclick="openManual(&quot;'+encoded(task.id)+'&quot;)">Werte aktualisieren</button></article>';
 }
@@ -1247,6 +1451,7 @@ function renderHeader(view){
     overview:{title:"Übersicht",subtitle:"Finanzen, Vermögen und offene Punkte auf einen Blick."},
     spending:{title:"Ausgaben",subtitle:"Kategorien und zugehörige Buchungen nachvollziehen."},
     assets:{title:"Vermögen",subtitle:"Konten, Anlagen und Vorsorge mit nachvollziehbaren Stichtagen."},
+    analyses:{title:"Analysen",subtitle:"Ausgaben verstehen und Veränderungen nachvollziehen."},
     status:{title:"Datenstatus",subtitle:"Aktualität, offene Aufgaben und Systemzustand auf einen Blick."}
   }[view];
   document.title=content.title+" · Finance Hub";
@@ -1254,7 +1459,10 @@ function renderHeader(view){
   eyebrow.hidden=view!=="status";
   document.getElementById("page-title").textContent=content.title;
   document.getElementById("page-subtitle").textContent=content.subtitle;
-  document.getElementById("refresh-button").setAttribute("aria-label",content.title+" aktualisieren");
+  const action=document.getElementById("refresh-button");
+  action.setAttribute("aria-label",view==="analyses"?"Aktuelle Analyse als CSV exportieren":content.title+" aktualisieren");
+  action.querySelector("[aria-hidden]").textContent=view==="analyses"?"↓":"↻";
+  action.querySelector(".desktop-label").textContent=view==="analyses"?"CSV exportieren":"Aktualisieren";
 }
 function renderLoading(view){
   document.getElementById("dashboard").setAttribute("aria-busy","true");
@@ -1264,6 +1472,8 @@ function renderLoading(view){
     <div class="expense-loading" aria-label="Ausgaben werden geladen"><section class="expense-summary-band"><div class="expense-period"><div class="skeleton" style="width:100%;height:44px">Lädt</div></div><div class="expense-summary-stat"><div class="skeleton" style="width:76%;height:16px">Lädt</div><div class="skeleton" style="width:58%;height:28px;margin-top:8px">Lädt</div></div><div class="expense-summary-stat"><div class="skeleton" style="width:68%;height:16px">Lädt</div><div class="skeleton" style="width:42%;height:28px;margin-top:8px">Lädt</div></div><div class="expense-summary-stat"><div class="skeleton" style="width:68%;height:16px">Lädt</div><div class="skeleton" style="width:42%;height:28px;margin-top:8px">Lädt</div></div></section><div class="expense-workspace"><section class="expense-pane expense-category-pane"><div class="skeleton" style="width:45%;height:24px">Lädt</div><div class="skeleton" style="width:100%;height:44px;margin-top:16px">Lädt</div><div class="skeleton" style="width:100%;height:250px;margin-top:12px">Lädt</div></section><section class="expense-pane expense-transactions-pane"><div class="skeleton" style="width:35%;height:24px">Lädt</div><div class="skeleton" style="width:100%;height:44px;margin-top:16px">Lädt</div><div class="skeleton" style="width:100%;height:330px;margin-top:12px">Lädt</div></section></div></div>'
     :view==="assets"?'\
     <div aria-label="Vermögen wird geladen"><section class="assets-summary"><div><div class="skeleton" style="width:48%;height:18px">Lädt</div><div class="skeleton" style="width:75%;height:48px;margin-top:10px">Lädt</div></div><div><div class="skeleton" style="width:100%;height:30px">Lädt</div><div class="skeleton" style="width:100%;height:48px;margin-top:14px">Lädt</div></div></section><div class="assets-workspace"><section class="assets-pane"><div class="skeleton" style="width:58%;height:24px">Lädt</div><div class="skeleton" style="width:100%;height:360px;margin-top:14px">Lädt</div></section><section class="assets-pane"><div class="skeleton" style="width:35%;height:24px">Lädt</div><div class="skeleton" style="width:100%;height:390px;margin-top:14px">Lädt</div></section></div></div>'
+    :view==="analyses"?'\
+    <div aria-label="Analyse wird geladen"><section class="analysis-toolbar"><div class="skeleton" style="height:44px">Lädt</div><div class="skeleton" style="height:44px">Lädt</div><div class="skeleton" style="height:44px">Lädt</div><div class="skeleton" style="height:44px">Lädt</div></section><section class="analysis-summary"><div><div class="skeleton" style="width:62%;height:18px">Lädt</div><div class="skeleton" style="width:72%;height:45px;margin-top:8px">Lädt</div></div><div><div class="skeleton" style="width:76%;height:18px">Lädt</div><div class="skeleton" style="width:50%;height:28px;margin-top:8px">Lädt</div></div><div><div class="skeleton" style="width:70%;height:18px">Lädt</div><div class="skeleton" style="width:45%;height:28px;margin-top:8px">Lädt</div></div></section><div class="analysis-grid"><section class="analysis-panel"><div class="skeleton" style="width:42%;height:24px">Lädt</div><div class="skeleton" style="width:100%;height:310px;margin-top:20px">Lädt</div></section><section class="analysis-panel"><div class="skeleton" style="width:52%;height:24px">Lädt</div><div class="skeleton" style="width:100%;height:310px;margin-top:20px">Lädt</div></section></div></div>'
     :'\
     <section class="status-overview" aria-label="Statusübersicht wird geladen"><div class="overview-main"><div class="skeleton" style="width:72%;height:28px">Lädt</div><div class="skeleton" style="width:42%;height:16px;margin-top:12px">Lädt</div></div><div class="overview-stats"><div class="stat"><strong>–</strong><span>Automatisch aktuell</span></div><div class="stat"><strong>–</strong><span>Aufgaben</span></div><div class="stat"><strong>–</strong><span>Historische Importe</span></div></div></section>';
 }
@@ -1271,7 +1481,7 @@ async function refresh(force=false){
   const view=activeView();
   const button=document.getElementById("refresh-button");
   renderHeader(view);renderNavigation();renderLoading(view);
-  const loadingLabel=view==="overview"?"Übersicht":view==="spending"?"Ausgaben":view==="assets"?"Vermögen":"Datenstatus";
+  const loadingLabel=view==="overview"?"Übersicht":view==="spending"?"Ausgaben":view==="assets"?"Vermögen":view==="analyses"?"Analyse":"Datenstatus";
   button.disabled=true;msg(loadingLabel+" wird aktualisiert …");
   try{
     if(view==="overview"){
@@ -1292,12 +1502,19 @@ async function refresh(force=false){
       const data=await call("/api/dashboard/spending?"+params.toString());renderSpending(data);
     }else if(view==="assets"){
       const data=await call("/api/dashboard/assets"+(force?"?refresh=1":""));renderAssets(data);
+    }else if(view==="analyses"){
+      const selection=analysisSelection();
+      const params=new URLSearchParams();
+      if(selection.period)params.set("period",String(selection.period));
+      if(selection.comparison)params.set("comparison",String(selection.comparison));
+      if(force)params.set("refresh","1");
+      const data=await call("/api/dashboard/analyses?"+params.toString());renderAnalyses(data);
     }else{
       const data=await call("/api/dashboard/status");renderDashboard(data);await loadManualSources();
     }
     msg("");
   }
-  catch(error){if(view==="spending")renderSpendingError(error);else if(view==="assets")renderAssetsError(error);else{msg(error.message,true);document.getElementById("dashboard").setAttribute("aria-busy","false")}}
+  catch(error){if(view==="spending")renderSpendingError(error);else if(view==="assets")renderAssetsError(error);else if(view==="analyses")renderAnalysesError(error);else{msg(error.message,true);document.getElementById("dashboard").setAttribute("aria-busy","false")}}
   finally{button.disabled=false}
 }
 async function syncSource(id){try{msg("Abruf läuft …");const result=await call("/api/sync/"+id,{method:"POST"});msg(result.message);await refresh()}catch(error){msg(error.message,true)}}

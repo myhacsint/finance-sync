@@ -39,6 +39,12 @@ export function loadConfig(): AppConfig {
     ghostfolio: parsed.ghostfolio
       ? { ...defaultConfig.ghostfolio!, ...parsed.ghostfolio }
       : defaultConfig.ghostfolio,
+    analysis: parsed.analysis ? {
+      ...parsed.analysis,
+      expenseStructure: parsed.analysis.expenseStructure
+        ? { ...parsed.analysis.expenseStructure }
+        : undefined
+    } : undefined,
     sources: parsed.sources ?? []
   };
 }
