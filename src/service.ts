@@ -45,6 +45,11 @@ import {
   type DashboardSpending,
   type SpendingQuery
 } from "./dashboard-spending.js";
+import {
+  buildDashboardAssets,
+  readGhostfolioAssets,
+  type DashboardAssets
+} from "./dashboard-assets.js";
 
 export class FinanceService {
   private running = new Set<string>();
@@ -54,6 +59,8 @@ export class FinanceService {
   private overviewLoading = new Map<string, Promise<DashboardOverview>>();
   private spendingCache = new Map<string, { expiresAt: number; value: ActualSpendingMonthSnapshot }>();
   private spendingLoading = new Map<string, Promise<ActualSpendingMonthSnapshot>>();
+  private assetsCache?: { expiresAt: number; value: DashboardAssets };
+  private assetsLoading?: Promise<DashboardAssets>;
 
   constructor(readonly db: FinanceDatabase, readonly config: AppConfig) {
     for (const source of config.sources) {
@@ -178,6 +185,31 @@ export class FinanceService {
       }
     }
     return buildDashboardSpending(snapshot.value, request);
+  }
+
+  async getDashboardAssets(force = false): Promise<DashboardAssets> {
+    const now = Date.now();
+    if (!force && this.assetsCache && this.assetsCache.expiresAt > now) {
+      return this.assetsCache.value;
+    }
+    if (this.assetsLoading) return this.assetsLoading;
+    const load = async (): Promise<DashboardAssets> => {
+      const generatedAt = new Date();
+      const market = await Promise.allSettled([
+        this.config.ghostfolio && Object.keys(this.config.ghostfolio.accountMap).length > 0
+          ? readGhostfolioAssets(this.config.ghostfolio)
+          : Promise.reject(new Error("Ghostfolio ist deaktiviert"))
+      ]);
+      const value = buildDashboardAssets(this.db, this.config, market[0], generatedAt);
+      this.assetsCache = { expiresAt: Date.now() + 5 * 60_000, value };
+      return value;
+    };
+    this.assetsLoading = load();
+    try {
+      return await this.assetsLoading;
+    } finally {
+      this.assetsLoading = undefined;
+    }
   }
 
   private async importSourceBundle(

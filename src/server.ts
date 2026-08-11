@@ -120,6 +120,13 @@ const server = createServer(async (req, res) => {
         })
       );
     }
+    if (req.method === "GET" && url.pathname === "/api/dashboard/assets") {
+      return json(
+        res,
+        200,
+        await service.getDashboardAssets(url.searchParams.get("refresh") === "1")
+      );
+    }
     if (req.method === "GET" && url.pathname === "/api/dashboard/status") {
       const rows = db.listSources() as unknown as SourceStatusRow[];
       const manualValueDates = Object.fromEntries(

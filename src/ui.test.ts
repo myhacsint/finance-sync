@@ -61,6 +61,21 @@ test("Ausgabenansicht besitzt Navigation, Filter, Pagination und mobile Buchunge
   assert.match(html, /new Intl\.DateTimeFormat\("de-DE",\{day:"2-digit",month:"2-digit",year:"numeric",timeZone:"UTC"\}\)/);
 });
 
+test("Vermögensansicht besitzt Aufteilung, Bereichsfilter und mobile Bestände", () => {
+  const html = renderUi();
+  assert.match(html, /#\/assets/);
+  assert.match(html, /\/api\/dashboard\/assets/);
+  assert.match(html, /assets-summary/);
+  assert.match(html, /assets-bar/);
+  assert.match(html, /assetArea/);
+  assert.match(html, /Vermögensbereiche/);
+  assert.match(html, /Bestände/);
+  assert.match(html, /assets-table/);
+  assert.match(html, /assets-mobile-list/);
+  assert.match(html, /Basis: letzte verfügbare Werte/);
+  assert.match(html, /Konten, Anlagen und Vorsorge mit nachvollziehbaren Stichtagen/);
+});
+
 test("Verwaltungstoken bleibt nur für die Browsersitzung gespeichert", () => {
   const html = renderUi();
   assert.match(html, /sessionStorage\.setItem\("financeToken"/);

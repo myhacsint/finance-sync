@@ -560,6 +560,82 @@ export function renderUi(): string {
     .expense-state .status-icon svg { width: 24px; height: 24px; }
     .expense-state h2 { font-size: 20px; }
     .expense-state p { margin: 7px 0 18px; color: var(--muted); }
+    .assets-summary {
+      display: grid;
+      grid-template-columns: minmax(250px, .8fr) minmax(520px, 2fr);
+      gap: 28px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 24px 26px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .assets-total span { display: block; color: var(--muted); font-size: 13px; }
+    .assets-total strong { display: block; margin-top: 5px; font-size: clamp(34px, 4vw, 48px); line-height: 1.05; font-variant-numeric: tabular-nums; }
+    .assets-total small { display: block; margin-top: 9px; color: var(--muted); }
+    .assets-allocation { min-width: 0; }
+    .assets-status-line { margin-bottom: 14px; color: var(--muted); text-align: right; }
+    .assets-status-line strong { color: var(--green); font-weight: 600; }
+    .assets-bar { display: flex; width: 100%; height: 30px; overflow: hidden; border-radius: 7px; background: var(--surface-3); }
+    .assets-bar span { display: block; min-width: 0; height: 100%; }
+    .assets-legend { display: grid; grid-template-columns: repeat(4, minmax(110px, 1fr)); gap: 12px; margin-top: 14px; }
+    .assets-legend-item { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 8px; color: var(--muted); }
+    .assets-legend-item i, .asset-area-dot { width: 10px; height: 10px; align-self: center; border-radius: 2px; background: var(--area-color); }
+    .assets-legend-item strong { grid-column: 2; color: var(--text); font-variant-numeric: tabular-nums; }
+    .area-cash { --area-color: #3b82f6; }
+    .area-depots { --area-color: #43c6ad; }
+    .area-pensions { --area-color: #9b75e8; }
+    .area-crypto { --area-color: #ff842b; }
+    .assets-workspace { display: grid; grid-template-columns: minmax(260px, .72fr) minmax(650px, 2.2fr); gap: 12px; margin-top: 12px; }
+    .assets-pane { min-width: 0; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); padding: 18px 16px; }
+    .assets-pane h2 { font-size: 19px; }
+    .asset-area-list { display: grid; gap: 7px; margin-top: 14px; }
+    .asset-area-button {
+      display: grid;
+      width: 100%;
+      min-height: 104px;
+      gap: 7px;
+      border: 1px solid var(--line-soft);
+      border-radius: 10px;
+      padding: 13px;
+      background: #0e1829;
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+    }
+    .asset-area-button:hover { border-color: #3b4d6a; background: var(--surface-2); }
+    .asset-area-button[aria-current="true"] { border-color: #4f91ff; background: #162b4c; }
+    .asset-area-title { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+    .asset-area-value { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
+    .asset-area-meta { color: var(--muted); font-size: 12px; }
+    .assets-mobile-filter { display: none; margin-top: 14px; }
+    .assets-mobile-filter select { min-height: 44px; cursor: pointer; }
+    .assets-pane-header { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+    .assets-pane-header p { margin-top: 3px; color: var(--muted); font-size: 13px; }
+    .assets-notice { display: flex; min-height: 50px; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 14px; border: 1px solid #7b5316; border-radius: 9px; padding: 11px 14px; background: #2b2115; color: #e6d3af; }
+    .assets-notice a { color: var(--amber); font-weight: 700; text-decoration: none; }
+    .assets-table-wrap { overflow-x: auto; border: 1px solid var(--line-soft); border-radius: 9px; }
+    .assets-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .assets-table th, .assets-table td { padding: 12px; border-bottom: 1px solid var(--line-soft); text-align: left; }
+    .assets-table tr:last-child td { border-bottom: 0; }
+    .assets-table th { color: var(--muted); font-size: 12px; font-weight: 500; }
+    .assets-table th:nth-child(1) { width: 27%; }
+    .assets-table th:nth-child(2) { width: 17%; }
+    .assets-table th:nth-child(3) { width: 18%; }
+    .assets-table th:nth-child(4) { width: 18%; }
+    .assets-table th:nth-child(5) { width: 20%; }
+    .assets-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .assets-table td:first-child svg { width: 18px; height: 18px; margin-right: 8px; color: var(--blue); vertical-align: middle; }
+    .assets-table td:nth-child(3) { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .asset-area-cell { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); }
+    .asset-state-text { display: block; color: var(--muted); font-size: 11px; }
+    .assets-mobile-list { display: none; overflow: hidden; border: 1px solid var(--line-soft); border-radius: 9px; }
+    .assets-mobile-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 12px; min-height: 92px; align-content: center; padding: 13px; }
+    .assets-mobile-row + .assets-mobile-row { border-top: 1px solid var(--line-soft); }
+    .assets-mobile-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .assets-mobile-row .asset-mobile-value { font-size: 17px; font-variant-numeric: tabular-nums; }
+    .asset-mobile-meta { color: var(--muted); font-size: 12px; }
     .mobile-nav { display: none; }
     @media (max-width: 980px) {
       .sidebar { width: 216px; }
@@ -575,6 +651,9 @@ export function renderUi(): string {
       .expense-period { grid-column: 1 / -1; border-bottom: 1px solid var(--line-soft); }
       .expense-summary-stat:first-of-type { border-left: 0; }
       .expense-workspace { grid-template-columns: minmax(250px, .8fr) minmax(460px, 1.4fr); }
+      .assets-summary { grid-template-columns: 1fr; gap: 20px; }
+      .assets-status-line { text-align: left; }
+      .assets-workspace { grid-template-columns: minmax(230px, .7fr) minmax(480px, 1.5fr); }
       .system-item:nth-child(3) { border-left: 0; border-top: 1px solid var(--line-soft); }
       .system-item:nth-child(4) { border-top: 1px solid var(--line-soft); }
     }
@@ -624,6 +703,12 @@ export function renderUi(): string {
       .expense-table-wrap { display: none; }
       .expense-mobile-list { display: block; }
       .expense-toolbar { grid-template-columns: 1fr; }
+      .assets-workspace { grid-template-columns: 1fr; }
+      .assets-area-pane { padding: 16px; }
+      .asset-area-list { display: none; }
+      .assets-mobile-filter { display: block; }
+      .assets-table-wrap { display: none; }
+      .assets-mobile-list { display: block; }
       .overview-panel { padding: 18px 16px; }
       .overview-panel .panel-header { gap: 8px; }
       .overview-panel .panel-header h2 { font-size: 18px; }
@@ -675,6 +760,10 @@ export function renderUi(): string {
       .expense-period .period-controls { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; }
       .expense-category { min-height: 62px; }
       .expense-mobile-row { grid-template-columns: minmax(0, 1fr) auto; }
+      .assets-summary { padding: 20px 18px; }
+      .assets-legend { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+      .assets-pane-header { align-items: start; }
+      .assets-notice { align-items: flex-start; flex-direction: column; gap: 5px; }
       .freshness-label { flex-wrap: nowrap; font-size: 12px; }
       .freshness-status { font-size: 12px; }
     }
@@ -733,12 +822,12 @@ const icons={
 const navItems=[
   {label:"Übersicht",icon:"overview",view:"overview"},
   {label:"Ausgaben",icon:"expenses",view:"spending"},
-  {label:"Vermögen",icon:"assets"},
+  {label:"Vermögen",icon:"assets",view:"assets"},
   {label:"Analysen",icon:"analysis"},
   {label:"Datenstatus",icon:"status",view:"status"}
 ];
-function activeView(){return location.hash==="#\/data-status"?"status":location.hash==="#\/spending"?"spending":"overview"}
-function viewHref(view){return view==="status"?'#/data-status':view==="spending"?'#/spending':'#/overview'}
+function activeView(){return location.hash==="#\/data-status"?"status":location.hash==="#\/spending"?"spending":location.hash==="#\/assets"?"assets":"overview"}
+function viewHref(view){return view==="status"?'#/data-status':view==="spending"?'#/spending':view==="assets"?'#/assets':'#/overview'}
 function navMarkup(){const current=activeView();return navItems.map(item=>item.view?'<a class="nav-item" href="'+viewHref(item.view)+'"'+(item.view===current?' aria-current="page"':'')+'>'+icons[item.icon]+'<span>'+item.label+'</span></a>':'<button class="nav-item" type="button" disabled title="Folgt in einem späteren Schritt">'+icons[item.icon]+'<span>'+item.label+'</span></button>').join("")}
 function renderNavigation(){document.getElementById("desktop-nav").innerHTML=navMarkup();document.getElementById("mobile-nav").innerHTML=navMarkup()}
 renderNavigation();
@@ -907,6 +996,18 @@ function toggleExpenseCategories(button){
   const query=params.toString();
   history.replaceState(null,"",(query?"?"+query:location.pathname)+location.hash);
 }
+function assetSelection(){
+  const requested=new URLSearchParams(location.search).get("assetArea")||"all";
+  return ["all","cash","depots","pensions","crypto"].includes(requested)?requested:"all";
+}
+function setAssetArea(value){
+  const area=["cash","depots","pensions","crypto"].includes(String(value))?String(value):"all";
+  const params=new URLSearchParams(location.search);
+  if(area==="all")params.delete("assetArea");else params.set("assetArea",area);
+  const query=params.toString();
+  history.pushState(null,"",(query?"?"+query:location.pathname)+location.hash);
+  refresh();
+}
 function rangeMonth(key,format){
   const match=String(key||"").match(/^(\\d{4})-(\\d{2})$/);
   if(!match)return "";
@@ -1055,6 +1156,59 @@ function renderSpending(data){
   document.getElementById("dashboard").setAttribute("aria-busy","false");
 }
 
+function assetStatusLabel(state,capturedAt){
+  if(state==="confirmed")return "Bestätigt";
+  if(state==="stale")return "Veraltet";
+  if(state==="error")return "Abruf fehlgeschlagen";
+  if(state==="unavailable")return "Nicht verfügbar";
+  return "Aktuell";
+}
+function assetAreaStatusLabel(state){
+  return state==="confirmed"?"Bestätigt":state==="stale"?"Veraltet":state==="error"?"Fehler":state==="unavailable"?"Nicht verfügbar":"Aktuell";
+}
+function assetAreaIcon(area){return area==="cash"?icons.bank:area==="crypto"?icons.wallet:area==="pensions"?icons.manual:icons.assets}
+function renderAssetsError(error){
+  document.getElementById("dashboard").innerHTML=expenseState("Nicht verfügbar","Die Vermögenswerte konnten nicht geladen werden. Bitte versuche es erneut.","refresh(true)","Erneut versuchen");
+  document.getElementById("dashboard").setAttribute("aria-busy","false");
+  msg(error?.message||"Die Vermögenswerte konnten nicht geladen werden.",true);
+}
+function renderAssets(data){
+  const selection=assetSelection();
+  const selectedArea=data.areas.find(area=>area.key===selection);
+  const filtered=selection==="all"?data.positions:data.positions.filter(position=>position.area===selection);
+  const allocationLabel=data.areas.map(area=>area.label+" "+(area.amountMinor===null?"nicht verfügbar":moneyWhole(area.amountMinor))).join(", ");
+  const segments=data.totalMinor===null?"":data.areas.map(area=>{
+    const width=area.amountMinor===null||data.totalMinor<=0?0:Math.max(0,area.amountMinor/data.totalMinor*100);
+    return '<span class="area-'+area.key+'" style="width:'+width+'%;background:var(--area-color)" title="'+esc(area.label)+'"></span>';
+  }).join("");
+  const legend=data.areas.map(area=>'<div class="assets-legend-item area-'+area.key+'"><i aria-hidden="true"></i><span>'+esc(area.label)+'</span><strong>'+(area.amountMinor===null?'–':moneyWhole(area.amountMinor))+'</strong></div>').join("");
+  const summaryStatus=data.state==="partial"
+    ? '<span class="tone-critical">Teilweise nicht verfügbar</span>'
+    : data.state==="stale"
+      ? '<span class="tone-warning">Werte teilweise veraltet</span>'
+      : '<strong>'+data.summary.automaticCurrent+' automatische Quellen aktuell</strong> · '+data.summary.confirmed+' bestätigt';
+  const summary='<section class="assets-summary" aria-label="Vermögensübersicht"><div class="assets-total"><span>Gesamtvermögen</span><strong>'+(data.totalMinor===null?'–':moneyWhole(data.totalMinor))+'</strong><small>Basis: letzte verfügbare Werte</small></div><div class="assets-allocation"><p class="assets-status-line">'+summaryStatus+'</p><div class="assets-bar" role="img" aria-label="'+esc(allocationLabel)+'">'+segments+'</div><div class="assets-legend">'+legend+'</div></div></section>';
+  const areaButtons=data.areas.map(area=>{
+    const active=area.key===selection;
+    return '<button class="asset-area-button area-'+area.key+'" type="button" aria-current="'+String(active)+'" onclick="setAssetArea(&quot;'+(active?'all':area.key)+'&quot;)"><span class="asset-area-title"><i class="asset-area-dot" aria-hidden="true"></i>'+esc(area.label)+'</span><span class="asset-area-value"><strong>'+(area.amountMinor===null?'–':moneyWhole(area.amountMinor))+'</strong><span>'+(area.percent===null?'–':new Intl.NumberFormat("de-DE",{maximumFractionDigits:1}).format(area.percent)+' %')+'</span></span><span class="asset-area-meta">'+area.positions+' '+(area.positions===1?'Position':'Positionen')+' · '+esc(assetAreaStatusLabel(area.status))+'</span></button>';
+  }).join("");
+  const options='<option value="all"'+(selection==="all"?' selected':'')+'>Alle Bereiche</option>'+data.areas.map(area=>'<option value="'+area.key+'"'+(selection===area.key?' selected':'')+'>'+esc(area.label)+'</option>').join("");
+  const confirmedDates=data.positions.filter(position=>position.status==="confirmed"&&position.capturedAt).map(position=>position.capturedAt).sort();
+  const notice=data.state==="partial"
+    ? '<div class="assets-notice"><span>'+esc(data.warnings[0]||"Teilwerte sind nicht verfügbar")+'</span><a href="#/data-status">Zum Datenstatus</a></div>'
+    : confirmedDates.length&&(selection==="all"||selection==="pensions")
+      ? '<div class="assets-notice"><span>Vorsorgewerte zuletzt am '+esc(formatDate(confirmedDates.at(-1)))+' bestätigt</span><a href="#/data-status">Zum Datenstatus</a></div>'
+      : '';
+  const desktopRows=filtered.map(position=>'<tr><td title="'+esc(position.label)+'">'+assetAreaIcon(position.area)+' '+esc(position.label)+'</td><td><span class="asset-area-cell area-'+position.area+'"><i class="asset-area-dot" aria-hidden="true"></i>'+esc(position.areaLabel)+'</span></td><td>'+(position.amountMinor===null?'–':moneyWhole(position.amountMinor))+'</td><td>'+esc(position.capturedAt?formatDate(position.capturedAt):"–")+'<span class="asset-state-text">'+esc(assetStatusLabel(position.status,position.capturedAt))+'</span></td><td>'+esc(position.basis)+'</td></tr>').join("");
+  const mobileRows=filtered.map(position=>'<article class="assets-mobile-row"><strong>'+esc(position.label)+'</strong><strong class="asset-mobile-value">'+(position.amountMinor===null?'–':moneyWhole(position.amountMinor))+'</strong><span class="asset-mobile-meta area-'+position.area+'">'+esc(position.areaLabel)+' · '+esc(position.basis)+'</span><span class="asset-mobile-meta">'+esc(position.capturedAt?formatDate(position.capturedAt):"–")+'</span></article>').join("");
+  const positionBody=filtered.length
+    ? '<div class="assets-table-wrap"><table class="assets-table"><thead><tr><th>Position</th><th>Bereich</th><th>Wert</th><th>Stichtag</th><th>Datenbasis</th></tr></thead><tbody>'+desktopRows+'</tbody></table></div><div class="assets-mobile-list">'+mobileRows+'</div>'
+    : expenseState("Keine Positionen","Für den gewählten Bereich liegen keine Werte vor.","setAssetArea(&quot;all&quot;)","Alle Bereiche anzeigen","warning");
+  const title=selectedArea?selectedArea.label:"Bestände";
+  document.getElementById("dashboard").innerHTML=summary+'<div class="assets-workspace"><section class="assets-pane assets-area-pane" aria-labelledby="assets-areas-title"><h2 id="assets-areas-title">Vermögensbereiche</h2><label class="assets-mobile-filter"><span class="sr-only">Vermögensbereich auswählen</span><select name="asset-area" autocomplete="off" onchange="setAssetArea(this.value)">'+options+'</select></label><div class="asset-area-list">'+areaButtons+'</div></section><section class="assets-pane" aria-labelledby="assets-positions-title"><div class="assets-pane-header"><div><h2 id="assets-positions-title">'+esc(title)+'</h2><p>'+(selection==="all"?'Alle Bereiche':esc(selectedArea?.label||""))+' · '+filtered.length+' '+(filtered.length===1?'Position':'Positionen')+'</p></div></div>'+notice+positionBody+'</section></div>';
+  document.getElementById("dashboard").setAttribute("aria-busy","false");
+}
+
 function renderTask(task){
   return '<article class="task-card"><span class="task-mark">'+icons.manual+'</span><div><h3>'+esc(task.label)+'</h3><p>Letzter bestätigter Wert: '+esc(formatDate(task.valueDate))+'</p></div><button class="button secondary" type="button" onclick="openManual(&quot;'+encoded(task.id)+'&quot;)">Werte aktualisieren</button></article>';
 }
@@ -1092,6 +1246,7 @@ function renderHeader(view){
   const content={
     overview:{title:"Übersicht",subtitle:"Finanzen, Vermögen und offene Punkte auf einen Blick."},
     spending:{title:"Ausgaben",subtitle:"Kategorien und zugehörige Buchungen nachvollziehen."},
+    assets:{title:"Vermögen",subtitle:"Konten, Anlagen und Vorsorge mit nachvollziehbaren Stichtagen."},
     status:{title:"Datenstatus",subtitle:"Aktualität, offene Aufgaben und Systemzustand auf einen Blick."}
   }[view];
   document.title=content.title+" · Finance Hub";
@@ -1107,6 +1262,8 @@ function renderLoading(view){
     <section class="wealth-overview" aria-label="Vermögensübersicht wird geladen"><div><div class="skeleton" style="width:52%;height:18px">Lädt</div><div class="skeleton" style="width:72%;height:48px;margin-top:10px">Lädt</div></div><div class="skeleton" style="width:100%;height:28px">Lädt</div></section>'
     :view==="spending"?'\
     <div class="expense-loading" aria-label="Ausgaben werden geladen"><section class="expense-summary-band"><div class="expense-period"><div class="skeleton" style="width:100%;height:44px">Lädt</div></div><div class="expense-summary-stat"><div class="skeleton" style="width:76%;height:16px">Lädt</div><div class="skeleton" style="width:58%;height:28px;margin-top:8px">Lädt</div></div><div class="expense-summary-stat"><div class="skeleton" style="width:68%;height:16px">Lädt</div><div class="skeleton" style="width:42%;height:28px;margin-top:8px">Lädt</div></div><div class="expense-summary-stat"><div class="skeleton" style="width:68%;height:16px">Lädt</div><div class="skeleton" style="width:42%;height:28px;margin-top:8px">Lädt</div></div></section><div class="expense-workspace"><section class="expense-pane expense-category-pane"><div class="skeleton" style="width:45%;height:24px">Lädt</div><div class="skeleton" style="width:100%;height:44px;margin-top:16px">Lädt</div><div class="skeleton" style="width:100%;height:250px;margin-top:12px">Lädt</div></section><section class="expense-pane expense-transactions-pane"><div class="skeleton" style="width:35%;height:24px">Lädt</div><div class="skeleton" style="width:100%;height:44px;margin-top:16px">Lädt</div><div class="skeleton" style="width:100%;height:330px;margin-top:12px">Lädt</div></section></div></div>'
+    :view==="assets"?'\
+    <div aria-label="Vermögen wird geladen"><section class="assets-summary"><div><div class="skeleton" style="width:48%;height:18px">Lädt</div><div class="skeleton" style="width:75%;height:48px;margin-top:10px">Lädt</div></div><div><div class="skeleton" style="width:100%;height:30px">Lädt</div><div class="skeleton" style="width:100%;height:48px;margin-top:14px">Lädt</div></div></section><div class="assets-workspace"><section class="assets-pane"><div class="skeleton" style="width:58%;height:24px">Lädt</div><div class="skeleton" style="width:100%;height:360px;margin-top:14px">Lädt</div></section><section class="assets-pane"><div class="skeleton" style="width:35%;height:24px">Lädt</div><div class="skeleton" style="width:100%;height:390px;margin-top:14px">Lädt</div></section></div></div>'
     :'\
     <section class="status-overview" aria-label="Statusübersicht wird geladen"><div class="overview-main"><div class="skeleton" style="width:72%;height:28px">Lädt</div><div class="skeleton" style="width:42%;height:16px;margin-top:12px">Lädt</div></div><div class="overview-stats"><div class="stat"><strong>–</strong><span>Automatisch aktuell</span></div><div class="stat"><strong>–</strong><span>Aufgaben</span></div><div class="stat"><strong>–</strong><span>Historische Importe</span></div></div></section>';
 }
@@ -1114,7 +1271,7 @@ async function refresh(force=false){
   const view=activeView();
   const button=document.getElementById("refresh-button");
   renderHeader(view);renderNavigation();renderLoading(view);
-  const loadingLabel=view==="overview"?"Übersicht":view==="spending"?"Ausgaben":"Datenstatus";
+  const loadingLabel=view==="overview"?"Übersicht":view==="spending"?"Ausgaben":view==="assets"?"Vermögen":"Datenstatus";
   button.disabled=true;msg(loadingLabel+" wird aktualisiert …");
   try{
     if(view==="overview"){
@@ -1133,12 +1290,14 @@ async function refresh(force=false){
       if(selection.page>1)params.set("page",String(selection.page));
       if(force)params.set("refresh","1");
       const data=await call("/api/dashboard/spending?"+params.toString());renderSpending(data);
+    }else if(view==="assets"){
+      const data=await call("/api/dashboard/assets"+(force?"?refresh=1":""));renderAssets(data);
     }else{
       const data=await call("/api/dashboard/status");renderDashboard(data);await loadManualSources();
     }
     msg("");
   }
-  catch(error){if(view==="spending")renderSpendingError(error);else{msg(error.message,true);document.getElementById("dashboard").setAttribute("aria-busy","false")}}
+  catch(error){if(view==="spending")renderSpendingError(error);else if(view==="assets")renderAssetsError(error);else{msg(error.message,true);document.getElementById("dashboard").setAttribute("aria-busy","false")}}
   finally{button.disabled=false}
 }
 async function syncSource(id){try{msg("Abruf läuft …");const result=await call("/api/sync/"+id,{method:"POST"});msg(result.message);await refresh()}catch(error){msg(error.message,true)}}
