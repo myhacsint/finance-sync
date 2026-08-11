@@ -12,6 +12,14 @@ test("Datenstatus enthält responsive Navigation und zugängliche Hauptbereiche"
   assert.match(html, /Aufteilung teilweise nicht verfügbar/);
   assert.match(html, /Datenbasis/);
   assert.match(html, /\/api\/dashboard\/overview/);
+  assert.match(html, /cashflowMonths/);
+  assert.match(html, /cashflowOffset/);
+  assert.match(html, />4 Monate</);
+  assert.match(html, />6 Monate</);
+  assert.match(html, />12 Monate</);
+  assert.match(html, /Einen Monat zurück/);
+  assert.match(html, /Einen Monat vor/);
+  assert.match(html, /Vollständige Monate/);
   assert.match(html, /Datenstatus/);
   assert.match(html, /Offene Aufgaben/);
   assert.match(html, /Automatische Quellen/);
@@ -24,6 +32,7 @@ test("Übersicht und Datenstatus sind als tiefe Links erreichbar", () => {
   assert.match(html, /#\/overview/);
   assert.match(html, /#\/data-status/);
   assert.match(html, /window\.addEventListener\("hashchange"/);
+  assert.match(html, /window\.addEventListener\("popstate"/);
   assert.match(html, /href="#\/data-status"/);
 });
 

@@ -20,6 +20,13 @@ export interface OverviewCategory {
 
 export interface ActualOverviewSnapshot {
   months: OverviewMonth[];
+  range: {
+    months: number;
+    offset: number;
+    start: string;
+    end: string;
+    endPartial: boolean;
+  };
   categoryMonth: string;
   categoryMonthLabel: string;
   categoryTotalMinor: number;
@@ -63,6 +70,7 @@ export interface DashboardOverview {
     state: "current" | "unavailable";
     source: "Actual";
     months: OverviewMonth[];
+    range?: ActualOverviewSnapshot["range"];
     error?: string;
   };
   spending: {
@@ -146,10 +154,15 @@ function monthLabel(key: string, timezone: string): string {
 
 export function overviewMonthKeys(
   now: Date,
-  timezone: string
+  timezone: string,
+  count = 4,
+  rangeOffset = 0
 ): Array<{ key: string; label: string; partial: boolean }> {
   const current = monthParts(now, timezone);
-  return [-3, -2, -1, 0].map((offset) => {
+  const safeCount = Math.max(1, Math.min(12, Math.trunc(count)));
+  const safeOffset = Math.max(0, Math.min(120, Math.trunc(rangeOffset)));
+  const start = -(safeCount - 1) - safeOffset;
+  return Array.from({ length: safeCount }, (_, index) => start + index).map((offset) => {
     const key = monthKey(current.year, current.month, offset);
     return { key, label: monthLabel(key, timezone), partial: offset === 0 };
   });
@@ -159,7 +172,12 @@ export async function readActualOverview(
   config: NonNullable<AppConfig["actual"]>,
   timezone: string,
   now = new Date(),
-  options: { loadApi?: ActualApiLoader; password?: string } = {}
+  options: {
+    loadApi?: ActualApiLoader;
+    password?: string;
+    months?: number;
+    offset?: number;
+  } = {}
 ): Promise<ActualOverviewSnapshot> {
   if (!config.enabled) throw new Error("Actual ist deaktiviert");
   const password = options.password ?? readSecret("actual-password");
@@ -172,11 +190,18 @@ export async function readActualOverview(
     await api.init({ dataDir, serverURL: config.serverUrl, password });
     initialized = true;
     await api.downloadBudget(config.budgetId);
-    const keys = overviewMonthKeys(now, timezone);
-    const budgetMonths = await Promise.all(keys.map(async (month) => ({
+    const keys = overviewMonthKeys(now, timezone, options.months, options.offset);
+    const current = monthParts(now, timezone);
+    const categoryKey = monthKey(current.year, current.month, -1);
+    const requestedKeys = [...new Set([...keys.map((month) => month.key), categoryKey])];
+    const budgetData = new Map(await Promise.all(requestedKeys.map(async (key) => [
+      key,
+      await api.getBudgetMonth(key)
+    ] as const)));
+    const budgetMonths = keys.map((month) => ({
       ...month,
-      data: await api.getBudgetMonth(month.key)
-    })));
+      data: budgetData.get(month.key)!
+    }));
     const months = budgetMonths.map(({ key, label, partial, data }) => ({
       key,
       label,
@@ -184,8 +209,9 @@ export async function readActualOverview(
       incomeMinor: Math.max(0, Math.round(data.totalIncome)),
       spentMinor: Math.max(0, Math.round(-data.totalSpent))
     }));
-    const completed = budgetMonths.at(-2);
-    if (!completed) throw new Error("Actual lieferte keinen abgeschlossenen Monat");
+    const completedData = budgetData.get(categoryKey);
+    if (!completedData) throw new Error("Actual lieferte keinen abgeschlossenen Monat");
+    const completed = { key: categoryKey, data: completedData };
     const categories = completed.data.categoryGroups
       .flatMap((group) => (group.categories ?? []).map((category) => ({
         label: String(category.name ?? "Ohne Kategorie"),
@@ -197,6 +223,13 @@ export async function readActualOverview(
     const categoryTotalMinor = Math.max(0, Math.round(-completed.data.totalSpent));
     return {
       months,
+      range: {
+        months: keys.length,
+        offset: Math.max(0, Math.min(120, Math.trunc(options.offset ?? 0))),
+        start: keys[0].key,
+        end: keys.at(-1)!.key,
+        endPartial: Boolean(keys.at(-1)?.partial)
+      },
       categoryMonth: completed.key,
       categoryMonthLabel: new Intl.DateTimeFormat("de-DE", {
         timeZone: timezone,
@@ -394,6 +427,7 @@ export function buildDashboardOverview(
       state: actualData ? "current" : "unavailable",
       source: "Actual",
       months: actualData?.months ?? [],
+      range: actualData?.range,
       error: actual.status === "rejected" ? "Datenabruf fehlgeschlagen" : undefined
     },
     spending: {

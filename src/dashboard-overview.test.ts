@@ -71,6 +71,13 @@ const actual: ActualOverviewSnapshot = {
     { key: "2026-07", label: "Jul", incomeMinor: 380_000, spentMinor: 1_480_000, partial: false },
     { key: "2026-08", label: "Aug", incomeMinor: 0, spentMinor: 220_000, partial: true }
   ],
+  range: {
+    months: 4,
+    offset: 0,
+    start: "2026-05",
+    end: "2026-08",
+    endPartial: true
+  },
   categoryMonth: "2026-07",
   categoryMonthLabel: "Juli",
   categoryTotalMinor: 1_480_000,
@@ -168,7 +175,27 @@ test("Actual liefert vier Monate und die vier größten Kategorien des letzten v
   ]);
   assert.deepEqual(result.categories.map((category) => category.label), ["A", "B", "C", "D"]);
   assert.equal(result.remainingMinor, 100);
+  assert.deepEqual(result.range, {
+    months: 4,
+    offset: 0,
+    start: "2026-05",
+    end: "2026-08",
+    endPartial: true
+  });
   assert.deepEqual(calls, ["init", "download", "shutdown"]);
+});
+
+test("Geldfluss-Zeitraum kann erweitert und monatsweise zurückgesetzt werden", () => {
+  const keys = overviewMonthKeys(
+    new Date("2026-08-10T12:00:00Z"),
+    config.timezone,
+    6,
+    2
+  );
+  assert.deepEqual(keys.map((month) => month.key), [
+    "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06"
+  ]);
+  assert.equal(keys.some((month) => month.partial), false);
 });
 
 test("Ghostfolio-Werte werden anhand der FinanceSync-Quellen gruppiert", async () => {
