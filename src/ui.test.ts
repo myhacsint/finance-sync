@@ -7,6 +7,13 @@ test("Datenstatus enthält responsive Navigation und zugängliche Hauptbereiche"
   assert.match(html, /<main class="content" id="main-content">/);
   assert.match(html, /aria-label="Mobile Hauptnavigation"/);
   assert.match(html, /Gesamtvermögen/);
+  assert.match(html, /Monatsvergleich/);
+  assert.match(html, /Gesamtvergleich offen/);
+  assert.match(html, /Unvollständige Anteile werden nicht summiert/);
+  assert.match(html, /Vergleichswert/);
+  assert.match(html, /part\.source/);
+  assert.match(html, /erkannte Staking-Erträge enthalten/);
+  assert.match(html, /\[SCHÄTZUNG\]/);
   assert.match(html, /Geldfluss/);
   assert.match(html, /Vermögensaufteilung/);
   assert.match(html, /Aufteilung teilweise nicht verfügbar/);

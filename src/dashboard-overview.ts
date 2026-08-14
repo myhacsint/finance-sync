@@ -4,6 +4,11 @@ import { join } from "node:path";
 import type { AppConfig, SourceKind } from "./types.js";
 import type { FinanceDatabase } from "./database.js";
 import { readSecret } from "./config.js";
+import {
+  buildOverviewAssetComparison,
+  type CoinGeckoSolPrice,
+  type OverviewAssetComparison
+} from "./dashboard-asset-comparison.js";
 
 export interface OverviewMonth {
   key: string;
@@ -68,6 +73,7 @@ export interface DashboardOverview {
     source: "Ghostfolio";
     allocation: InvestmentOverviewSnapshot["allocation"];
   };
+  comparison: OverviewAssetComparison;
   cashflow: {
     state: "current" | "unavailable";
     source: "Actual";
@@ -386,7 +392,11 @@ export function buildDashboardOverview(
   config: AppConfig,
   actual: PromiseSettledResult<ActualOverviewSnapshot>,
   investments: PromiseSettledResult<InvestmentOverviewSnapshot>,
-  now = new Date()
+  now = new Date(),
+  solPrice: PromiseSettledResult<CoinGeckoSolPrice> = {
+    status: "rejected",
+    reason: new Error("CoinGecko-Tageskurs nicht geladen")
+  }
 ): DashboardOverview {
   const rows = db.listSources() as unknown as SourceRow[];
   const cash = cashSnapshot(db, config);
@@ -421,6 +431,12 @@ export function buildDashboardOverview(
   const totalMinor = cash.amountMinor !== null && investment
     ? cash.amountMinor + investment.amountMinor
     : null;
+  const comparison = buildOverviewAssetComparison(db, config, {
+    totalMinor,
+    cashMinor: cash.amountMinor,
+    investmentMinor: investment?.amountMinor ?? null,
+    allocation: investment?.allocation ?? []
+  }, solPrice, now);
   return {
     generatedAt: now.toISOString(),
     state: warnings.length ? "partial" : "current",
@@ -432,6 +448,7 @@ export function buildDashboardOverview(
       source: "Ghostfolio",
       allocation: investment?.allocation ?? []
     },
+    comparison,
     cashflow: {
       state: actualData ? "current" : "unavailable",
       source: "Actual",

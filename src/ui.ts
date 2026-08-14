@@ -366,6 +366,22 @@ export function renderUi(): string {
     .composition-legend span { display: flex; align-items: center; gap: 8px; min-width: 0; }
     .composition-legend i { width: 10px; height: 10px; flex: 0 0 auto; border-radius: 2px; }
     .composition-legend strong { color: var(--text); font-variant-numeric: tabular-nums; }
+    .wealth-change-summary { margin-top: 15px; }
+    .wealth-change-summary span, .wealth-change-summary small { display: block; color: var(--muted); font-size: 12px; }
+    .wealth-change-summary strong { display: block; margin: 2px 0; font-size: 20px; font-variant-numeric: tabular-nums; }
+    .wealth-change-positive { color: var(--green); }
+    .wealth-change-negative { color: var(--orange); }
+    .wealth-change-neutral { color: var(--text); }
+    .wealth-comparison { grid-column: 1 / -1; border-top: 1px solid var(--line-soft); padding-top: 18px; }
+    .wealth-comparison-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+    .wealth-comparison-head h2 { font-size: 16px; }
+    .wealth-comparison-head p { color: var(--muted); font-size: 12px; }
+    .wealth-comparison-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+    .wealth-comparison-part { min-width: 0; border-left: 2px solid #405274; padding-left: 12px; }
+    .wealth-comparison-part > span { display: block; color: var(--muted); font-size: 12px; }
+    .wealth-comparison-part > strong { display: block; margin: 2px 0 3px; font-size: 17px; font-variant-numeric: tabular-nums; }
+    .wealth-comparison-part small { display: block; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .wealth-comparison-part .comparison-estimate { color: var(--amber); font-weight: 800; }
     .overview-action {
       display: grid;
       grid-template-columns: auto minmax(0, 1fr) auto;
@@ -747,6 +763,8 @@ export function renderUi(): string {
       .task-list { grid-template-columns: 1fr; }
       .system-band { grid-template-columns: repeat(2, 1fr); }
       .wealth-overview { grid-template-columns: 1fr; gap: 24px; }
+      .wealth-comparison { grid-column: 1; }
+      .wealth-comparison-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .expense-summary-band { grid-template-columns: 1fr repeat(3, 1fr); }
       .expense-period { grid-column: 1 / -1; border-bottom: 1px solid var(--line-soft); }
       .expense-summary-stat:first-of-type { border-left: 0; }
@@ -784,6 +802,8 @@ export function renderUi(): string {
       .wealth-overview { min-height: 0; padding: 22px 20px; }
       .wealth-composition { margin-top: 2px; }
       .wealth-health { justify-content: flex-start; margin-bottom: 16px; }
+      .wealth-comparison-grid { grid-template-columns: 1fr; gap: 12px; }
+      .wealth-comparison-head { align-items: flex-start; flex-direction: column; gap: 3px; }
       .overview-action { gap: 10px; padding: 12px 14px; }
       .overview-action .task-mark { width: 36px; height: 36px; }
       .overview-action strong { font-size: 14px; white-space: nowrap; }
@@ -1033,6 +1053,7 @@ function formatBytes(bytes){
   return new Intl.NumberFormat("de-DE",{maximumFractionDigits:value>=100?0:1}).format(value)+" "+units[index];
 }
 function moneyWhole(minor){if(!Number.isFinite(minor))return "Nicht verfügbar";return new Intl.NumberFormat("de-DE",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(Number(minor)/100)}
+function signedMoneyWhole(minor){if(!Number.isFinite(minor))return "Nicht verfügbar";return new Intl.NumberFormat("de-DE",{style:"currency",currency:"EUR",maximumFractionDigits:0,signDisplay:"always"}).format(Number(minor)/100)}
 function numberWhole(minor){if(!Number.isFinite(minor))return "–";return new Intl.NumberFormat("de-DE",{maximumFractionDigits:0}).format(Number(minor)/100)}
 function cashflowSelection(){
   const params=new URLSearchParams(location.search);
@@ -1248,6 +1269,25 @@ function renderOverview(data){
   const actionDetails=data.manualActions.map(action=>esc(action.label.replace(" Riester","").replace(" Fondsrente",""))+" "+esc(dayMonth(action.capturedAt))).join(" · ");
   const action=data.manualActions.length?'\
     <section class="overview-action" aria-label="Vorsorgewerte prüfen"><span class="task-mark">'+icons.manual+'</span><div><strong>'+data.manualActions.length+' Vorsorgewerte prüfen</strong><p>'+actionDetails+'</p></div><a class="text-action" href="#/data-status"><span><span class="to-prefix">Zum </span>Datenstatus</span>'+icons.chevron+'</a></section>':'';
+  const comparison=data.comparison||{effectiveDate:"",state:"partial",changeTotalMinor:null,parts:[],warnings:[]};
+  const totalChangeTone=Number(comparison.changeTotalMinor)>0?"positive":Number(comparison.changeTotalMinor)<0?"negative":"neutral";
+  const comparisonSummary=Number.isFinite(comparison.changeTotalMinor)
+    ?'<div class="wealth-change-summary"><span>Seit '+esc(formatDate(comparison.effectiveDate))+'</span><strong class="wealth-change-'+totalChangeTone+'">'+signedMoneyWhole(comparison.changeTotalMinor)+'</strong><small>Vollständig abgestimmter Monatsvergleich</small></div>'
+    :'<div class="wealth-change-summary"><span>Seit '+esc(formatDate(comparison.effectiveDate))+'</span><strong>Gesamtvergleich offen</strong><small>Unvollständige Anteile werden nicht summiert</small></div>';
+  const comparisonParts=(comparison.parts||[]).map(part=>{
+    const changeTone=Number(part.changeMinor)>0?"positive":Number(part.changeMinor)<0?"negative":"neutral";
+    const value=Number.isFinite(part.changeMinor)?signedMoneyWhole(part.changeMinor):"Vergleich nicht verfügbar";
+    const dates=(part.capturedDates||[]).map(value=>formatDate(value));
+    const dateText=dates.length===0?"Stichtag nicht verfügbar":dates.length===1?"Stichtag "+dates[0]:"Stichtage "+dates[0]+" bis "+dates.at(-1);
+    const valuation=part.valuation==="estimated"?'<span class="comparison-estimate">[SCHÄTZUNG]</span>':part.valuation==="confirmed"?"bestätigt":part.valuation==="measured"?"gemessen":"nicht verfügbar";
+    const previous=Number.isFinite(part.previousMinor)?"Vergleichswert "+moneyWhole(part.previousMinor):"Kein belastbarer Vergleichswert";
+    const quantity=Number.isFinite(part.quantity)?new Intl.NumberFormat("de-DE",{maximumFractionDigits:9}).format(part.quantity)+" SOL":null;
+    const price=Number.isFinite(part.priceMinor)?new Intl.NumberFormat("de-DE",{style:"currency",currency:"EUR",minimumFractionDigits:2,maximumFractionDigits:2}).format(part.priceMinor/100)+"/SOL":null;
+    const solDetail=quantity&&price?'<small>'+quantity+' · '+price+' am '+esc(formatDate(part.priceDate))+'</small>':'';
+    const staking=Number(part.stakingRewardsQuantity)>0?'<small>'+new Intl.NumberFormat("de-DE",{maximumFractionDigits:9}).format(part.stakingRewardsQuantity)+' SOL erkannte Staking-Erträge enthalten</small>':'';
+    return '<div class="wealth-comparison-part"><span>'+esc(part.label)+'</span><strong class="wealth-change-'+changeTone+'">'+value+'</strong><small>'+previous+' · '+esc(part.source)+'</small><small>'+esc(dateText)+' · '+valuation+'</small>'+solDetail+staking+'</div>';
+  }).join("");
+  const comparisonPanel='<section class="wealth-comparison" aria-labelledby="wealth-comparison-title"><div class="wealth-comparison-head"><h2 id="wealth-comparison-title">Monatsvergleich</h2><p>Letztes vollständiges Monatsende · '+esc(formatDate(comparison.effectiveDate))+'</p></div><div class="wealth-comparison-grid">'+comparisonParts+'</div></section>';
   const months=data.cashflow.months||[];
   const selection=cashflowSelection();
   const range=data.cashflow.range||{months:months.length||selection.months,offset:selection.offset,start:months.at(0)?.key,end:months.at(-1)?.key,endPartial:Boolean(months.at(-1)?.partial)};
@@ -1299,8 +1339,9 @@ function renderOverview(data){
   const warning=data.warnings.length?'<div class="overview-warning" role="status">Die Übersicht ist teilweise verfügbar: '+data.warnings.map(esc).join(" · ")+'</div>':'';
   document.getElementById("dashboard").innerHTML='\
     <section class="wealth-overview" aria-label="Vermögensübersicht">\
-      <div><span class="wealth-label">Gesamtvermögen</span><strong class="wealth-value">'+moneyWhole(total)+'</strong><p class="wealth-date">Stand '+esc(formatDate(data.generatedAt))+' · Bankkonten und Anlagen</p></div>\
+      <div><span class="wealth-label">Gesamtvermögen</span><strong class="wealth-value">'+moneyWhole(total)+'</strong><p class="wealth-date">Stand '+esc(formatDate(data.generatedAt))+' · Bankkonten und Anlagen</p>'+comparisonSummary+'</div>\
       <div class="wealth-composition"><div class="wealth-health">'+statusIcon(automaticOk?"ok":"warning")+'<span>'+(automaticOk?'Automatische Quellen aktuell':'Quellenstatus mit Hinweisen')+'</span></div>'+composition+'<div class="composition-legend"><span><i class="composition-cash"></i>Liquidität <strong>'+moneyWhole(data.cash.amountMinor)+'</strong></span><span><i class="composition-investments"></i>Anlagen <strong>'+moneyWhole(data.investments.amountMinor)+'</strong></span></div></div>\
+      '+comparisonPanel+'\
     </section>'+warning+action+'\
     <div class="overview-dashboard-grid">\
       <section class="overview-panel" data-month-count="'+months.length+'" aria-labelledby="cashflow-title"><div class="panel-header cashflow-panel-header"><div><h2 id="cashflow-title">Geldfluss</h2><p class="cashflow-period">'+esc(rangeLabel)+' <span aria-hidden="true">·</span> '+esc(rangeDetail)+'</p></div><div class="period-controls" aria-label="Zeitraum für Geldfluss"><button class="range-previous" type="button" onclick="shiftCashflow(1)" aria-label="Einen Monat zurück" title="Einen Monat zurück">'+icons.chevron+'</button><label class="sr-only" for="cashflow-window">Angezeigter Zeitraum</label><select class="cashflow-window" id="cashflow-window" name="cashflow-window" autocomplete="off" onchange="setCashflowMonths(this.value)"><option value="4"'+(range.months===4?' selected':'')+'>4 Monate</option><option value="6"'+(range.months===6?' selected':'')+'>6 Monate</option><option value="12"'+(range.months===12?' selected':'')+'>12 Monate</option></select><button class="range-next" type="button" onclick="shiftCashflow(-1)" aria-label="Einen Monat vor" title="Einen Monat vor"'+(range.offset===0?' disabled':'')+'>'+icons.chevron+'</button></div></div>'+cashflow+'</section>\

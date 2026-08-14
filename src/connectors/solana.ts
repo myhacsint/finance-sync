@@ -30,6 +30,11 @@ interface HistoryTransaction {
       mint: string;
       uiTokenAmount: { amount: string; decimals: number };
     }>;
+    rewards?: Array<{
+      pubkey?: string;
+      lamports?: number;
+      rewardType?: string;
+    }>;
   };
 }
 
@@ -195,6 +200,21 @@ export async function fetchSolana(source: SourceConfig): Promise<ImportBundle> {
         ? new Date(item.blockTime * 1000).toISOString()
         : capturedAt;
       if (!signature) continue;
+      for (const reward of item.meta?.rewards ?? []) {
+        if (reward.rewardType !== "staking" || !Number.isSafeInteger(reward.lamports) || reward.lamports === 0) continue;
+        activities.push({
+          sourceId: source.id,
+          sourceActivityId: `${signature}:staking:${reward.pubkey ?? "unknown"}`,
+          accountId: reward.pubkey ?? wallet,
+          occurredAt,
+          type: "STAKING_REWARD",
+          symbol: "SOL",
+          quantityAtomic: String(reward.lamports),
+          atomicDecimals: 9,
+          note: "On-chain staking reward",
+          rawHash
+        });
+      }
       const keys = item.transaction?.message?.accountKeys?.map(
         (key) => typeof key === "string" ? key : key.pubkey ?? ""
       ) ?? [];

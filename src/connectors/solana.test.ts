@@ -39,7 +39,8 @@ test("Solana-Historie wird bis zum letzten Seitencursor gelesen", async () => {
             transaction: { message: { accountKeys: [wallet] } },
             meta: {
               preBalances: [secondPage ? 100 : 0],
-              postBalances: [secondPage ? 300 : 100]
+              postBalances: [secondPage ? 300 : 100],
+              ...(secondPage ? { rewards: [{ pubkey: "Stake111", lamports: 7, rewardType: "staking" }] } : {})
             }
           }],
           paginationToken: secondPage ? null : "next-page"
@@ -59,7 +60,11 @@ test("Solana-Historie wird bis zum letzten Seitencursor gelesen", async () => {
       settings: { wallets: [wallet] }
     });
     assert.equal(historyCalls, 2);
-    assert.equal(bundle.activities?.length, 2);
+    assert.equal(bundle.activities?.length, 3);
+    const reward = bundle.activities?.find((activity) => activity.type === "STAKING_REWARD");
+    assert.equal(reward?.symbol, "SOL");
+    assert.equal(reward?.quantityAtomic, "7");
+    assert.equal(reward?.atomicDecimals, 9);
     const raw = bundle.raw as {
       wallets: Record<string, { history: { data: unknown[] } }>;
     };

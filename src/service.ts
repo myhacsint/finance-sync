@@ -57,6 +57,10 @@ import {
   readGhostfolioAssets,
   type DashboardAssets
 } from "./dashboard-assets.js";
+import {
+  lastCompletedMonthEnd,
+  readCoinGeckoSolPrice
+} from "./dashboard-asset-comparison.js";
 
 export class FinanceService {
   private running = new Set<string>();
@@ -128,7 +132,8 @@ export class FinanceService {
     if (pending) return pending;
     const load = async (): Promise<DashboardOverview> => {
       const generatedAt = new Date();
-      const [actual, investments] = await Promise.allSettled([
+      const comparisonDate = lastCompletedMonthEnd(generatedAt, this.config.timezone).effectiveDate;
+      const [actual, investments, solPrice] = await Promise.allSettled([
         this.config.actual?.enabled
           ? this.withActual(() => readActualOverview(
               this.config.actual!,
@@ -143,14 +148,18 @@ export class FinanceService {
           : Promise.reject(new Error("Actual ist deaktiviert")),
         this.config.ghostfolio?.enabled
           ? readInvestmentOverview(this.config, this.db)
-          : Promise.reject(new Error("Ghostfolio ist deaktiviert"))
+          : Promise.reject(new Error("Ghostfolio ist deaktiviert")),
+        this.config.sources.some((source) => source.enabled && source.kind === "solana")
+          ? readCoinGeckoSolPrice(comparisonDate)
+          : Promise.reject(new Error("Solana ist deaktiviert"))
       ]);
       const value = buildDashboardOverview(
         this.db,
         this.config,
         actual,
         investments,
-        generatedAt
+        generatedAt,
+        solPrice
       );
       this.overviewCache.set(cacheKey, {
         expiresAt: Date.now() + 5 * 60_000,
