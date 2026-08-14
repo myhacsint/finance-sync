@@ -54,6 +54,16 @@ bereits angelegt.
 - `POST /api/reconcile`
 - `POST /api/backup`
 - `POST /api/manual-snapshot`
+- `GET /api/dashboard/analyses/recurring-expenses`
+- `GET /api/dashboard/analyses/recurring-expenses/:candidate`
+- `PUT /api/decisions/recurring-expenses/:candidate`
+
+Die API für regelmäßige Ausgaben wertet ausschließlich bereinigte
+Actual-Einzelbuchungen aus. Kandidaten und Buchungsschlüssel sind
+pseudonymisiert. Nutzerentscheidungen werden mit dem aktuellen
+Beleg-Fingerprint in der FinanceSync-Datenbank gespeichert; sie schreiben
+weder nach Actual zurück noch verändern sie die bestehende
+Ausgabenklassifikation.
 
 In der Verwaltungsoberfläche gibt es zusätzlich den bestätigungspflichtigen
 Bereich **Vorsorge aktualisieren**. Er unterstützt kopierten Text aus dem

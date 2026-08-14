@@ -7,6 +7,8 @@ import type {
   NormalizedHolding,
   NormalizedTransaction,
   ImportBundle,
+  RecurringExpenseDecision,
+  RecurringExpenseDecisionRecord,
   SyncState
 } from "./types.js";
 
@@ -122,6 +124,16 @@ export class FinanceDatabase {
       CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS recurring_expense_decisions (
+        candidate_key TEXT PRIMARY KEY,
+        decision TEXT NOT NULL CHECK(decision IN (
+          'GRUNDBEDARF', 'GESTALTBAR', 'VERMEIDBAR', 'UNKLAR', 'KEIN_KANDIDAT'
+        )),
+        evidence_hash TEXT NOT NULL,
+        fingerprint_version INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_transactions_account_date
         ON transactions(account_id, booked_at);
@@ -376,6 +388,52 @@ export class FinanceDatabase {
       INSERT INTO settings(key, value) VALUES (?, ?)
       ON CONFLICT(key) DO UPDATE SET value=excluded.value
     `).run(key, value);
+  }
+
+  listRecurringExpenseDecisions(): RecurringExpenseDecisionRecord[] {
+    const rows = this.db.prepare(`
+      SELECT candidate_key, decision, evidence_hash, fingerprint_version,
+        created_at, updated_at
+      FROM recurring_expense_decisions
+      ORDER BY candidate_key
+    `).all() as Array<{
+      candidate_key: string;
+      decision: RecurringExpenseDecision;
+      evidence_hash: string;
+      fingerprint_version: number;
+      created_at: string;
+      updated_at: string;
+    }>;
+    return rows.map((row) => ({
+      candidateKey: row.candidate_key,
+      decision: row.decision,
+      evidenceHash: row.evidence_hash,
+      fingerprintVersion: row.fingerprint_version,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
+  }
+
+  setRecurringExpenseDecision(
+    candidateKey: string,
+    decision: RecurringExpenseDecision,
+    evidenceHash: string,
+    fingerprintVersion = 1,
+    now = new Date()
+  ): RecurringExpenseDecisionRecord {
+    const timestamp = now.toISOString();
+    this.db.prepare(`
+      INSERT INTO recurring_expense_decisions(
+        candidate_key, decision, evidence_hash, fingerprint_version, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(candidate_key) DO UPDATE SET
+        decision=excluded.decision,
+        evidence_hash=excluded.evidence_hash,
+        fingerprint_version=excluded.fingerprint_version,
+        updated_at=excluded.updated_at
+    `).run(candidateKey, decision, evidenceHash, fingerprintVersion, timestamp, timestamp);
+    return this.listRecurringExpenseDecisions()
+      .find((row) => row.candidateKey === candidateKey)!;
   }
 
   close(): void {

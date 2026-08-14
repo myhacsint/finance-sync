@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { timingSafeEqual } from "node:crypto";
 import { loadConfig, paths, readSecret } from "./config.js";
 import { FinanceDatabase } from "./database.js";
-import { FinanceService } from "./service.js";
+import { FinanceService, FinanceServiceError } from "./service.js";
+import type { RecurringExpenseDecision } from "./types.js";
 import { exportAll } from "./exporter.js";
 import { manualSnapshotBundle } from "./connectors/manual.js";
 import { importBundle } from "./importer.js";
@@ -139,6 +140,53 @@ const server = createServer(async (req, res) => {
         })
       );
     }
+    if (req.method === "GET"
+      && url.pathname === "/api/dashboard/analyses/recurring-expenses") {
+      return json(
+        res,
+        200,
+        await service.getDashboardRecurringExpenses(
+          url.searchParams.get("refresh") === "1",
+          {
+            rhythm: (url.searchParams.get("rhythm") ?? undefined) as never,
+            review: (url.searchParams.get("review") ?? undefined) as never,
+            classification: (url.searchParams.get("classification") ?? undefined) as never,
+            confidence: (url.searchParams.get("confidence") ?? undefined) as never
+          }
+        )
+      );
+    }
+    const recurringDetailMatch = /^\/api\/dashboard\/analyses\/recurring-expenses\/(recurring-[a-f0-9]{18})$/
+      .exec(url.pathname);
+    if (req.method === "GET" && recurringDetailMatch) {
+      return json(
+        res,
+        200,
+        await service.getDashboardRecurringExpenseDetail(
+          recurringDetailMatch[1],
+          url.searchParams.get("refresh") === "1"
+        )
+      );
+    }
+    const recurringDecisionMatch = /^\/api\/decisions\/recurring-expenses\/(recurring-[a-f0-9]{18})$/
+      .exec(url.pathname);
+    if (req.method === "PUT" && recurringDecisionMatch) {
+      const payload = await body(req, 4096).catch(() => {
+        throw new FinanceServiceError("Ungültige Entscheidungsanfrage", 400);
+      }) as {
+        decision?: RecurringExpenseDecision;
+        expectedEvidenceHash?: string;
+      };
+      return json(
+        res,
+        200,
+        await service.setRecurringExpenseDecision(
+          recurringDecisionMatch[1],
+          String(payload.decision ?? "") as RecurringExpenseDecision,
+          String(payload.expectedEvidenceHash ?? "")
+        )
+      );
+    }
     if (req.method === "GET" && url.pathname === "/api/dashboard/status") {
       const rows = db.listSources() as unknown as SourceStatusRow[];
       const manualValueDates = Object.fromEntries(
@@ -246,7 +294,7 @@ const server = createServer(async (req, res) => {
     }
     return json(res, 404, { error: "Nicht gefunden" });
   } catch (error) {
-    return json(res, 500, {
+    return json(res, error instanceof FinanceServiceError ? error.status : 500, {
       error: error instanceof Error ? error.message : String(error)
     });
   }

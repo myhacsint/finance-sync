@@ -752,6 +752,75 @@ export function renderUi(): string {
     .analysis-mobile-positions { display: none; }
     .analysis-warning { display: flex; gap: 11px; margin-top: 12px; border: 1px solid #7b5316; border-radius: 11px; background: #2b2115; padding: 13px 15px; color: #e6d3af; }
     .analysis-warning svg { width: 19px; height: 19px; flex: 0 0 auto; color: var(--amber); }
+    .recurring-toolbar { grid-template-columns: minmax(220px, 1.25fr) repeat(4, minmax(130px, .65fr)) auto; }
+    .recurring-summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      overflow: hidden;
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    .recurring-summary > div { min-height: 94px; padding: 18px 22px; }
+    .recurring-summary > div + div { border-left: 1px solid var(--line-soft); }
+    .recurring-summary span { display: block; color: var(--muted); font-size: 13px; }
+    .recurring-summary strong { display: block; margin-top: 4px; font-size: 28px; font-variant-numeric: tabular-nums; }
+    .recurring-freshness { display: flex; flex-wrap: wrap; gap: 7px 18px; margin-top: 12px; color: var(--muted); font-size: 12px; }
+    .recurring-panel { margin-top: 12px; }
+    .recurring-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .recurring-table th, .recurring-table td { padding: 13px 12px; border-bottom: 1px solid var(--line-soft); text-align: left; vertical-align: middle; }
+    .recurring-table th { color: var(--muted); font-size: 12px; font-weight: 500; }
+    .recurring-table th:nth-child(1) { width: 29%; }
+    .recurring-table th:nth-child(2) { width: 16%; }
+    .recurring-table th:nth-child(3), .recurring-table th:nth-child(4) { width: 14%; }
+    .recurring-table th:nth-child(5) { width: 21%; }
+    .recurring-table th:last-child { width: 6%; }
+    .recurring-row:hover { background: var(--surface-2); }
+    .recurring-open {
+      display: grid;
+      width: 100%;
+      min-height: 44px;
+      align-content: center;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      padding: 0;
+      text-align: left;
+      cursor: pointer;
+    }
+    .recurring-row td:nth-child(3), .recurring-row td:nth-child(4) { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .recurring-row td:last-child { color: var(--muted); text-align: right; }
+    .recurring-row td:last-child svg { width: 17px; height: 17px; transform: rotate(-90deg); transition: transform .16s ease; }
+    .recurring-row[data-open="true"] td:last-child svg { transform: rotate(0); }
+    .recurring-status { display: grid; gap: 2px; }
+    .recurring-status strong { font-size: 13px; }
+    .recurring-status span { color: var(--muted); font-size: 12px; }
+    .recurring-detail-row[hidden] { display: none; }
+    .recurring-detail-row td { padding: 0; background: #0e1728; }
+    .recurring-detail { padding: 19px 20px 22px; }
+    .recurring-detail-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--line-soft); }
+    .recurring-detail-grid > div { min-height: 76px; padding: 12px 14px; background: var(--surface); }
+    .recurring-detail-grid span { display: block; color: var(--muted); font-size: 11px; }
+    .recurring-detail-grid strong { display: block; margin-top: 4px; font-size: 14px; font-variant-numeric: tabular-nums; }
+    .recurring-reasons { margin: 16px 0 0; padding-left: 20px; color: var(--muted); }
+    .recurring-reasons li + li { margin-top: 4px; }
+    .recurring-decision { display: flex; align-items: end; gap: 12px; margin-top: 18px; padding-top: 17px; border-top: 1px solid var(--line-soft); }
+    .recurring-decision label { min-width: min(330px, 100%); }
+    .recurring-decision p { margin-top: 5px; color: var(--muted); font-size: 12px; }
+    .recurring-payment-list { display: grid; gap: 0; margin-top: 18px; border: 1px solid var(--line-soft); border-radius: 10px; }
+    .recurring-payment { display: grid; grid-template-columns: 140px minmax(0, 1fr) auto; gap: 12px; padding: 10px 13px; border-bottom: 1px solid var(--line-soft); font-size: 13px; }
+    .recurring-payment:last-child { border-bottom: 0; }
+    .recurring-payment span:nth-child(2) { color: var(--muted); }
+    .recurring-payment strong { font-variant-numeric: tabular-nums; }
+    .recurring-mobile-list { display: none; }
+    .recurring-mobile-row { border: 0; border-bottom: 1px solid var(--line-soft); background: transparent; color: var(--text); padding: 14px; text-align: left; cursor: pointer; }
+    .recurring-mobile-row:last-child { border-bottom: 0; }
+    .recurring-mobile-main { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; }
+    .recurring-mobile-main > strong:last-of-type { font-variant-numeric: tabular-nums; }
+    .recurring-mobile-meta { color: var(--muted); font-size: 12px; }
+    .recurring-mobile-detail { display: none; padding: 0 14px 16px; background: #0e1728; }
+    .recurring-mobile-row[aria-expanded="true"] + .recurring-mobile-detail { display: block; }
     .mobile-nav { display: none; }
     @media (max-width: 980px) {
       .sidebar { width: 216px; }
@@ -846,6 +915,14 @@ export function renderUi(): string {
       .analysis-mobile-meta { color: var(--muted); font-size: 12px; }
       .analysis-mobile-detail { display: none; margin-top: 10px; }
       .analysis-mobile-row[aria-expanded="true"] .analysis-mobile-detail { display: flex; }
+      .recurring-toolbar { grid-template-columns: 1fr 1fr; }
+      .recurring-toolbar > label:first-child { grid-column: 1 / -1; }
+      .recurring-toolbar .button { width: 100%; }
+      .recurring-table { display: none; }
+      .recurring-mobile-list { display: grid; overflow: hidden; border: 1px solid var(--line-soft); border-radius: 9px; }
+      .recurring-detail-grid { grid-template-columns: 1fr 1fr; }
+      .recurring-decision { align-items: stretch; flex-direction: column; }
+      .recurring-decision .button { width: 100%; }
       .overview-panel { padding: 18px 16px; }
       .overview-panel .panel-header { gap: 8px; }
       .overview-panel .panel-header h2 { font-size: 18px; }
@@ -906,6 +983,14 @@ export function renderUi(): string {
       .analysis-summary { grid-template-columns: 1fr; }
       .analysis-summary > div:first-child { grid-column: auto; }
       .analysis-summary > div + div { border-left: 0; border-top: 1px solid var(--line-soft); }
+      .recurring-toolbar { grid-template-columns: 1fr; }
+      .recurring-toolbar > label:first-child { grid-column: auto; }
+      .recurring-summary { grid-template-columns: 1fr; }
+      .recurring-summary > div { min-height: 72px; }
+      .recurring-summary > div + div { border-left: 0; border-top: 1px solid var(--line-soft); }
+      .recurring-detail-grid { grid-template-columns: 1fr; }
+      .recurring-payment { grid-template-columns: 1fr auto; }
+      .recurring-payment span:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
       .analysis-category { grid-template-columns: minmax(0, 1fr) auto; gap: 7px 10px; }
       .analysis-bar-pair { grid-column: 1 / -1; grid-row: 2; }
       .analysis-category-values { grid-column: 2; grid-row: 1; }
@@ -995,8 +1080,10 @@ let token=sessionStorage.getItem("financeToken")||"";
 let currentPreview=null;
 let currentExpenseMonth="";
 let currentAnalysisData=null;
+let currentRecurringData=null;
+let currentRecurringDetail=null;
 
-function headerAction(){if(activeView()==="analyses")exportAnalysisCsv();else refresh(true)}
+function headerAction(){if(activeView()==="analyses"&&analysisSelection().view==="expense-structure")exportAnalysisCsv();else refresh(true)}
 
 function requestToken(){
   const request=document.getElementById("token-request");
@@ -1185,11 +1272,23 @@ function analysisSelection(){
   const period=Number(params.get("analysisPeriod")||0);
   const comparison=Number(params.get("analysisComparison")||0);
   return {
+    view:params.get("analysisView")==="recurring-expenses"?"recurring-expenses":"expense-structure",
     period:Number.isInteger(period)&&period>0?period:0,
     comparison:Number.isInteger(comparison)&&comparison>0?comparison:0,
     expanded:params.get("analysisCategoriesExpanded")==="1",
-    position:params.get("analysisPosition")||""
+    position:params.get("analysisPosition")||"",
+    rhythm:["monatlich","vierteljaehrlich","jaehrlich"].includes(params.get("recurringRhythm"))?params.get("recurringRhythm"):"alle",
+    review:["alle","bestaetigt","kein-kandidat"].includes(params.get("recurringReview"))?params.get("recurringReview"):"moeglich",
+    classification:["GRUNDBEDARF","GESTALTBAR","VERMEIDBAR","UNKLAR"].includes(params.get("recurringClassification"))?params.get("recurringClassification"):"alle",
+    confidence:["hoch","mittel"].includes(params.get("recurringConfidence"))?params.get("recurringConfidence"):"alle",
+    candidate:/^recurring-[a-f0-9]{18}$/.test(params.get("recurringCandidate")||"")?params.get("recurringCandidate"):""
   };
+}
+function setAnalysisView(value){
+  const params=new URLSearchParams(location.search);
+  if(value==="recurring-expenses")params.set("analysisView","recurring-expenses");else params.delete("analysisView");
+  params.delete("analysisPosition");params.delete("recurringCandidate");
+  const query=params.toString();history.pushState(null,"",(query?"?"+query:location.pathname)+location.hash);refresh();
 }
 function applyAnalysisFilters(){
   const period=Number(document.getElementById("analysis-period")?.value||0);
@@ -1201,6 +1300,45 @@ function applyAnalysisFilters(){
   const query=params.toString();
   history.pushState(null,"",(query?"?"+query:location.pathname)+location.hash);
   refresh();
+}
+function applyRecurringFilters(){
+  const params=new URLSearchParams(location.search);
+  const values={
+    recurringRhythm:document.getElementById("recurring-rhythm")?.value||"alle",
+    recurringReview:document.getElementById("recurring-review")?.value||"moeglich",
+    recurringClassification:document.getElementById("recurring-classification")?.value||"alle",
+    recurringConfidence:document.getElementById("recurring-confidence")?.value||"alle"
+  };
+  Object.entries(values).forEach(([name,value])=>{const defaultValue=name==="recurringReview"?"moeglich":"alle";if(value===defaultValue)params.delete(name);else params.set(name,value)});
+  params.delete("recurringCandidate");
+  const query=params.toString();history.pushState(null,"",(query?"?"+query:location.pathname)+location.hash);currentRecurringDetail=null;refresh();
+}
+function toggleRecurringCandidate(key){
+  const params=new URLSearchParams(location.search);
+  const close=params.get("recurringCandidate")===key;
+  if(close)params.delete("recurringCandidate");else params.set("recurringCandidate",key);
+  const query=params.toString();history.replaceState(null,"",(query?"?"+query:location.pathname)+location.hash);
+  if(close){currentRecurringDetail=null;if(currentRecurringData)renderRecurringExpenses(currentRecurringData);return}
+  currentRecurringDetail=null;if(currentRecurringData)renderRecurringExpenses(currentRecurringData);loadRecurringDetail(key);
+}
+async function loadRecurringDetail(key){
+  try{
+    const data=await call("/api/dashboard/analyses/recurring-expenses/"+encoded(key));
+    if(analysisSelection().candidate!==key)return;
+    currentRecurringDetail=data;if(currentRecurringData)renderRecurringExpenses(currentRecurringData);
+  }catch(error){msg(error.message,true)}
+}
+async function saveRecurringDecision(key,instance){
+  const select=document.getElementById("recurring-decision-"+instance+"-"+key);
+  const button=document.getElementById("recurring-save-"+instance+"-"+key);
+  const decision=select?.value||"";
+  if(!decision){select?.focus();msg("Bitte zuerst eine Entscheidung auswählen.",true);return}
+  const evidenceHash=currentRecurringDetail?.candidate?.key===key?currentRecurringDetail.candidate.evidence.evidenceHash:"";
+  try{
+    button.disabled=true;msg("Entscheidung wird gespeichert …");
+    await call("/api/decisions/recurring-expenses/"+encoded(key),{method:"PUT",body:JSON.stringify({decision,expectedEvidenceHash:evidenceHash})});
+    currentRecurringDetail=null;msg("Entscheidung gespeichert.");await refresh();
+  }catch(error){msg(error.message,true);if(button)button.disabled=false}
 }
 function toggleAnalysisCategories(){
   const params=new URLSearchParams(location.search);
@@ -1471,7 +1609,7 @@ function renderAnalyses(data){
   const state=analysisSelection();
   const periodOptions=analysisYearOptions(data.availableYears,data.selection.periodYear,0);
   const comparisonOptions=analysisYearOptions(data.availableYears,data.selection.comparisonYear,data.selection.periodYear);
-  const toolbar='<section class="analysis-toolbar" aria-label="Analysefilter"><label>Ansicht<select name="analysis-view" disabled><option>Ausgabenstruktur</option></select></label><label>Zeitraum<select id="analysis-period" name="analysis-period" autocomplete="off">'+periodOptions+'</select></label><label>Vergleich<select id="analysis-comparison" name="analysis-comparison" autocomplete="off">'+comparisonOptions+'</select></label><button class="button" type="button" onclick="applyAnalysisFilters()">Anwenden</button></section>';
+  const toolbar='<section class="analysis-toolbar" aria-label="Analysefilter"><label>Ansicht<select name="analysis-view" onchange="setAnalysisView(this.value)"><option value="expense-structure" selected>Ausgabenstruktur</option><option value="recurring-expenses">Regelmäßige Ausgaben prüfen</option></select></label><label>Zeitraum<select id="analysis-period" name="analysis-period" autocomplete="off">'+periodOptions+'</select></label><label>Vergleich<select id="analysis-comparison" name="analysis-comparison" autocomplete="off">'+comparisonOptions+'</select></label><button class="button" type="button" onclick="applyAnalysisFilters()">Anwenden</button></section>';
   const change=data.changePercent===null?'–':new Intl.NumberFormat("de-DE",{signDisplay:"always",maximumFractionDigits:1}).format(data.changePercent)+' %';
   const changeTone=data.changePercent===null?'':data.changePercent<=0?' tone-ok':' tone-warning';
   const summary='<section class="analysis-summary" aria-label="Zusammenfassung Ausgabenstruktur"><div><span>Wirtschaftliche Ausgaben '+esc(data.period.label)+'</span><strong class="analysis-total">'+(data.state==="empty"?'–':moneyWhole(data.period.totalMinor))+'</strong><p class="analysis-basis">Gebucht, Zusatzwerte einbezogen, interne Überträge ausgeschlossen '+analysisEstimate(data.period.estimate)+'</p></div><div><span>Veränderung zu '+esc(data.comparison.label)+' '+analysisEstimate(data.comparison.estimate)+'</span><strong class="'+changeTone+'">'+change+'</strong></div><div><span>Nicht zuordenbar</span><strong>'+new Intl.NumberFormat("de-DE",{maximumFractionDigits:1}).format(data.unknownPercent)+' %</strong><p class="analysis-basis">'+moneyWhole(data.unknownMinor)+'</p></div></section>';
@@ -1502,6 +1640,58 @@ function renderAnalyses(data){
   const warnings=data.warnings.map(warning=>'<div class="analysis-warning" role="status">'+icons.warning+'<span>'+esc(warning)+'</span></div>').join("");
   document.getElementById("dashboard").innerHTML=toolbar+summary+'<div class="analysis-grid">'+categories+classes+'</div>'+positionPanel+warnings;
   document.getElementById("dashboard").setAttribute("aria-busy","false");
+}
+
+function renderRecurringError(error){
+  currentRecurringData=null;currentRecurringDetail=null;
+  document.getElementById("dashboard").innerHTML=expenseState("Nicht verfügbar","Die regelmäßigen Ausgaben konnten nicht geladen werden. Bitte versuche es erneut.","refresh(true)","Erneut versuchen");
+  document.getElementById("dashboard").setAttribute("aria-busy","false");
+  msg(error?.message||"Die regelmäßigen Ausgaben konnten nicht geladen werden.",true);
+}
+function selectedOption(value,current,label){return '<option value="'+value+'"'+(value===current?' selected':'')+'>'+label+'</option>'}
+function recurringDecisionOptions(current){
+  return '<option value=""'+(!current?' selected':'')+' disabled>Bitte auswählen</option>'
+    +selectedOption("GRUNDBEDARF",current,"Grundbedarf")
+    +selectedOption("GESTALTBAR",current,"Gestaltbar")
+    +selectedOption("VERMEIDBAR",current,"Vermeidbar")
+    +selectedOption("UNKLAR",current,"Unklar")
+    +selectedOption("KEIN_KANDIDAT",current,"Kein Kandidat");
+}
+function recurringDetailMarkup(candidate,detail,instance){
+  if(!detail||detail.candidate.key!==candidate.key)return '<div class="recurring-detail" aria-live="polite"><div class="skeleton" style="height:120px">Details werden geladen …</div></div>';
+  const item=detail.candidate;
+  const decision=item.decision&&!item.decision.stale?item.decision.value:"";
+  const stale=item.decision?.stale?'<div class="analysis-warning" role="status">'+icons.warning+'<span>Die frühere Entscheidung passt nicht mehr zur aktuellen Beleglage und muss erneut bestätigt werden.</span></div>':'';
+  const reasons=item.markingReasons.map(reason=>'<li>'+esc(reason)+'</li>').join("");
+  const payments=detail.payments.map(payment=>'<div class="recurring-payment"><span>'+esc(formatDate(payment.date))+'</span><span>'+esc(payment.category)+(payment.kind==="refund"?' · Erstattung':payment.kind==="exception"?' · Ausnahme':'')+'</span><strong>'+money(payment.amountMinor)+'</strong></div>').join("");
+  return '<div class="recurring-detail">'+stale+'<div class="recurring-detail-grid"><div><span>Beobachtungsfenster</span><strong>'+esc(formatDate(item.observation.startDate))+'–'+esc(formatDate(item.observation.endDate))+'</strong></div><div><span>Treffer / Ausnahmen</span><strong>'+item.observation.occurrences+' / '+item.observation.exceptions+'</strong></div><div><span>Spanne</span><strong>'+money(item.amount.minMinor)+'–'+money(item.amount.maxMinor)+'</strong></div><div><span>Beleglage</span><strong>'+esc(item.evidence.label)+' · '+esc(item.evidence.source)+'</strong></div><div><span>Rhythmussicherheit</span><strong>'+esc(item.rhythm.confidence==='hoch'?'Hoch':'Mittel')+'</strong></div><div><span>Klassifikationssicherheit</span><strong>'+esc(item.classification.confidence==='nutzerbestaetigt'?'Vom Nutzer bestätigt':'Unbestätigt')+'</strong></div><div><span>Letzte Zahlung</span><strong>'+esc(formatDate(item.observation.lastPaymentDate))+' · '+money(item.amount.lastMinor)+'</strong></div><div><span>Typischer Abstand</span><strong>'+item.rhythm.typicalDays+' Tage</strong></div></div><ul class="recurring-reasons">'+reasons+'</ul><div class="recurring-decision"><label for="recurring-decision-'+instance+'-'+esc(item.key)+'">Nutzerentscheidung<select id="recurring-decision-'+instance+'-'+esc(item.key)+'" name="recurring-decision" autocomplete="off">'+recurringDecisionOptions(decision)+'</select><p>Erst eine gespeicherte Auswahl bestätigt die Einordnung. Bis dahin bleibt der Treffer eine mögliche regelmäßige Zahlung.</p></label><button class="button" id="recurring-save-'+instance+'-'+esc(item.key)+'" type="button" onclick="saveRecurringDecision(&quot;'+esc(item.key)+'&quot;,&quot;'+instance+'&quot;)">Entscheidung speichern</button></div><div class="recurring-payment-list" aria-label="Beitragende Zahlungen">'+payments+'</div></div>';
+}
+function renderRecurringExpenses(data){
+  currentRecurringData=data;
+  const state=analysisSelection();
+  const toolbar='<section class="analysis-toolbar recurring-toolbar" aria-label="Filter für regelmäßige Ausgaben"><label>Ansicht<select name="analysis-view" autocomplete="off" onchange="setAnalysisView(this.value)"><option value="expense-structure">Ausgabenstruktur</option><option value="recurring-expenses" selected>Regelmäßige Ausgaben prüfen</option></select></label><label>Rhythmus<select id="recurring-rhythm" name="recurring-rhythm" autocomplete="off">'+selectedOption("alle",data.selection.rhythm,"Alle")+selectedOption("monatlich",data.selection.rhythm,"Monatlich")+selectedOption("vierteljaehrlich",data.selection.rhythm,"Vierteljährlich")+selectedOption("jaehrlich",data.selection.rhythm,"Jährlich")+'</select></label><label>Prüfstatus<select id="recurring-review" name="recurring-review" autocomplete="off">'+selectedOption("moeglich",data.selection.review,"Möglich")+selectedOption("bestaetigt",data.selection.review,"Bestätigt")+selectedOption("kein-kandidat",data.selection.review,"Kein Kandidat")+selectedOption("alle",data.selection.review,"Alle")+'</select></label><label>Einordnung<select id="recurring-classification" name="recurring-classification" autocomplete="off">'+selectedOption("alle",data.selection.classification,"Alle")+selectedOption("GRUNDBEDARF",data.selection.classification,"Grundbedarf")+selectedOption("GESTALTBAR",data.selection.classification,"Gestaltbar")+selectedOption("VERMEIDBAR",data.selection.classification,"Vermeidbar")+selectedOption("UNKLAR",data.selection.classification,"Unklar")+'</select></label><label>Rhythmussicherheit<select id="recurring-confidence" name="recurring-confidence" autocomplete="off">'+selectedOption("alle",data.selection.confidence,"Alle")+selectedOption("hoch",data.selection.confidence,"Hoch")+selectedOption("mittel",data.selection.confidence,"Mittel")+'</select></label><button class="button" type="button" onclick="applyRecurringFilters()">Anwenden</button></section>';
+  const summary='<section class="recurring-summary" aria-label="Prüfbestand"><div><span>Mögliche regelmäßige Zahlungen</span><strong>'+data.summary.possible+'</strong></div><div><span>Vom Nutzer bestätigt</span><strong>'+data.summary.confirmed+'</strong></div><div><span>Als kein Kandidat markiert</span><strong>'+data.summary.notCandidate+'</strong></div></section>';
+  const freshness='<div class="recurring-freshness"><span>Quelle: '+esc(data.source)+'</span><span>Beobachtet: '+esc(formatDate(data.freshness.windowStart))+'–'+esc(formatDate(data.freshness.windowEnd))+'</span><span>Letzter vollständiger Monat: '+esc(analysisMonthLabel(data.freshness.lastCompleteMonth))+'</span><span>Stand: '+esc(formatDate(data.freshness.lastSuccessfulAt,true))+'</span></div>';
+  const warnings=data.warnings.map(warning=>'<div class="analysis-warning" role="status">'+icons.warning+'<span>'+esc(warning)+'</span></div>').join("");
+  if(!data.candidates.length){
+    const title=data.summary.possible+data.summary.confirmed+data.summary.notCandidate===0?"Keine stabilen Kandidaten":"Keine Treffer für diese Filter";
+    const detail=title==="Keine stabilen Kandidaten"?"Im Beobachtungsfenster wurde keine ausreichend stabile und aktuelle Zahlungsfolge erkannt.":"Passe die Filter an, um andere Prüfstände anzuzeigen.";
+    document.getElementById("dashboard").innerHTML=toolbar+summary+freshness+warnings+'<div style="margin-top:12px">'+expenseState(title,detail,"document.getElementById(&quot;recurring-rhythm&quot;).focus()","Filter prüfen","warning")+'</div>';
+    document.getElementById("dashboard").setAttribute("aria-busy","false");return;
+  }
+  const desktopRows=data.candidates.map(candidate=>{
+    const open=state.candidate===candidate.key;
+    const detail=open?recurringDetailMarkup(candidate,currentRecurringDetail,"desktop"):"";
+    return '<tr class="recurring-row" data-open="'+String(open)+'"><td><button class="recurring-open" type="button" aria-expanded="'+String(open)+'" onclick="toggleRecurringCandidate(&quot;'+esc(candidate.key)+'&quot;)"><strong>'+esc(candidate.label)+'</strong><span class="recurring-mobile-meta">'+esc(candidate.statusLabel)+'</span></button></td><td>'+esc(candidate.rhythm.label)+'<div class="recurring-mobile-meta">Sicherheit '+esc(candidate.rhythm.confidence)+'</div></td><td>'+money(candidate.amount.typicalMinor)+'</td><td>'+money(candidate.amount.lastMinor)+'</td><td><span class="recurring-status"><strong>'+esc(candidate.classification.label)+'</strong><span>'+esc(candidate.classification.confidence==='nutzerbestaetigt'?'Nutzerbestätigt':'Noch unbestätigt')+'</span></span></td><td aria-hidden="true">'+icons.chevron+'</td></tr><tr class="recurring-detail-row"'+(open?'':' hidden')+'><td colspan="6">'+detail+'</td></tr>';
+  }).join("");
+  const mobileRows=data.candidates.map(candidate=>{
+    const open=state.candidate===candidate.key;
+    return '<button class="recurring-mobile-row" type="button" aria-expanded="'+String(open)+'" onclick="toggleRecurringCandidate(&quot;'+esc(candidate.key)+'&quot;)"><span class="recurring-mobile-main"><strong>'+esc(candidate.label)+'</strong><strong>'+money(candidate.amount.typicalMinor)+'</strong><span class="recurring-mobile-meta">'+esc(candidate.rhythm.label)+' · '+esc(candidate.classification.label)+' · '+esc(candidate.statusLabel)+'</span></span></button><div class="recurring-mobile-detail">'+(open?recurringDetailMarkup(candidate,currentRecurringDetail,"mobile"):'')+'</div>';
+  }).join("");
+  const panel='<section class="analysis-panel recurring-panel" aria-labelledby="recurring-list-title"><div class="analysis-panel-head"><div><h2 id="recurring-list-title">Regelmäßige Ausgaben prüfen</h2><p>'+data.summary.visible+' sichtbare Treffer · keine Summenbildung vor Bestätigung</p></div></div><table class="recurring-table"><thead><tr><th scope="col">Zahlung / Gruppe</th><th scope="col">Rhythmus</th><th scope="col">Typisch</th><th scope="col">Zuletzt</th><th scope="col">Einordnung</th><th scope="col"><span class="sr-only">Details</span></th></tr></thead><tbody>'+desktopRows+'</tbody></table><div class="recurring-mobile-list">'+mobileRows+'</div></section>';
+  document.getElementById("dashboard").innerHTML=toolbar+summary+freshness+panel+warnings;
+  document.getElementById("dashboard").setAttribute("aria-busy","false");
+  if(state.candidate&&(!currentRecurringDetail||currentRecurringDetail.candidate?.key!==state.candidate))loadRecurringDetail(state.candidate);
 }
 
 function renderTask(task){
@@ -1551,9 +1741,10 @@ function renderHeader(view){
   document.getElementById("page-title").textContent=content.title;
   document.getElementById("page-subtitle").textContent=content.subtitle;
   const action=document.getElementById("refresh-button");
-  action.setAttribute("aria-label",view==="analyses"?"Aktuelle Analyse als CSV exportieren":content.title+" aktualisieren");
-  action.querySelector("[aria-hidden]").textContent=view==="analyses"?"↓":"↻";
-  action.querySelector(".desktop-label").textContent=view==="analyses"?"CSV exportieren":"Aktualisieren";
+  const analysisExport=view==="analyses"&&analysisSelection().view==="expense-structure";
+  action.setAttribute("aria-label",analysisExport?"Aktuelle Analyse als CSV exportieren":content.title+" aktualisieren");
+  action.querySelector("[aria-hidden]").textContent=analysisExport?"↓":"↻";
+  action.querySelector(".desktop-label").textContent=analysisExport?"CSV exportieren":"Aktualisieren";
 }
 function renderLoading(view){
   document.getElementById("dashboard").setAttribute("aria-busy","true");
@@ -1596,16 +1787,26 @@ async function refresh(force=false){
     }else if(view==="analyses"){
       const selection=analysisSelection();
       const params=new URLSearchParams();
-      if(selection.period)params.set("period",String(selection.period));
-      if(selection.comparison)params.set("comparison",String(selection.comparison));
-      if(force)params.set("refresh","1");
-      const data=await call("/api/dashboard/analyses?"+params.toString());renderAnalyses(data);
+      if(selection.view==="recurring-expenses"){
+        if(selection.rhythm!=="alle")params.set("rhythm",selection.rhythm);
+        if(selection.review!=="moeglich")params.set("review",selection.review);
+        if(selection.classification!=="alle")params.set("classification",selection.classification);
+        if(selection.confidence!=="alle")params.set("confidence",selection.confidence);
+        if(force)params.set("refresh","1");
+        currentRecurringDetail=null;
+        const data=await call("/api/dashboard/analyses/recurring-expenses?"+params.toString());renderRecurringExpenses(data);
+      }else{
+        if(selection.period)params.set("period",String(selection.period));
+        if(selection.comparison)params.set("comparison",String(selection.comparison));
+        if(force)params.set("refresh","1");
+        const data=await call("/api/dashboard/analyses?"+params.toString());renderAnalyses(data);
+      }
     }else{
       const data=await call("/api/dashboard/status");renderDashboard(data);await loadManualSources();
     }
     msg("");
   }
-  catch(error){if(view==="spending")renderSpendingError(error);else if(view==="assets")renderAssetsError(error);else if(view==="analyses")renderAnalysesError(error);else{msg(error.message,true);document.getElementById("dashboard").setAttribute("aria-busy","false")}}
+  catch(error){if(view==="spending")renderSpendingError(error);else if(view==="assets")renderAssetsError(error);else if(view==="analyses"&&analysisSelection().view==="recurring-expenses")renderRecurringError(error);else if(view==="analyses")renderAnalysesError(error);else{msg(error.message,true);document.getElementById("dashboard").setAttribute("aria-busy","false")}}
   finally{button.disabled=false}
 }
 async function syncSource(id){try{msg("Abruf läuft …");const result=await call("/api/sync/"+id,{method:"POST"});msg(result.message);await refresh()}catch(error){msg(error.message,true)}}

@@ -1,4 +1,10 @@
-import type { AppConfig, ImportBundle, SourceConfig, SyncResult } from "./types.js";
+import type {
+  AppConfig,
+  ImportBundle,
+  RecurringExpenseDecision,
+  SourceConfig,
+  SyncResult
+} from "./types.js";
 import type { FinanceDatabase } from "./database.js";
 import { join } from "node:path";
 import { paths } from "./config.js";
@@ -42,6 +48,7 @@ import {
   buildDashboardSpending,
   readActualSpendingRange,
   readActualSpendingMonth,
+  type ActualSpendingRangeSnapshot,
   type ActualSpendingMonthSnapshot,
   type DashboardSpending,
   type SpendingQuery
@@ -53,6 +60,15 @@ import {
   type DashboardAnalyses
 } from "./dashboard-analyses.js";
 import {
+  buildDashboardRecurringExpenseDetail,
+  buildDashboardRecurringExpenses,
+  recurringExpenseRange,
+  recurringFingerprintVersion,
+  type DashboardRecurringExpenseDetail,
+  type DashboardRecurringExpenses,
+  type RecurringExpenseQuery
+} from "./dashboard-recurring-expenses.js";
+import {
   buildDashboardAssets,
   readGhostfolioAssets,
   type DashboardAssets
@@ -61,6 +77,12 @@ import {
   lastCompletedMonthEnd,
   readCoinGeckoSolPrice
 } from "./dashboard-asset-comparison.js";
+
+export class FinanceServiceError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
 
 export class FinanceService {
   private running = new Set<string>();
@@ -72,6 +94,8 @@ export class FinanceService {
   private spendingLoading = new Map<string, Promise<ActualSpendingMonthSnapshot>>();
   private analysesCache = new Map<string, { expiresAt: number; value: DashboardAnalyses }>();
   private analysesLoading = new Map<string, Promise<DashboardAnalyses>>();
+  private recurringCache?: { expiresAt: number; value: ActualSpendingRangeSnapshot };
+  private recurringLoading?: Promise<ActualSpendingRangeSnapshot>;
   private assetsCache?: { expiresAt: number; value: DashboardAssets };
   private assetsLoading?: Promise<DashboardAssets>;
 
@@ -276,6 +300,107 @@ export class FinanceService {
     } finally {
       this.analysesLoading.delete(cacheKey);
     }
+  }
+
+  private async getRecurringSnapshot(
+    force = false,
+    allowStale = true
+  ): Promise<{ snapshot: ActualSpendingRangeSnapshot; stale: boolean }> {
+    if (!this.config.actual?.enabled) throw new FinanceServiceError("Actual ist deaktiviert", 503);
+    const now = new Date();
+    if (!force && this.recurringCache && this.recurringCache.expiresAt > now.getTime()) {
+      return { snapshot: this.recurringCache.value, stale: false };
+    }
+    let loading = this.recurringLoading;
+    if (!loading) {
+      const range = recurringExpenseRange(now, this.config.timezone);
+      loading = this.withActual(() => readActualSpendingRange(
+        this.config.actual!,
+        range.startDate,
+        range.endDate,
+        now
+      ));
+      this.recurringLoading = loading;
+    }
+    try {
+      const snapshot = await loading;
+      this.recurringCache = { expiresAt: Date.now() + 5 * 60_000, value: snapshot };
+      return { snapshot, stale: false };
+    } catch (error) {
+      if (allowStale && this.recurringCache) {
+        return { snapshot: this.recurringCache.value, stale: true };
+      }
+      throw error;
+    } finally {
+      if (this.recurringLoading === loading) this.recurringLoading = undefined;
+    }
+  }
+
+  async getDashboardRecurringExpenses(
+    force = false,
+    query: RecurringExpenseQuery = {}
+  ): Promise<DashboardRecurringExpenses> {
+    const { snapshot, stale } = await this.getRecurringSnapshot(force, true);
+    return buildDashboardRecurringExpenses(
+      snapshot,
+      this.db.listRecurringExpenseDecisions(),
+      query,
+      { stale }
+    );
+  }
+
+  async getDashboardRecurringExpenseDetail(
+    candidateKey: string,
+    force = false
+  ): Promise<DashboardRecurringExpenseDetail> {
+    const { snapshot, stale } = await this.getRecurringSnapshot(force, true);
+    const detail = buildDashboardRecurringExpenseDetail(
+      snapshot,
+      this.db.listRecurringExpenseDecisions(),
+      candidateKey,
+      { stale }
+    );
+    if (!detail) throw new FinanceServiceError("Kandidat nicht gefunden", 404);
+    return detail;
+  }
+
+  async setRecurringExpenseDecision(
+    candidateKey: string,
+    decision: RecurringExpenseDecision,
+    expectedEvidenceHash: string
+  ): Promise<DashboardRecurringExpenseDetail> {
+    const allowed = new Set<RecurringExpenseDecision>([
+      "GRUNDBEDARF", "GESTALTBAR", "VERMEIDBAR", "UNKLAR", "KEIN_KANDIDAT"
+    ]);
+    if (!allowed.has(decision)) throw new FinanceServiceError("Ungültige Entscheidung", 400);
+    if (!/^evidence-[a-f0-9]{20}$/.test(expectedEvidenceHash)) {
+      throw new FinanceServiceError("Ungültiger Beleg-Fingerprint", 400);
+    }
+    const { snapshot, stale } = await this.getRecurringSnapshot(false, false);
+    if (stale) throw new FinanceServiceError("Entscheidungen benötigen aktuelle Actual-Daten", 503);
+    const current = buildDashboardRecurringExpenseDetail(
+      snapshot,
+      this.db.listRecurringExpenseDecisions(),
+      candidateKey
+    );
+    if (!current) throw new FinanceServiceError("Kandidat nicht gefunden", 404);
+    if (current.candidate.evidence.evidenceHash !== expectedEvidenceHash) {
+      throw new FinanceServiceError(
+        "Die Beleglage hat sich geändert. Bitte Kandidat erneut laden.",
+        409
+      );
+    }
+    this.db.setRecurringExpenseDecision(
+      candidateKey,
+      decision,
+      expectedEvidenceHash,
+      recurringFingerprintVersion()
+    );
+    return buildDashboardRecurringExpenseDetail(
+      snapshot,
+      this.db.listRecurringExpenseDecisions(),
+      candidateKey
+    )!;
   }
 
   private async importSourceBundle(

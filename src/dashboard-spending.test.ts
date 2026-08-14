@@ -133,6 +133,7 @@ test("Kategorie, Konto, Suche und Pagination greifen gemeinsam", () => {
     lines: Array.from({ length: 23 }, (_, index) => ({
       id: `row-${index}`,
       date: `2026-07-${String(31 - index).padStart(2, "0")}`,
+      merchantKey: index % 2 ? "merchant-market" : "merchant-books",
       merchant: index % 2 ? "Supermarkt" : "Buchhandlung",
       notes: "",
       accountKey: index % 2 ? "account-one" : "account-two",

@@ -21,6 +21,22 @@ export type ExpenseClass =
   | "DISPOSITIV"
   | "UNBEKANNT";
 
+export type RecurringExpenseDecision =
+  | "GRUNDBEDARF"
+  | "GESTALTBAR"
+  | "VERMEIDBAR"
+  | "UNKLAR"
+  | "KEIN_KANDIDAT";
+
+export interface RecurringExpenseDecisionRecord {
+  candidateKey: string;
+  decision: RecurringExpenseDecision;
+  evidenceHash: string;
+  fingerprintVersion: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ExpenseAnalysisAdjustment {
   id: string;
   label: string;

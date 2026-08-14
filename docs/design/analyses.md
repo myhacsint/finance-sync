@@ -1,16 +1,45 @@
-# Analysen – Ausgabenstruktur
+# Analysen
 
 ## Ziel der ersten Stufe
 
 Der Bereich `Analysen` startet mit genau einer belastbaren Ansicht:
 `Ausgabenstruktur`. Sie vergleicht gemessene Ausgaben zwischen zwei Zeiträumen,
 zeigt deren Klassifikation und führt bis zu den beitragenden Positionen zurück.
-Weitere Analysearten werden später über dieselbe Route ergänzt, ohne die
-Hauptnavigation zu erweitern.
+Die zweite Ansicht `Regelmäßige Ausgaben prüfen` nutzt dieselbe Route und
+ergänzt die Hauptnavigation nicht.
 
 Die Ansicht bewertet Ausgaben nicht und formuliert keine Empfehlungen. Sie
 stellt ausschließlich Beträge, Veränderungen, Klassifikationen und bekannte
 Datenlücken dar.
+
+## Regelmäßige Ausgaben prüfen
+
+Die Ansicht erkennt nur aktuelle, ausreichend stabile monatliche,
+vierteljährliche und jährliche Zahlungsfolgen aus den bereinigten
+Einzelbuchungen. Jeder neue Treffer bleibt bis zu einer ausdrücklichen
+Nutzerentscheidung eine `mögliche regelmäßige Zahlung`; deshalb werden
+vorher weder Summen noch Einsparpotenziale gebildet.
+
+Harte Ausschlüsse gelten für interne Überträge, Kreditkarten-Sammelposten,
+Marktplätze ohne Einzelbeleg, nicht auswertbare oder private Gegenparteien und
+unsichere Zuordnungen. Die Detailansicht zeigt neutral die Zahlungsgruppe,
+Rhythmus, typische und letzte Zahlung, Spanne, Beobachtungsfenster,
+Treffer/Ausnahmen, Markierungsgründe, Beleglage sowie getrennte Rhythmus- und
+Klassifikationssicherheit.
+
+Die Nutzerentscheidung ist auf `Grundbedarf`, `Gestaltbar`, `Vermeidbar`,
+`Unklar` oder `Kein Kandidat` begrenzt. Sie wird ausschließlich in FinanceSync
+gespeichert und ändert weder Actual-Buchungen noch die bestehende
+Ausgabenklassifikation. Ein Beleg-Fingerprint verhindert, dass eine alte
+Entscheidung nach einer materiell veränderten Zahlungsfolge stillschweigend
+weitergilt. Nur bestätigte Einträge der Klassen `Gestaltbar` und `Vermeidbar`
+können später separat und sichtbar als `[SCHÄTZUNG]` an ein Entscheidungslabor
+übergeben werden.
+
+Filter und der geöffnete Kandidat sind als teilbarer URL-Zustand abgelegt. Die
+URL enthält nur pseudonymisierte Kandidatenschlüssel. Lade-, Frische-, Teil-,
+Leer- und Fehlerzustände benennen die verfügbare Datenbasis, ohne fehlende
+Werte als Null auszugeben.
 
 ## Informationshierarchie
 

@@ -64,6 +64,7 @@ export type ActualSpendingApiLoader = () => Promise<ActualSpendingApi>;
 export interface SpendingLine {
   id: string;
   date: string;
+  merchantKey: string;
   merchant: string;
   notes: string;
   accountKey: string;
@@ -231,6 +232,20 @@ function safeMerchant(value: unknown): string {
   return likelyPrivatePerson(label) ? "Private Gegenpartei" : label;
 }
 
+function merchantKey(
+  transaction: ActualTransaction,
+  parent: ActualTransaction,
+  payee: ActualPayee | undefined,
+  parentPayee: ActualPayee | undefined,
+  merchant: string
+): string {
+  const stable = payee?.id ?? parentPayee?.id
+    ?? transaction.imported_payee ?? parent.imported_payee ?? merchant;
+  return `merchant-${createHash("sha256")
+    .update(`finance-hub:merchant:${stable}`)
+    .digest("hex").slice(0, 16)}`;
+}
+
 function categoriesFromApi(rows: Array<ActualCategory | ActualCategoryGroup>): ActualCategory[] {
   return rows.flatMap((row) => "categories" in row ? row.categories ?? [] : [row]);
 }
@@ -260,6 +275,7 @@ function normalizeLine(
   return {
     id: `${parent.id}:${transaction.id}`,
     date: transaction.date || parent.date,
+    merchantKey: merchantKey(transaction, parent, payee, parentPayee, merchant),
     merchant,
     notes: safeLabel(transaction.notes ?? parent.notes, ""),
     accountKey: account.key,

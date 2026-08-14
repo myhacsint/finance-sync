@@ -55,6 +55,7 @@ function line(
   return {
     id,
     date,
+    merchantKey: `merchant-${id}`,
     merchant,
     notes: "",
     accountKey: "account",

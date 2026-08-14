@@ -99,6 +99,29 @@ test("Analysenansicht besitzt Jahresvergleich, Schätzungsmarker, Drilldown und 
   assert.match(html, /analysis-mobile-positions/);
 });
 
+test("Analysenansicht besitzt regelmäßige Ausgaben mit Filtern, Detail und Nutzerentscheidung", () => {
+  const html = renderUi();
+  assert.match(html, /Regelmäßige Ausgaben prüfen/);
+  assert.match(html, /analysisView/);
+  assert.match(html, /recurringRhythm/);
+  assert.match(html, /recurringReview/);
+  assert.match(html, /recurringClassification/);
+  assert.match(html, /recurringConfidence/);
+  assert.match(html, /recurringCandidate/);
+  assert.match(html, /\/api\/dashboard\/analyses\/recurring-expenses/);
+  assert.match(html, /\/api\/decisions\/recurring-expenses/);
+  assert.match(html, /Mögliche regelmäßige Zahlungen/);
+  assert.match(html, /keine Summenbildung vor Bestätigung/);
+  assert.match(html, /Rhythmussicherheit/);
+  assert.match(html, /Klassifikationssicherheit/);
+  assert.match(html, /item\.evidence\.label/);
+  assert.match(html, /Grundbedarf/);
+  assert.match(html, /Gestaltbar/);
+  assert.match(html, /Vermeidbar/);
+  assert.match(html, /Kein Kandidat/);
+  assert.match(html, /recurring-mobile-list/);
+});
+
 test("Verwaltungstoken bleibt nur für die Browsersitzung gespeichert", () => {
   const html = renderUi();
   assert.match(html, /id="token-form"/);

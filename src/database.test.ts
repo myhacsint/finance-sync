@@ -38,6 +38,35 @@ test("wiederholter Import erzeugt keine Dubletten", () => {
   db.close();
 });
 
+test("Entscheidungen zu regelmäßigen Ausgaben werden getrennt und idempotent gespeichert", () => {
+  const root = mkdtempSync(join(tmpdir(), "finance-sync-recurring-decision-"));
+  const db = new FinanceDatabase(join(root, "finance.sqlite"));
+  const created = db.setRecurringExpenseDecision(
+    "recurring-0123456789abcdef01",
+    "GESTALTBAR",
+    "evidence-0123456789abcdef0123",
+    1,
+    new Date("2026-08-14T10:00:00.000Z")
+  );
+  assert.equal(created.decision, "GESTALTBAR");
+  const updated = db.setRecurringExpenseDecision(
+    created.candidateKey,
+    "VERMEIDBAR",
+    created.evidenceHash,
+    1,
+    new Date("2026-08-14T11:00:00.000Z")
+  );
+  assert.equal(updated.decision, "VERMEIDBAR");
+  assert.equal(updated.createdAt, created.createdAt);
+  assert.equal(updated.updatedAt, "2026-08-14T11:00:00.000Z");
+  assert.equal(db.listRecurringExpenseDecisions().length, 1);
+  assert.equal(
+    db.query("SELECT count(*) AS count FROM recurring_expense_decisions")[0].count,
+    1
+  );
+  db.close();
+});
+
 test("korrigierte Normalisierung aktualisiert denselben Saldo-Snapshot", () => {
   const root = mkdtempSync(join(tmpdir(), "finance-sync-balance-"));
   const db = new FinanceDatabase(join(root, "finance.sqlite"));
