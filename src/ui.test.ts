@@ -94,6 +94,10 @@ test("Analysenansicht besitzt Jahresvergleich, Schätzungsmarker, Drilldown und 
 
 test("Verwaltungstoken bleibt nur für die Browsersitzung gespeichert", () => {
   const html = renderUi();
+  assert.match(html, /id="token-form"/);
+  assert.match(html, /id="token-input" type="password"/);
+  assert.match(html, /function submitToken\(event\)/);
+  assert.doesNotMatch(html, /prompt\(/);
   assert.match(html, /sessionStorage\.setItem\("financeToken"/);
   assert.match(html, /localStorage\.removeItem\("financeToken"\)/);
   assert.doesNotMatch(html, /localStorage\.setItem\("financeToken"/);

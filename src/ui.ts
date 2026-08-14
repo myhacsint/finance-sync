@@ -138,6 +138,33 @@ export function renderUi(): string {
     }
     .notice.error { color: var(--red); }
     .notice:empty { display: none; }
+    .token-request {
+      display: none;
+      max-width: 520px;
+      margin: 0 0 22px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .token-request[aria-hidden="false"] { display: block; }
+    .token-request h2 { font-size: 17px; }
+    .token-request p { margin: 7px 0 15px; color: var(--muted); font-size: 14px; }
+    .token-request label { display: block; margin-bottom: 7px; font-size: 13px; font-weight: 700; }
+    .token-request-row { display: flex; gap: 10px; }
+    .token-request input {
+      min-width: 0;
+      flex: 1;
+      min-height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 0 12px;
+      background: var(--surface-2);
+      color: var(--text);
+      font: inherit;
+    }
+    @media (max-width: 520px) { .token-request-row { display: grid; } }
     .status-overview {
       display: grid;
       grid-template-columns: minmax(0, 1.7fr) minmax(360px, 1fr);
@@ -891,6 +918,17 @@ export function renderUi(): string {
           </button>
         </header>
         <div id="message" class="notice" role="status" aria-live="polite"></div>
+        <section class="token-request" id="token-request" aria-hidden="true" aria-labelledby="token-request-title">
+          <h2 id="token-request-title">Zugang zum Finance Hub</h2>
+          <p>Gib den Verwaltungstoken ein. Er bleibt nur für diese Browsersitzung gespeichert.</p>
+          <form id="token-form">
+            <label for="token-input">Verwaltungstoken</label>
+            <div class="token-request-row">
+              <input id="token-input" type="password" autocomplete="off" spellcheck="false" required>
+              <button class="button" type="submit">Daten laden</button>
+            </div>
+          </form>
+        </section>
         <div id="dashboard" aria-busy="true">
           <section class="wealth-overview" aria-label="Vermögensübersicht">
             <div><div class="skeleton" style="width:52%;height:18px">Lädt</div><div class="skeleton" style="width:72%;height:48px;margin-top:10px">Lädt</div></div>
@@ -941,12 +979,24 @@ let currentAnalysisData=null;
 function headerAction(){if(activeView()==="analyses")exportAnalysisCsv();else refresh(true)}
 
 function requestToken(){
-  const supplied=prompt("Finance Hub Verwaltungstoken eingeben");
-  if(!supplied)return false;
-  token=supplied.trim();
-  sessionStorage.setItem("financeToken",token);
-  return Boolean(token);
+  const request=document.getElementById("token-request");
+  const input=document.getElementById("token-input");
+  request.setAttribute("aria-hidden","false");
+  input.focus();
+  return false;
 }
+function submitToken(event){
+  event.preventDefault();
+  const input=document.getElementById("token-input");
+  const supplied=input.value.trim();
+  if(!supplied)return;
+  token=supplied;
+  sessionStorage.setItem("financeToken",token);
+  input.value="";
+  document.getElementById("token-request").setAttribute("aria-hidden","true");
+  refresh();
+}
+document.getElementById("token-form").addEventListener("submit",submitToken);
 async function call(path,options={},retry=true){
   if(!token&&!requestToken())throw new Error("Für die Finance-Hub-Daten wird das Verwaltungstoken benötigt.");
   const response=await fetch(path,{...options,headers:{authorization:"Bearer "+token,"content-type":"application/json",...options.headers}});
