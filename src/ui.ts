@@ -752,6 +752,54 @@ export function renderUi(): string {
     .analysis-mobile-positions { display: none; }
     .analysis-warning { display: flex; gap: 11px; margin-top: 12px; border: 1px solid #7b5316; border-radius: 11px; background: #2b2115; padding: 13px 15px; color: #e6d3af; }
     .analysis-warning svg { width: 19px; height: 19px; flex: 0 0 auto; color: var(--amber); }
+    .crypto-toolbar { grid-template-columns: minmax(260px, 1.4fr) repeat(2, minmax(170px, .7fr)); }
+    .crypto-toolbar-meta { min-height: 44px; display: grid; align-content: center; gap: 2px; border-left: 1px solid var(--line-soft); padding-left: 16px; }
+    .crypto-toolbar-meta span { color: var(--muted); font-size: 12px; }
+    .crypto-toolbar-meta strong { font-size: 14px; }
+    .crypto-summary .analysis-total { font-size: clamp(34px, 3.5vw, 46px); }
+    .crypto-summary strong { white-space: nowrap; }
+    .crypto-layout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(360px, .9fr); gap: 12px; margin-top: 12px; }
+    .crypto-basis-list { display: grid; }
+    .crypto-basis-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px 20px; padding: 15px 0; border-top: 1px solid var(--line-soft); }
+    .crypto-basis-row:first-child { border-top: 0; padding-top: 0; }
+    .crypto-basis-row > div { display: grid; gap: 3px; }
+    .crypto-basis-row > span { color: var(--muted); font-size: 12px; }
+    .crypto-basis-row > strong { grid-column: 2; grid-row: 1 / span 2; align-self: center; text-align: right; font-size: 21px; font-variant-numeric: tabular-nums; }
+    .crypto-basis-row > strong small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 500; }
+    .crypto-break-even { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 10px; border: 1px solid #245ea8; border-radius: 9px; background: #11294a; padding: 13px 15px; }
+    .crypto-break-even span { color: #b8c9e3; font-size: 12px; }
+    .crypto-break-even strong { font-size: 20px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .crypto-holdings-list { display: grid; }
+    .crypto-holding-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 14px; min-height: 55px; align-content: center; border-top: 1px solid var(--line-soft); }
+    .crypto-holding-row:first-child { border-top: 0; }
+    .crypto-holding-row > div { display: grid; gap: 3px; }
+    .crypto-holding-row span { color: var(--muted); font-size: 12px; }
+    .crypto-holding-row > strong { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-variant-numeric: tabular-nums; }
+    .crypto-tax { margin-top: 12px; }
+    .crypto-tax-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .crypto-tax-table th, .crypto-tax-table td { padding: 13px 12px; border-top: 1px solid var(--line-soft); text-align: left; vertical-align: top; }
+    .crypto-tax-table th { border-top: 0; color: var(--muted); font-size: 12px; font-weight: 500; }
+    .crypto-tax-table th:nth-child(1) { width: 9%; }
+    .crypto-tax-table th:nth-child(2) { width: 24%; }
+    .crypto-tax-table th:nth-child(3) { width: 22%; }
+    .crypto-tax-table th:nth-child(4) { width: 18%; }
+    .crypto-tax-table th:nth-child(5) { width: 27%; }
+    .crypto-tax-table td { font-size: 13px; }
+    .crypto-tax-table td:first-child, .crypto-tax-reference { font-variant-numeric: tabular-nums; }
+    .crypto-tax-reference small { display: block; margin-top: 3px; color: var(--muted); }
+    .crypto-tax-detail { color: var(--muted); }
+    .crypto-status { display: inline-flex; min-height: 28px; align-items: center; border: 1px solid var(--line); border-radius: 999px; padding: 4px 9px; font-size: 12px; font-weight: 700; }
+    .crypto-status-review { border-color: #8a5916; background: #332313; color: #ffbd55; }
+    .crypto-status-likely-tax-free { border-color: #1c6a58; background: #102d29; color: #63d7bd; }
+    .crypto-status-below-threshold { border-color: #365c93; background: #142641; color: #9cc2ff; }
+    .crypto-status-future-filing { border-color: #6b4d96; background: #251b36; color: #c9a8ff; }
+    .crypto-tax-mobile { display: none; }
+    .crypto-evidence { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--line-soft); border-radius: 9px; }
+    .crypto-evidence-item { min-height: 94px; padding: 14px; }
+    .crypto-evidence-item + .crypto-evidence-item { border-left: 1px solid var(--line-soft); }
+    .crypto-evidence-item span { display: block; color: var(--muted); font-size: 12px; }
+    .crypto-evidence-item strong { display: block; margin-top: 5px; }
+    .crypto-evidence-item p { margin-top: 5px; color: var(--muted); font-size: 12px; }
     .recurring-toolbar { grid-template-columns: minmax(220px, 1.25fr) repeat(4, minmax(130px, .65fr)) auto; }
     .recurring-summary {
       display: grid;
@@ -842,6 +890,7 @@ export function renderUi(): string {
       .assets-status-line { text-align: left; }
       .assets-workspace { grid-template-columns: minmax(230px, .7fr) minmax(480px, 1.5fr); }
       .analysis-grid { grid-template-columns: 1fr; }
+      .crypto-layout { grid-template-columns: 1fr; }
       .system-item:nth-child(3) { border-left: 0; border-top: 1px solid var(--line-soft); }
       .system-item:nth-child(4) { border-top: 1px solid var(--line-soft); }
     }
@@ -915,6 +964,10 @@ export function renderUi(): string {
       .analysis-mobile-meta { color: var(--muted); font-size: 12px; }
       .analysis-mobile-detail { display: none; margin-top: 10px; }
       .analysis-mobile-row[aria-expanded="true"] .analysis-mobile-detail { display: flex; }
+      .crypto-toolbar { grid-template-columns: 1fr 1fr; }
+      .crypto-toolbar > label { grid-column: 1 / -1; }
+      .crypto-evidence { grid-template-columns: 1fr; }
+      .crypto-evidence-item + .crypto-evidence-item { border-left: 0; border-top: 1px solid var(--line-soft); }
       .recurring-toolbar { grid-template-columns: 1fr 1fr; }
       .recurring-toolbar > label:first-child { grid-column: 1 / -1; }
       .recurring-toolbar .button { width: 100%; }
@@ -983,6 +1036,22 @@ export function renderUi(): string {
       .analysis-summary { grid-template-columns: 1fr; }
       .analysis-summary > div:first-child { grid-column: auto; }
       .analysis-summary > div + div { border-left: 0; border-top: 1px solid var(--line-soft); }
+      .crypto-toolbar { grid-template-columns: 1fr; }
+      .crypto-toolbar > label { grid-column: auto; }
+      .crypto-toolbar-meta { border-left: 0; border-top: 1px solid var(--line-soft); padding: 12px 0 0; }
+      .crypto-basis-row { grid-template-columns: 1fr; }
+      .crypto-basis-row > strong { grid-column: 1; grid-row: auto; margin-top: 4px; text-align: left; }
+      .crypto-holding-row { grid-template-columns: 1fr; padding: 11px 0; }
+      .crypto-holding-row > strong { grid-column: 1; grid-row: auto; margin-top: 4px; }
+      .crypto-break-even { align-items: flex-start; flex-direction: column; gap: 5px; }
+      .crypto-tax-table { display: none; }
+      .crypto-tax-mobile { display: grid; }
+      .crypto-tax-card { padding: 15px 0; border-top: 1px solid var(--line-soft); }
+      .crypto-tax-card:first-child { border-top: 0; padding-top: 0; }
+      .crypto-tax-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+      .crypto-tax-card h3 { margin-top: 10px; font-size: 16px; }
+      .crypto-tax-card p { margin-top: 5px; color: var(--muted); font-size: 13px; }
+      .crypto-tax-card .crypto-tax-reference { margin-top: 9px; color: var(--text); }
       .recurring-toolbar { grid-template-columns: 1fr; }
       .recurring-toolbar > label:first-child { grid-column: auto; }
       .recurring-summary { grid-template-columns: 1fr; }
@@ -1082,8 +1151,9 @@ let currentExpenseMonth="";
 let currentAnalysisData=null;
 let currentRecurringData=null;
 let currentRecurringDetail=null;
+let currentCryptoData=null;
 
-function headerAction(){if(activeView()==="analyses"&&analysisSelection().view==="expense-structure")exportAnalysisCsv();else refresh(true)}
+function headerAction(){if(activeView()==="analyses"&&analysisSelection().view!=="recurring-expenses")exportAnalysisCsv();else refresh(true)}
 
 function requestToken(){
   const request=document.getElementById("token-request");
@@ -1272,7 +1342,7 @@ function analysisSelection(){
   const period=Number(params.get("analysisPeriod")||0);
   const comparison=Number(params.get("analysisComparison")||0);
   return {
-    view:params.get("analysisView")==="recurring-expenses"?"recurring-expenses":"expense-structure",
+    view:params.get("analysisView")==="recurring-expenses"?"recurring-expenses":params.get("analysisView")==="crypto-origin-tax"?"crypto-origin-tax":"expense-structure",
     period:Number.isInteger(period)&&period>0?period:0,
     comparison:Number.isInteger(comparison)&&comparison>0?comparison:0,
     expanded:params.get("analysisCategoriesExpanded")==="1",
@@ -1286,7 +1356,7 @@ function analysisSelection(){
 }
 function setAnalysisView(value){
   const params=new URLSearchParams(location.search);
-  if(value==="recurring-expenses")params.set("analysisView","recurring-expenses");else params.delete("analysisView");
+  if(value==="recurring-expenses"||value==="crypto-origin-tax")params.set("analysisView",value);else params.delete("analysisView");
   params.delete("analysisPosition");params.delete("recurringCandidate");
   const query=params.toString();history.pushState(null,"",(query?"?"+query:location.pathname)+location.hash);refresh();
 }
@@ -1356,6 +1426,7 @@ function toggleAnalysisPosition(key){
 }
 function csvCell(value){const text=String(value??"");return /[";\\n]/.test(text)?'"'+text.replaceAll('"','""')+'"':text}
 function exportAnalysisCsv(){
+  if(analysisSelection().view==="crypto-origin-tax"){exportCryptoAnalysisCsv();return}
   if(!currentAnalysisData){msg("Die Analyse ist noch nicht geladen.",true);return}
   const data=currentAnalysisData;
   const rows=[["Bereich","Position","Kategorie","Klasse","Zeitraum","Betrag EUR","Status"]];
@@ -1367,6 +1438,23 @@ function exportAnalysisCsv(){
   link.download="ausgabenstruktur-"+data.period.year+"-vergleich-"+data.comparison.year+".csv";
   link.click();setTimeout(()=>URL.revokeObjectURL(link.href),0);
   msg("CSV für die aktuelle Auswahl wurde erstellt.");
+}
+function exportCryptoAnalysisCsv(){
+  if(!currentCryptoData){msg("Die Kryptoanalyse ist noch nicht geladen.",true);return}
+  const data=currentCryptoData;
+  const rows=[["Bereich","Kennzahl","Wert","Einheit","Status"]];
+  rows.push(["Bestand","Gesamtbestand",String(data.holdings.totalSol).replace(".",","),"SOL","Bestätigt"]);
+  rows.push(["Bestand","Staking Rewards",String(data.holdings.rewardsSol).replace(".",","),"SOL","Bestätigt"]);
+  rows.push(["Investment","SOL-Konvertierungsbasis",String(data.transition.conversionBasisEurPerSol).replace(".",","),"EUR/SOL","[SCHÄTZUNG]"]);
+  rows.push(["Investment","Effektive Basis inklusive Staking",String(data.investment.effectiveBasisEurPerSol).replace(".",","),"EUR/SOL","[SCHÄTZUNG]"]);
+  rows.push(["Cash-on-Cash","Netto-Fiatkapital",(data.investment.netFiatCapitalEurMinor/100).toFixed(2).replace(".",","),"EUR","Bestätigt"]);
+  data.taxYears.forEach(year=>rows.push(["Steuerprüfung",String(year.year),year.referenceMinor===undefined?"":(year.referenceMinor/100).toFixed(2).replace(".",","),year.referenceMinor===undefined?"":"EUR",year.title+(year.estimate?" [SCHÄTZUNG]":"")]));
+  const csv="\ufeff"+rows.map(row=>row.map(csvCell).join(";")).join("\\n");
+  const link=document.createElement("a");
+  link.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  link.download="krypto-herkunft-steuerstatus-stand-"+data.capturedAt.slice(0,10)+".csv";
+  link.click();setTimeout(()=>URL.revokeObjectURL(link.href),0);
+  msg("CSV für die Kryptoanalyse wurde erstellt.");
 }
 function rangeMonth(key,format){
   const match=String(key||"").match(/^(\\d{4})-(\\d{2})$/);
@@ -1609,7 +1697,7 @@ function renderAnalyses(data){
   const state=analysisSelection();
   const periodOptions=analysisYearOptions(data.availableYears,data.selection.periodYear,0);
   const comparisonOptions=analysisYearOptions(data.availableYears,data.selection.comparisonYear,data.selection.periodYear);
-  const toolbar='<section class="analysis-toolbar" aria-label="Analysefilter"><label>Ansicht<select name="analysis-view" onchange="setAnalysisView(this.value)"><option value="expense-structure" selected>Ausgabenstruktur</option><option value="recurring-expenses">Regelmäßige Ausgaben prüfen</option></select></label><label>Zeitraum<select id="analysis-period" name="analysis-period" autocomplete="off">'+periodOptions+'</select></label><label>Vergleich<select id="analysis-comparison" name="analysis-comparison" autocomplete="off">'+comparisonOptions+'</select></label><button class="button" type="button" onclick="applyAnalysisFilters()">Anwenden</button></section>';
+  const toolbar='<section class="analysis-toolbar" aria-label="Analysefilter"><label>Ansicht<select name="analysis-view" onchange="setAnalysisView(this.value)"><option value="expense-structure" selected>Ausgabenstruktur</option><option value="recurring-expenses">Regelmäßige Ausgaben prüfen</option><option value="crypto-origin-tax">Krypto · Herkunft &amp; Steuerstatus</option></select></label><label>Zeitraum<select id="analysis-period" name="analysis-period" autocomplete="off">'+periodOptions+'</select></label><label>Vergleich<select id="analysis-comparison" name="analysis-comparison" autocomplete="off">'+comparisonOptions+'</select></label><button class="button" type="button" onclick="applyAnalysisFilters()">Anwenden</button></section>';
   const change=data.changePercent===null?'–':new Intl.NumberFormat("de-DE",{signDisplay:"always",maximumFractionDigits:1}).format(data.changePercent)+' %';
   const changeTone=data.changePercent===null?'':data.changePercent<=0?' tone-ok':' tone-warning';
   const summary='<section class="analysis-summary" aria-label="Zusammenfassung Ausgabenstruktur"><div><span>Wirtschaftliche Ausgaben '+esc(data.period.label)+'</span><strong class="analysis-total">'+(data.state==="empty"?'–':moneyWhole(data.period.totalMinor))+'</strong><p class="analysis-basis">Gebucht, Zusatzwerte einbezogen, interne Überträge ausgeschlossen '+analysisEstimate(data.period.estimate)+'</p></div><div><span>Veränderung zu '+esc(data.comparison.label)+' '+analysisEstimate(data.comparison.estimate)+'</span><strong class="'+changeTone+'">'+change+'</strong></div><div><span>Nicht zuordenbar</span><strong>'+new Intl.NumberFormat("de-DE",{maximumFractionDigits:1}).format(data.unknownPercent)+' %</strong><p class="analysis-basis">'+moneyWhole(data.unknownMinor)+'</p></div></section>';
@@ -1642,6 +1730,35 @@ function renderAnalyses(data){
   document.getElementById("dashboard").setAttribute("aria-busy","false");
 }
 
+function solAmount(value){return new Intl.NumberFormat("de-DE",{minimumFractionDigits:0,maximumFractionDigits:9}).format(Number(value))}
+function perSol(value,currency="EUR"){return new Intl.NumberFormat("de-DE",{style:"currency",currency,minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value))+"/SOL"}
+function confidenceLabel(value){return value==="Bestaetigt"?"Bestätigt":String(value)}
+function cryptoTaxStatus(status){
+  const labels={review:"Prüfung nötig","likely-tax-free":"Wahrscheinlich steuerfrei","below-threshold":"Unter Freigrenze","future-filing":"Für Erklärung vormerken"};
+  return '<span class="crypto-status crypto-status-'+esc(status)+'">'+esc(labels[status]||status)+'</span>';
+}
+function renderCryptoError(error){
+  currentCryptoData=null;
+  document.getElementById("dashboard").innerHTML=expenseState("Nicht verfügbar","Die Kryptoanalyse konnte nicht geladen werden. Die rekonstruierte Datenbasis bleibt davon unverändert.","refresh(true)","Erneut versuchen");
+  document.getElementById("dashboard").setAttribute("aria-busy","false");
+  msg(error?.message||"Die Kryptoanalyse konnte nicht geladen werden.",true);
+}
+function renderCryptoAnalysis(data){
+  currentCryptoData=data;
+  const toolbar='<section class="analysis-toolbar crypto-toolbar" aria-label="Auswahl und Datenstand der Kryptoanalyse"><label>Ansicht<select name="analysis-view" autocomplete="off" onchange="setAnalysisView(this.value)"><option value="expense-structure">Ausgabenstruktur</option><option value="recurring-expenses">Regelmäßige Ausgaben prüfen</option><option value="crypto-origin-tax" selected>Krypto · Herkunft &amp; Steuerstatus</option></select></label><div class="crypto-toolbar-meta"><span>Prüfumfang</span><strong>Ab '+data.selection.scopeStartYear+'</strong></div><div class="crypto-toolbar-meta"><span>Rekonstruktionsstand</span><strong>'+esc(formatDate(data.capturedAt,true))+'</strong></div></section>';
+  const summary='<section class="analysis-summary crypto-summary" aria-label="Zusammenfassung der Solana-Position"><div><span>Aktueller Gesamtbestand zum Rekonstruktionsstand</span><strong class="analysis-total">'+solAmount(data.holdings.totalSol)+' SOL</strong><p class="analysis-basis">Quelle: '+esc(data.source)+' · Stake ist kein Abfluss</p></div><div><span>Davon Staking Rewards</span><strong>'+solAmount(data.holdings.rewardsSol)+' SOL</strong><p class="analysis-basis">'+new Intl.NumberFormat("de-DE",{maximumFractionDigits:2}).format(data.holdings.rewardsPercent)+' % des Bestands</p></div><div><span>In Stake-Accounts</span><strong>'+solAmount(data.holdings.stakeTotalSol)+' SOL</strong><p class="analysis-basis">Deaktiviert: '+solAmount(data.holdings.inactiveStakeSol)+' SOL</p></div></section>';
+  const investment='<section class="analysis-panel" aria-labelledby="crypto-investment-title"><div class="analysis-panel-head"><div><h2 id="crypto-investment-title">Investmentbasis</h2><p>Ökonomische Average-Cost-Sicht, getrennt von der Steuerbasis</p></div></div><div class="crypto-basis-list"><div class="crypto-basis-row"><div><strong>A. Übergang ETH → SOL</strong><span>Marktwert beim Übergang / erhaltene SOL '+analysisEstimate(true)+'</span></div><strong>'+perSol(data.transition.conversionBasisEurPerSol)+'<small>'+perSol(data.transition.conversionBasisUsdPerSol,"USD")+'</small></strong></div><div class="crypto-basis-row"><div><strong>B. Effektiv inklusive Staking</strong><span>Fortgeführte Kapitalbasis / heutiger Bestand '+analysisEstimate(true)+'</span></div><strong>'+perSol(data.investment.effectiveBasisEurPerSol)+'<small>'+perSol(data.investment.effectiveBasisUsdPerSol,"USD")+'</small></strong></div><div class="crypto-basis-row"><div><strong>C. Netto-Fiatkapital</strong><span>Einzahlungen abzüglich bestätigter Fiat-Auszahlungen · keine steuerliche Cost Basis</span></div><strong>'+money(data.investment.netFiatCapitalEurMinor)+'<small>'+perSol(data.investment.netFiatPerCurrentSolEur)+'</small></strong></div></div><div class="crypto-break-even"><span>Break-even der heutigen Position vor Steuern und Verkaufskosten '+analysisEstimate(true)+'</span><strong>'+perSol(data.investment.breakEvenEurPerSol)+'</strong></div></section>';
+  const holdings='<section class="analysis-panel" aria-labelledby="crypto-holdings-title"><div class="analysis-panel-head"><div><h2 id="crypto-holdings-title">Bestandszusammensetzung</h2><p>Mengen sind nicht mit Anschaffungskosten gleichzusetzen</p></div></div><div class="crypto-holdings-list"><div class="crypto-holding-row"><div><strong>Liquide</strong><span>Hauptwallet</span></div><strong>'+solAmount(data.holdings.liquidSol)+' SOL</strong></div><div class="crypto-holding-row"><div><strong>Aktiv delegiert</strong><span>Native Stake-Delegation</span></div><strong>'+solAmount(data.holdings.delegatedSol)+' SOL</strong></div><div class="crypto-holding-row"><div><strong>Noch nicht delegiert</strong><span>Jito-Tips im Stake-Account</span></div><strong>'+solAmount(data.holdings.undelegatedStakeSol)+' SOL</strong></div><div class="crypto-holding-row"><div><strong>Rent-Reserve</strong><span>Grundsätzlich bei Kontoschließung rückholbar</span></div><strong>'+solAmount(data.holdings.rentReserveSol)+' SOL</strong></div><div class="crypto-holding-row"><div><strong>Gekauft oder konvertiert</strong><span>Heutiger Bestand vor Rewards</span></div><strong>'+solAmount(data.holdings.acquiredOrConvertedSol)+' SOL</strong></div></div></section>';
+  const taxRows=data.taxYears.map(year=>'<tr><td><strong>'+year.year+'</strong></td><td>'+cryptoTaxStatus(year.status)+'</td><td class="crypto-tax-reference">'+(year.referenceMinor===undefined?'–':money(year.referenceMinor)+(year.estimate?' '+analysisEstimate(true):''))+(year.referenceLabel?'<small>'+esc(year.referenceLabel)+'</small>':'')+'</td><td>'+esc(confidenceLabel(year.confidence))+'</td><td><strong>'+esc(year.title)+'</strong><br><span class="crypto-tax-detail">'+esc(year.detail)+'</span></td></tr>').join("");
+  const taxCards=data.taxYears.map(year=>'<article class="crypto-tax-card"><div class="crypto-tax-card-head"><strong>'+year.year+'</strong>'+cryptoTaxStatus(year.status)+'</div><h3>'+esc(year.title)+'</h3><p>'+esc(year.detail)+'</p><p class="crypto-tax-reference">'+(year.referenceMinor===undefined?'Kein belastbarer Betrag':money(year.referenceMinor)+(year.estimate?' '+analysisEstimate(true):''))+(year.referenceLabel?' · '+esc(year.referenceLabel):'')+'</p><p>Belegstatus: '+esc(confidenceLabel(year.confidence))+'</p></article>').join("");
+  const tax='<section class="analysis-panel crypto-tax" aria-labelledby="crypto-tax-title"><div class="analysis-panel-head"><div><h2 id="crypto-tax-title">Steuerliche Prüfspur '+data.selection.scopeStartYear+' ff.</h2><p>Keine Steuerschuld, sondern der dokumentierte Prüfstatus je Kalenderjahr</p></div></div><table class="crypto-tax-table"><thead><tr><th scope="col">Jahr</th><th scope="col">Status</th><th scope="col">Referenz</th><th scope="col">Beleglage</th><th scope="col">Einordnung</th></tr></thead><tbody>'+taxRows+'</tbody></table><div class="crypto-tax-mobile">'+taxCards+'</div></section>';
+  const evidenceRows=data.evidence.map(item=>'<div class="crypto-evidence-item"><span>'+esc(confidenceLabel(item.confidence))+'</span><strong>'+esc(item.label)+'</strong><p>'+esc(item.detail)+'</p></div>').join("");
+  const evidence='<section class="analysis-panel crypto-tax" aria-labelledby="crypto-evidence-title"><div class="analysis-panel-head"><div><h2 id="crypto-evidence-title">Datenbasis &amp; Belegstatus</h2><p>Öffentliche Blockchain-Daten und lokale Exporte, ohne Wallet-Adressen im Browser</p></div></div><div class="crypto-evidence">'+evidenceRows+'</div></section>';
+  const warnings=data.warnings.map(warning=>'<div class="analysis-warning" role="status">'+icons.warning+'<span>'+esc(warning)+'</span></div>').join("");
+  document.getElementById("dashboard").innerHTML=toolbar+summary+'<div class="crypto-layout">'+investment+holdings+'</div>'+tax+evidence+warnings;
+  document.getElementById("dashboard").setAttribute("aria-busy","false");
+}
+
 function renderRecurringError(error){
   currentRecurringData=null;currentRecurringDetail=null;
   document.getElementById("dashboard").innerHTML=expenseState("Nicht verfügbar","Die regelmäßigen Ausgaben konnten nicht geladen werden. Bitte versuche es erneut.","refresh(true)","Erneut versuchen");
@@ -1669,7 +1786,7 @@ function recurringDetailMarkup(candidate,detail,instance){
 function renderRecurringExpenses(data){
   currentRecurringData=data;
   const state=analysisSelection();
-  const toolbar='<section class="analysis-toolbar recurring-toolbar" aria-label="Filter für regelmäßige Ausgaben"><label>Ansicht<select name="analysis-view" autocomplete="off" onchange="setAnalysisView(this.value)"><option value="expense-structure">Ausgabenstruktur</option><option value="recurring-expenses" selected>Regelmäßige Ausgaben prüfen</option></select></label><label>Rhythmus<select id="recurring-rhythm" name="recurring-rhythm" autocomplete="off">'+selectedOption("alle",data.selection.rhythm,"Alle")+selectedOption("monatlich",data.selection.rhythm,"Monatlich")+selectedOption("vierteljaehrlich",data.selection.rhythm,"Vierteljährlich")+selectedOption("jaehrlich",data.selection.rhythm,"Jährlich")+'</select></label><label>Prüfstatus<select id="recurring-review" name="recurring-review" autocomplete="off">'+selectedOption("moeglich",data.selection.review,"Möglich")+selectedOption("bestaetigt",data.selection.review,"Bestätigt")+selectedOption("kein-kandidat",data.selection.review,"Kein Kandidat")+selectedOption("alle",data.selection.review,"Alle")+'</select></label><label>Einordnung<select id="recurring-classification" name="recurring-classification" autocomplete="off">'+selectedOption("alle",data.selection.classification,"Alle")+selectedOption("GRUNDBEDARF",data.selection.classification,"Grundbedarf")+selectedOption("GESTALTBAR",data.selection.classification,"Gestaltbar")+selectedOption("VERMEIDBAR",data.selection.classification,"Vermeidbar")+selectedOption("UNKLAR",data.selection.classification,"Unklar")+'</select></label><label>Rhythmussicherheit<select id="recurring-confidence" name="recurring-confidence" autocomplete="off">'+selectedOption("alle",data.selection.confidence,"Alle")+selectedOption("hoch",data.selection.confidence,"Hoch")+selectedOption("mittel",data.selection.confidence,"Mittel")+'</select></label><button class="button" type="button" onclick="applyRecurringFilters()">Anwenden</button></section>';
+  const toolbar='<section class="analysis-toolbar recurring-toolbar" aria-label="Filter für regelmäßige Ausgaben"><label>Ansicht<select name="analysis-view" autocomplete="off" onchange="setAnalysisView(this.value)"><option value="expense-structure">Ausgabenstruktur</option><option value="recurring-expenses" selected>Regelmäßige Ausgaben prüfen</option><option value="crypto-origin-tax">Krypto · Herkunft &amp; Steuerstatus</option></select></label><label>Rhythmus<select id="recurring-rhythm" name="recurring-rhythm" autocomplete="off">'+selectedOption("alle",data.selection.rhythm,"Alle")+selectedOption("monatlich",data.selection.rhythm,"Monatlich")+selectedOption("vierteljaehrlich",data.selection.rhythm,"Vierteljährlich")+selectedOption("jaehrlich",data.selection.rhythm,"Jährlich")+'</select></label><label>Prüfstatus<select id="recurring-review" name="recurring-review" autocomplete="off">'+selectedOption("moeglich",data.selection.review,"Möglich")+selectedOption("bestaetigt",data.selection.review,"Bestätigt")+selectedOption("kein-kandidat",data.selection.review,"Kein Kandidat")+selectedOption("alle",data.selection.review,"Alle")+'</select></label><label>Einordnung<select id="recurring-classification" name="recurring-classification" autocomplete="off">'+selectedOption("alle",data.selection.classification,"Alle")+selectedOption("GRUNDBEDARF",data.selection.classification,"Grundbedarf")+selectedOption("GESTALTBAR",data.selection.classification,"Gestaltbar")+selectedOption("VERMEIDBAR",data.selection.classification,"Vermeidbar")+selectedOption("UNKLAR",data.selection.classification,"Unklar")+'</select></label><label>Rhythmussicherheit<select id="recurring-confidence" name="recurring-confidence" autocomplete="off">'+selectedOption("alle",data.selection.confidence,"Alle")+selectedOption("hoch",data.selection.confidence,"Hoch")+selectedOption("mittel",data.selection.confidence,"Mittel")+'</select></label><button class="button" type="button" onclick="applyRecurringFilters()">Anwenden</button></section>';
   const summary='<section class="recurring-summary" aria-label="Prüfbestand"><div><span>Mögliche regelmäßige Zahlungen</span><strong>'+data.summary.possible+'</strong></div><div><span>Vom Nutzer bestätigt</span><strong>'+data.summary.confirmed+'</strong></div><div><span>Als kein Kandidat markiert</span><strong>'+data.summary.notCandidate+'</strong></div></section>';
   const freshness='<div class="recurring-freshness"><span>Quelle: '+esc(data.source)+'</span><span>Beobachtet: '+esc(formatDate(data.freshness.windowStart))+'–'+esc(formatDate(data.freshness.windowEnd))+'</span><span>Letzter vollständiger Monat: '+esc(analysisMonthLabel(data.freshness.lastCompleteMonth))+'</span><span>Stand: '+esc(formatDate(data.freshness.lastSuccessfulAt,true))+'</span></div>';
   const warnings=data.warnings.map(warning=>'<div class="analysis-warning" role="status">'+icons.warning+'<span>'+esc(warning)+'</span></div>').join("");
@@ -1735,13 +1852,14 @@ function renderHeader(view){
     analyses:{title:"Analysen",subtitle:"Ausgaben verstehen und Veränderungen nachvollziehen."},
     status:{title:"Datenstatus",subtitle:"Aktualität, offene Aufgaben und Systemzustand auf einen Blick."}
   }[view];
+  if(view==="analyses"&&analysisSelection().view==="crypto-origin-tax")content.subtitle="Krypto-Herkunft, Investmentbasis und Steuerstatus nachvollziehen.";
   document.title=content.title+" · Finance Hub";
   const eyebrow=document.getElementById("page-eyebrow");
   eyebrow.hidden=view!=="status";
   document.getElementById("page-title").textContent=content.title;
   document.getElementById("page-subtitle").textContent=content.subtitle;
   const action=document.getElementById("refresh-button");
-  const analysisExport=view==="analyses"&&analysisSelection().view==="expense-structure";
+  const analysisExport=view==="analyses"&&analysisSelection().view!=="recurring-expenses";
   action.setAttribute("aria-label",analysisExport?"Aktuelle Analyse als CSV exportieren":content.title+" aktualisieren");
   action.querySelector("[aria-hidden]").textContent=analysisExport?"↓":"↻";
   action.querySelector(".desktop-label").textContent=analysisExport?"CSV exportieren":"Aktualisieren";
@@ -1787,7 +1905,9 @@ async function refresh(force=false){
     }else if(view==="analyses"){
       const selection=analysisSelection();
       const params=new URLSearchParams();
-      if(selection.view==="recurring-expenses"){
+      if(selection.view==="crypto-origin-tax"){
+        const data=await call("/api/dashboard/analyses/crypto-position");renderCryptoAnalysis(data);
+      }else if(selection.view==="recurring-expenses"){
         if(selection.rhythm!=="alle")params.set("rhythm",selection.rhythm);
         if(selection.review!=="moeglich")params.set("review",selection.review);
         if(selection.classification!=="alle")params.set("classification",selection.classification);
@@ -1806,7 +1926,7 @@ async function refresh(force=false){
     }
     msg("");
   }
-  catch(error){if(view==="spending")renderSpendingError(error);else if(view==="assets")renderAssetsError(error);else if(view==="analyses"&&analysisSelection().view==="recurring-expenses")renderRecurringError(error);else if(view==="analyses")renderAnalysesError(error);else{msg(error.message,true);document.getElementById("dashboard").setAttribute("aria-busy","false")}}
+  catch(error){if(view==="spending")renderSpendingError(error);else if(view==="assets")renderAssetsError(error);else if(view==="analyses"&&analysisSelection().view==="recurring-expenses")renderRecurringError(error);else if(view==="analyses"&&analysisSelection().view==="crypto-origin-tax")renderCryptoError(error);else if(view==="analyses")renderAnalysesError(error);else{msg(error.message,true);document.getElementById("dashboard").setAttribute("aria-busy","false")}}
   finally{button.disabled=false}
 }
 async function syncSource(id){try{msg("Abruf läuft …");const result=await call("/api/sync/"+id,{method:"POST"});msg(result.message);await refresh()}catch(error){msg(error.message,true)}}

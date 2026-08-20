@@ -43,6 +43,9 @@ export function loadConfig(): AppConfig {
       ...parsed.analysis,
       expenseStructure: parsed.analysis.expenseStructure
         ? { ...parsed.analysis.expenseStructure }
+        : undefined,
+      cryptoPosition: parsed.analysis.cryptoPosition
+        ? { ...parsed.analysis.cryptoPosition }
         : undefined
     } : undefined,
     sources: parsed.sources ?? []

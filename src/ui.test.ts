@@ -122,6 +122,19 @@ test("Analysenansicht besitzt regelmäßige Ausgaben mit Filtern, Detail und Nut
   assert.match(html, /recurring-mobile-list/);
 });
 
+test("Analysenansicht trennt Kryptoherkunft, Investmentbasis und Steuerprüfung", () => {
+  const html = renderUi();
+  assert.match(html, /Krypto · Herkunft &amp; Steuerstatus/);
+  assert.match(html, /\/api\/dashboard\/analyses\/crypto-position/);
+  assert.match(html, /Investmentbasis/);
+  assert.match(html, /Bestandszusammensetzung/);
+  assert.match(html, /Steuerliche Prüfspur/);
+  assert.match(html, /keine steuerliche Cost Basis/);
+  assert.match(html, /Keine Steuerschuld/);
+  assert.match(html, /crypto-tax-mobile/);
+  assert.doesNotMatch(html, /walletAddress|stakeAccountAddress|sourceAddress/i);
+});
+
 test("Verwaltungstoken bleibt nur für die Browsersitzung gespeichert", () => {
   const html = renderUi();
   assert.match(html, /id="token-form"/);

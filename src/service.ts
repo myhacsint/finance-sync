@@ -74,6 +74,10 @@ import {
   type DashboardAssets
 } from "./dashboard-assets.js";
 import {
+  buildDashboardCryptoAnalysis,
+  type DashboardCryptoAnalysis
+} from "./dashboard-crypto-analysis.js";
+import {
   lastCompletedMonthEnd,
   readCoinGeckoSolPrice
 } from "./dashboard-asset-comparison.js";
@@ -299,6 +303,17 @@ export class FinanceService {
       return await loading;
     } finally {
       this.analysesLoading.delete(cacheKey);
+    }
+  }
+
+  getDashboardCryptoAnalysis(): DashboardCryptoAnalysis {
+    try {
+      return buildDashboardCryptoAnalysis(this.config);
+    } catch (error) {
+      throw new FinanceServiceError(
+        error instanceof Error ? error.message : "Kryptoanalyse ist nicht verfügbar",
+        503
+      );
     }
   }
 

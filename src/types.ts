@@ -60,6 +60,56 @@ export interface ExpenseAnalysisOverride {
   class?: ExpenseClass;
 }
 
+export type CryptoEvidenceStatus = "Bestaetigt" | "Sehr wahrscheinlich" | "Unklar";
+
+export interface CryptoTaxYearConfig {
+  year: number;
+  status: "review" | "likely-tax-free" | "below-threshold" | "future-filing";
+  title: string;
+  detail: string;
+  confidence: CryptoEvidenceStatus;
+  referenceMinor?: number;
+  referenceLabel?: string;
+  estimate?: boolean;
+}
+
+export interface CryptoPositionAnalysisConfig {
+  capturedAt: string;
+  scopeStartYear: number;
+  holdings: {
+    liquidSolAtomic: string;
+    delegatedSolAtomic: string;
+    undelegatedStakeSolAtomic: string;
+    rentReserveSolAtomic: string;
+    inactiveStakeSolAtomic: string;
+    rewardsSolAtomic: string;
+  };
+  transition: {
+    occurredAt: string;
+    inputEth: number;
+    outputSolAtomic: string;
+    valueEurMinor: number;
+    valueUsdMinor: number;
+    confidence: CryptoEvidenceStatus;
+  };
+  capital: {
+    currentPositionBasisEurMinor: number;
+    currentPositionBasisUsdMinor: number;
+    grossFiatContributionsEurMinor: number;
+    grossFiatContributionsUsdMinor: number;
+    fiatWithdrawalsEurMinor: number;
+    fiatWithdrawalsUsdMinor: number;
+    netFiatCapitalEurMinor: number;
+    netFiatCapitalUsdMinor: number;
+  };
+  taxYears: CryptoTaxYearConfig[];
+  evidence: Array<{
+    label: string;
+    detail: string;
+    confidence: CryptoEvidenceStatus;
+  }>;
+}
+
 export interface SourceConfig {
   id: string;
   kind: SourceKind;
@@ -98,6 +148,7 @@ export interface AppConfig {
       overrides?: ExpenseAnalysisOverride[];
       adjustments?: ExpenseAnalysisAdjustment[];
     };
+    cryptoPosition?: CryptoPositionAnalysisConfig;
   };
 }
 

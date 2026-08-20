@@ -141,6 +141,10 @@ const server = createServer(async (req, res) => {
       );
     }
     if (req.method === "GET"
+      && url.pathname === "/api/dashboard/analyses/crypto-position") {
+      return json(res, 200, service.getDashboardCryptoAnalysis());
+    }
+    if (req.method === "GET"
       && url.pathname === "/api/dashboard/analyses/recurring-expenses") {
       return json(
         res,
