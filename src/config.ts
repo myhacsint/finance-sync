@@ -77,7 +77,10 @@ export function loadConfig(): AppConfig {
             incomeBookingRules: savingsIncomeRules(
               parsed.analysis.savingsBaseline.incomeBookingRules,
               /^booking-[a-f0-9]{20}$/
-            )
+            ),
+            committedOutflowBookingKeys:
+              parsed.analysis.savingsBaseline.committedOutflowBookingKeys
+                ?.filter((key) => /^booking-[a-f0-9]{20}$/.test(key))
           }
         : undefined,
       expenseStructure: parsed.analysis.expenseStructure

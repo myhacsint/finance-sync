@@ -150,6 +150,7 @@ test("sonstige Einnahmeregeln trennen laufend, variabel, Erstattung und Durchlau
     ...config,
     analysis: {
       savingsBaseline: {
+        committedOutflowBookingKeys: ["booking-77777777777777777777"],
         incomeMerchantRules: {
           "merchant-1111111111111111": "REGULAR",
           "merchant-2222222222222222": "VARIABLE",
@@ -168,6 +169,11 @@ test("sonstige Einnahmeregeln trennen laufend, variabel, Erstattung und Durchlau
     line({ amountMinor: 10_000, categoryIsIncome: true, merchantKey: "merchant-4444444444444444" }),
     line({ amountMinor: 3_500, categoryIsIncome: true, merchantKey: "merchant-5555555555555555" }),
     line({ amountMinor: 120_000, categoryIsIncome: true, merchantKey: "merchant-6666666666666666" }),
+    line({
+      bookingKey: "booking-77777777777777777777",
+      amountMinor: -40_000,
+      categoryLabel: "Sparen & Investieren"
+    }),
     line({ amountMinor: -80_000, categoryLabel: "Lebensmittel" })
   ]), rulesConfig, new Date("2026-08-22T10:00:00.000Z"));
   assert.equal(result.state, "current");
@@ -177,6 +183,9 @@ test("sonstige Einnahmeregeln trennen laufend, variabel, Erstattung und Durchlau
   assert.equal(result.otherIncome.passThroughAnnualMinor, 10_000);
   assert.equal(result.otherIncome.investmentReturnAnnualMinor, 3_500);
   assert.equal(result.otherIncome.internalTransferAnnualMinor, 120_000);
+  assert.equal(result.committedOutflow.grossAnnualMinor, 40_000);
+  assert.equal(result.committedOutflow.earmarkedFundingAnnualMinor, 10_000);
+  assert.equal(result.committedOutflow.householdContributionAnnualMinor, 30_000);
   assert.equal(result.months.find((month) => month.month === "2026-07")?.consumptionMinor, 60_000);
 });
 

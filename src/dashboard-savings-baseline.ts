@@ -104,6 +104,15 @@ export interface DashboardSavingsBaseline {
     typicalMonthlyMinor: number | null;
     estimate: true;
   };
+  committedOutflow: {
+    grossMonthlyMinor: number | null;
+    earmarkedFundingMonthlyMinor: number | null;
+    householdContributionMonthlyMinor: number | null;
+    grossAnnualMinor: number;
+    earmarkedFundingAnnualMinor: number;
+    householdContributionAnnualMinor: number;
+    estimate: true;
+  };
   savingsCapacityMonthlyMinor: number | null;
   months: Array<{
     month: string;
@@ -121,6 +130,7 @@ export interface DashboardSavingsBaseline {
     unreviewedIncomeMinor: number;
     unknownPositiveMinor: number;
     consumptionMinor: number;
+    committedOutflowMinor: number;
   }>;
   warnings: string[];
   basis: string[];
@@ -204,6 +214,9 @@ export function buildDashboardSavingsBaseline(
   const assignments = config.analysis?.savingsBaseline?.manualForwardedIncomeAssignments ?? {};
   const merchantRules = config.analysis?.savingsBaseline?.incomeMerchantRules ?? {};
   const bookingRules = config.analysis?.savingsBaseline?.incomeBookingRules ?? {};
+  const committedOutflowBookingKeys = new Set(
+    config.analysis?.savingsBaseline?.committedOutflowBookingKeys ?? []
+  );
   const months = new Map<string, DashboardSavingsBaseline["months"][number]>();
   for (let month = range.startMonth; month <= range.endMonth; month = shiftMonth(month, 1)) {
     months.set(month, {
@@ -221,7 +234,8 @@ export function buildDashboardSavingsBaseline(
       internalTransferMinor: 0,
       unreviewedIncomeMinor: 0,
       unknownPositiveMinor: 0,
-      consumptionMinor: 0
+      consumptionMinor: 0,
+      committedOutflowMinor: 0
     });
   }
 
@@ -266,6 +280,10 @@ export function buildDashboardSavingsBaseline(
     const bookingMonth = line.date.slice(0, 7);
     const item = months.get(bookingMonth);
     if (!item) continue;
+    if (line.amountMinor < 0 && committedOutflowBookingKeys.has(line.bookingKey)) {
+      item.committedOutflowMinor -= line.amountMinor;
+      continue;
+    }
     if (line.amountMinor > 0 && configuredManual.has(line.merchantKey)) {
       const assignedMonth = assignments[line.bookingKey];
       const assignedItem = assignedMonth ? months.get(assignedMonth) : undefined;
@@ -334,10 +352,20 @@ export function buildDashboardSavingsBaseline(
     warnings.push("Noch nicht geprüfte sonstige Einnahmen sind nicht in der Sparratenbasis enthalten.");
   }
   const typicalConsumptionMinor = median(resultMonths.map((month) => month.consumptionMinor));
+  const committedOutflowGrossAnnualMinor = resultMonths.reduce(
+    (sum, month) => sum + month.committedOutflowMinor,
+    0
+  );
+  const earmarkedFundingAnnualMinor = resultMonths.reduce(
+    (sum, month) => sum + Math.min(month.passThroughMinor, month.committedOutflowMinor),
+    0
+  );
   const regularHouseholdIncomeMinor = median(resultMonths.map((month) =>
     month.payrollRegularMinor
       + month.secondIncomeRegularMinor
       + month.otherIncomeRegularMinor
+      + Math.min(month.passThroughMinor, month.committedOutflowMinor)
+      - month.committedOutflowMinor
   ));
   const savingsCapacityMonthlyMinor = warnings.length === 0
     && typicalConsumptionMinor !== null
@@ -415,6 +443,20 @@ export function buildDashboardSavingsBaseline(
       typicalMonthlyMinor: typicalConsumptionMinor,
       estimate: true
     },
+    committedOutflow: {
+      grossMonthlyMinor: median(resultMonths.map((month) => month.committedOutflowMinor)),
+      earmarkedFundingMonthlyMinor: median(resultMonths.map((month) =>
+        Math.min(month.passThroughMinor, month.committedOutflowMinor)
+      )),
+      householdContributionMonthlyMinor: median(resultMonths.map((month) =>
+        Math.max(0, month.committedOutflowMinor - month.passThroughMinor)
+      )),
+      grossAnnualMinor: committedOutflowGrossAnnualMinor,
+      earmarkedFundingAnnualMinor,
+      householdContributionAnnualMinor:
+        committedOutflowGrossAnnualMinor - earmarkedFundingAnnualMinor,
+      estimate: true
+    },
     savingsCapacityMonthlyMinor,
     months: resultMonths,
     warnings,
@@ -424,6 +466,7 @@ export function buildDashboardSavingsBaseline(
       "Manuell weitergeleitetes zweites Gehalt nach bestätigtem Wirtschaftsmonat",
       "Regelmäßige, variable und zweckgebundene Einnahmen getrennt [SCHÄTZUNG]",
       "Kostenerstattungen mit Ausgaben verrechnet; Kapitalerträge nicht als Sparleistung gezählt",
+      "Zweckgebundene Sparbeiträge nur mit dem eigenen Haushaltsanteil belastet [SCHÄTZUNG]",
       "Interne Überträge sowie Sparen & Investieren nicht als Konsum gezählt",
       "Regelmäßige Sparratenbasis aus Median der zwölf vollständigen Monate [SCHÄTZUNG]"
     ]

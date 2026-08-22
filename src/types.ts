@@ -195,6 +195,7 @@ export interface AppConfig {
       manualForwardedIncomeAssignments?: Record<string, string>;
       incomeMerchantRules?: Record<string, SavingsIncomeTreatment>;
       incomeBookingRules?: Record<string, SavingsIncomeTreatment>;
+      committedOutflowBookingKeys?: string[];
     };
     expenseStructure?: {
       oldestYear?: number;
