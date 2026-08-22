@@ -186,7 +186,8 @@ test("aktueller unvollständiger Monat bleibt sichtbar, aber außerhalb der Proj
     netMinor: 50_000,
     incomeDifferenceMinor: -500_000,
     expensesDifferenceMinor: -400_000,
-    netDifferenceMinor: -100_000
+    netDifferenceMinor: -100_000,
+    excludedIncomeMinor: 0
   });
 });
 

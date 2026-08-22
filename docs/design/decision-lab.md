@@ -9,7 +9,7 @@ Das Entscheidungslabor vergleicht das vorhandene Finanzvermögen ohne Immobilie 
 ## Bedienung
 
 - Realrendite nach Inflation, konservativ mit 2 % vorbelegt
-- Ausgangsbasis `Aktuelles Jahr` als Standard: tatsächliche YTD-Bilanz plus typischer Monat anhand des Medians der realen Monatsüberschüsse
+- Ausgangsbasis `Aktuelles Jahr` als Standard: tatsächliche YTD-Bilanz plus realer Referenzmonat nahe dem Median der Monatsüberschüsse
 - geglättete Basis `YTD + letztes Jahr`
 - monatliche Veränderung für zusätzliche Einsparungen oder Ausgaben
 - einmaliger Zu- oder Abfluss für Vorhaben wie eine Renovierung

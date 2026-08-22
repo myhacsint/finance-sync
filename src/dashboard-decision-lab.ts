@@ -93,6 +93,7 @@ export interface DashboardDecisionLab {
       incomeDifferenceMinor: number | null;
       expensesDifferenceMinor: number | null;
       netDifferenceMinor: number | null;
+      excludedIncomeMinor: number;
     };
   };
   series: Array<{
@@ -255,12 +256,28 @@ function trendOption(
     };
   }, { incomeMinor: 0, expensesMinor: 0, excludedIncomeMinor: 0 });
   const netMinor = totals.incomeMinor - totals.expensesMinor;
-  const monthlyIncomeMinor = monthlyValue(monthValues.map((value) => value.incomeMinor), monthlyMetric);
-  const monthlyExpensesMinor = monthlyValue(monthValues.map((value) => value.expensesMinor), monthlyMetric);
-  const averageMonthlyNetMinor = monthlyValue(
-    monthValues.map((value) => value.incomeMinor - value.expensesMinor), monthlyMetric
+  const medianNetMinor = median(
+    monthValues.map((value) => value.incomeMinor - value.expensesMinor)
   );
-  const breakdown = monthlyBreakdown(monthValues, monthlyMetric);
+  const representativeMonth = monthlyMetric === "median"
+    ? monthValues.reduce((closest, value) => {
+        const distance = Math.abs(value.incomeMinor - value.expensesMinor - medianNetMinor);
+        const closestDistance = Math.abs(
+          closest.incomeMinor - closest.expensesMinor - medianNetMinor
+        );
+        return distance <= closestDistance ? value : closest;
+      })
+    : null;
+  const monthlyIncomeMinor = representativeMonth?.incomeMinor
+    ?? monthlyValue(monthValues.map((value) => value.incomeMinor), monthlyMetric);
+  const monthlyExpensesMinor = representativeMonth?.expensesMinor
+    ?? monthlyValue(monthValues.map((value) => value.expensesMinor), monthlyMetric);
+  const averageMonthlyNetMinor = representativeMonth
+    ? representativeMonth.incomeMinor - representativeMonth.expensesMinor
+    : monthlyValue(monthValues.map((value) => value.incomeMinor - value.expensesMinor), monthlyMetric);
+  const breakdown = representativeMonth
+    ? monthlyBreakdown([representativeMonth], "average")
+    : monthlyBreakdown(monthValues, monthlyMetric);
   return {
     key,
     label,
@@ -302,7 +319,7 @@ export function decisionTrendOptions(
     trendOption(
       "current-year",
       "Aktuelles Jahr",
-      "YTD-Bilanz und typischer Monat als Median der realen Monatsüberschüsse",
+      "YTD-Bilanz und realer Referenzmonat in der Mitte der Monatsüberschüsse",
       ytd,
       "median"
     ),
@@ -463,7 +480,8 @@ export function buildDashboardDecisionLab(
           : null,
         netDifferenceMinor: currentMonthNetMinor !== null && typicalTrend.averageMonthlyNetMinor !== null
           ? currentMonthNetMinor - typicalTrend.averageMonthlyNetMinor
-          : null
+          : null,
+        excludedIncomeMinor: currentMonthValues?.incomeBreakdown.unreviewedExcludedMinor ?? 0
       }
     },
     series,
@@ -475,7 +493,7 @@ export function buildDashboardDecisionLab(
       "Rendite als Realrendite nach Inflation und monatliche Verzinsung gerechnet [SCHÄTZUNG]",
       "Einnahmen und Ausgaben nach der gewählten historischen Basis fortgeschrieben [SCHÄTZUNG]",
       "Kostenerstattungen mit Ausgaben verrechnet; interne Überträge und Kapitalerträge ausgeschlossen",
-      "Der typische Monat verwendet den Median der realen monatlichen Überschüsse; der letzte Monat dient nur als Vergleich [SCHÄTZUNG]",
+      "Der typische Monat ist ein realer Referenzmonat nahe dem Median der monatlichen Überschüsse; der letzte Monat dient nur als Vergleich [SCHÄTZUNG]",
       "Mitarbeiteraktienvorteile sind nur enthalten, wenn sie als eigener Arbeitgeberzufluss gebucht wurden",
       "Bei aufgebrauchtem Finanzvermögen wird nicht automatisch eine Verschuldung unterstellt"
     ]
