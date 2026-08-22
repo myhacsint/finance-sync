@@ -89,11 +89,12 @@ test("YTD ist Standard und alle drei historischen Ausgangsbasen bleiben nachvoll
     option.key,
     option.months,
     option.averageMonthlyNetMinor,
-    option.annualizedNetMinor
+    option.annualizedNetMinor,
+    option.excludedIncomeMinor
   ]), [
-    ["ytd", 7, 157_143, 1_885_716],
-    ["last-month", 1, 200_000, 2_400_000],
-    ["ytd-plus-last-year", 19, 121_053, 1_452_636]
+    ["ytd", 7, 157_143, 1_885_716, 0],
+    ["last-month", 1, 200_000, 2_400_000, 0],
+    ["ytd-plus-last-year", 19, 121_053, 1_452_636, 0]
   ]);
   assert.equal(decisionLabInputs().trendBasis, "ytd");
 });

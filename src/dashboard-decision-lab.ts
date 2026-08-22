@@ -23,6 +23,7 @@ export interface DecisionTrendOption {
   netMinor: number | null;
   averageMonthlyNetMinor: number | null;
   annualizedNetMinor: number | null;
+  excludedIncomeMinor: number;
 }
 
 export interface DashboardDecisionLab {
@@ -123,16 +124,21 @@ function trendOption(
       expensesMinor: null,
       netMinor: null,
       averageMonthlyNetMinor: null,
-      annualizedNetMinor: null
+      annualizedNetMinor: null,
+      excludedIncomeMinor: 0
     };
   }
   const totals = months.reduce((sum, month) => {
     const values = trendMonthValues(month);
     return {
       incomeMinor: sum.incomeMinor + values.incomeMinor,
-      expensesMinor: sum.expensesMinor + values.expensesMinor
+      expensesMinor: sum.expensesMinor + values.expensesMinor,
+      excludedIncomeMinor: sum.excludedIncomeMinor
+        + month.manualForwardedUnassignedMinor
+        + month.unreviewedIncomeMinor
+        + month.unknownPositiveMinor
     };
-  }, { incomeMinor: 0, expensesMinor: 0 });
+  }, { incomeMinor: 0, expensesMinor: 0, excludedIncomeMinor: 0 });
   const netMinor = totals.incomeMinor - totals.expensesMinor;
   const averageMonthlyNetMinor = Math.round(netMinor / months.length);
   return {
@@ -147,7 +153,8 @@ function trendOption(
     expensesMinor: totals.expensesMinor,
     netMinor,
     averageMonthlyNetMinor,
-    annualizedNetMinor: averageMonthlyNetMinor * 12
+    annualizedNetMinor: averageMonthlyNetMinor * 12,
+    excludedIncomeMinor: totals.excludedIncomeMinor
   };
 }
 
@@ -219,12 +226,17 @@ export function buildDashboardDecisionLab(
   const selectedTrend = trendOptions.find((option) => option.key === inputs.trendBasis)!;
   const startingAssetsMinor = assets.totalMinor;
   const projectedMonthlyCapacityMinor = selectedTrend.averageMonthlyNetMinor;
-  const warnings = [...assets.warnings, ...cashflow.warnings];
+  const warnings = [...assets.warnings];
   if (startingAssetsMinor === null) {
     warnings.push("Das aktuelle Finanzvermögen ist unvollständig; die Projektion ist nicht verfügbar.");
   }
   if (!selectedTrend.available || projectedMonthlyCapacityMinor === null) {
     warnings.push("Die gewählte Einnahmen- und Ausgabenbasis ist unvollständig; die Projektion ist nicht verfügbar.");
+  }
+  if (selectedTrend.excludedIncomeMinor > 0) {
+    warnings.push(
+      "Im gewählten Zeitraum sind noch nicht eindeutig zugeordnete Einnahmen nicht in der Projektion enthalten."
+    );
   }
   let series: DashboardDecisionLab["series"] = [];
   let milestones: DashboardDecisionLab["milestones"] = [];
@@ -263,7 +275,7 @@ export function buildDashboardDecisionLab(
     state: startingAssetsMinor !== null
       && projectedMonthlyCapacityMinor !== null
       && assets.state === "current"
-      && cashflow.warnings.length === 0
+      && selectedTrend.excludedIncomeMinor === 0
       ? "current"
       : "partial",
     source: "FinanceSync + Actual",
