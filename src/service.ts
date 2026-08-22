@@ -2,6 +2,8 @@ import type {
   AppConfig,
   ImportBundle,
   RecurringExpenseDecision,
+  RecurringExpenseOptimizationPriority,
+  RecurringExpenseOptimizationStatus,
   SourceConfig,
   SyncResult
 } from "./types.js";
@@ -62,10 +64,12 @@ import {
 import {
   buildDashboardRecurringExpenseDetail,
   buildDashboardRecurringExpenses,
+  buildDashboardRecurringExpenseOptimizations,
   recurringExpenseRange,
   recurringFingerprintVersion,
   type DashboardRecurringExpenseDetail,
   type DashboardRecurringExpenses,
+  type DashboardRecurringExpenseOptimizations,
   type RecurringExpenseQuery
 } from "./dashboard-recurring-expenses.js";
 import {
@@ -379,6 +383,18 @@ export class FinanceService {
     return detail;
   }
 
+  async getDashboardRecurringExpenseOptimizations(
+    force = false
+  ): Promise<DashboardRecurringExpenseOptimizations> {
+    const { snapshot, stale } = await this.getRecurringSnapshot(force, true);
+    return buildDashboardRecurringExpenseOptimizations(
+      snapshot,
+      this.db.listRecurringExpenseDecisions(),
+      this.db.listRecurringExpenseOptimizations(),
+      { stale }
+    );
+  }
+
   async setRecurringExpenseDecision(
     candidateKey: string,
     decision: RecurringExpenseDecision,
@@ -416,6 +432,69 @@ export class FinanceService {
       this.db.listRecurringExpenseDecisions(),
       candidateKey
     )!;
+  }
+
+  async setRecurringExpenseOptimization(
+    candidateKey: string,
+    payload: {
+      status: RecurringExpenseOptimizationStatus;
+      effectiveDate: string | null;
+      expectedAnnualSavingsMinor: number | null;
+      priority: RecurringExpenseOptimizationPriority | null;
+      expectedEvidenceHash: string;
+    }
+  ): Promise<DashboardRecurringExpenseOptimizations> {
+    const statuses = new Set<RecurringExpenseOptimizationStatus>([
+      "PRUEFEN", "GEPLANT", "GEKUENDIGT", "BEIBEHALTEN"
+    ]);
+    const priorities = new Set<RecurringExpenseOptimizationPriority>([
+      "HOCH", "MITTEL", "NIEDRIG"
+    ]);
+    if (!statuses.has(payload.status)) throw new FinanceServiceError("Ungültiger Maßnahmenstatus", 400);
+    if (payload.priority !== null && !priorities.has(payload.priority)) {
+      throw new FinanceServiceError("Ungültige Priorität", 400);
+    }
+    if (payload.effectiveDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(payload.effectiveDate)) {
+      throw new FinanceServiceError("Ungültiges Enddatum", 400);
+    }
+    if (payload.expectedAnnualSavingsMinor !== null && (
+      !Number.isSafeInteger(payload.expectedAnnualSavingsMinor)
+      || payload.expectedAnnualSavingsMinor < 0
+      || payload.expectedAnnualSavingsMinor > 100_000_000
+    )) {
+      throw new FinanceServiceError("Ungültige jährliche Entlastung", 400);
+    }
+    if (!/^evidence-[a-f0-9]{20}$/.test(payload.expectedEvidenceHash)) {
+      throw new FinanceServiceError("Ungültiger Beleg-Fingerprint", 400);
+    }
+    const { snapshot, stale } = await this.getRecurringSnapshot(false, false);
+    if (stale) throw new FinanceServiceError("Maßnahmen benötigen aktuelle Actual-Daten", 503);
+    const current = buildDashboardRecurringExpenseDetail(
+      snapshot,
+      this.db.listRecurringExpenseDecisions(),
+      candidateKey
+    );
+    if (!current) throw new FinanceServiceError("Kandidat nicht gefunden", 404);
+    if (current.candidate.evidence.evidenceHash !== payload.expectedEvidenceHash) {
+      throw new FinanceServiceError("Die Beleglage hat sich geändert. Bitte Liste neu laden.", 409);
+    }
+    if (current.candidate.classification.confidence !== "nutzerbestaetigt"
+      || current.candidate.classification.value === "GRUNDBEDARF") {
+      throw new FinanceServiceError("Nur bestätigte optimierbare Ausgaben können geplant werden", 409);
+    }
+    this.db.setRecurringExpenseOptimization(
+      candidateKey,
+      payload.expectedEvidenceHash,
+      payload.status,
+      payload.effectiveDate,
+      payload.expectedAnnualSavingsMinor,
+      payload.priority
+    );
+    return buildDashboardRecurringExpenseOptimizations(
+      snapshot,
+      this.db.listRecurringExpenseDecisions(),
+      this.db.listRecurringExpenseOptimizations()
+    );
   }
 
   private async importSourceBundle(

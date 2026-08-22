@@ -122,6 +122,19 @@ test("Analysenansicht besitzt regelmäßige Ausgaben mit Filtern, Detail und Nut
   assert.match(html, /recurring-mobile-list/);
 });
 
+test("Analysenansicht besitzt eine konkrete Optimierungsliste", () => {
+  const html = renderUi();
+  assert.match(html, /Optimierungsliste/);
+  assert.match(html, /expense-optimizations/);
+  assert.match(html, /recurring-expenses\/optimizations/);
+  assert.match(html, /Kündigung \/ Änderung geplant/);
+  assert.match(html, /Gekündigt \/ umgesetzt/);
+  assert.match(html, /Wirksam ab \/ Enddatum/);
+  assert.match(html, /Jährliche Entlastung in €/);
+  assert.match(html, /\[SCHÄTZUNG\]/);
+  assert.match(html, /Nicht gesetzt/);
+});
+
 test("Analysenansicht trennt Kryptoherkunft, Investmentbasis und Steuerprüfung", () => {
   const html = renderUi();
   assert.match(html, /Krypto · Herkunft &amp; Steuerstatus/);

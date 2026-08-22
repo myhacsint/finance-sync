@@ -1,12 +1,12 @@
 # Analysen
 
-## Ziel der ersten Stufe
+## Ziel und Ausbau
 
-Der Bereich `Analysen` startet mit genau einer belastbaren Ansicht:
-`Ausgabenstruktur`. Sie vergleicht gemessene Ausgaben zwischen zwei Zeiträumen,
-zeigt deren Klassifikation und führt bis zu den beitragenden Positionen zurück.
-Die zweite Ansicht `Regelmäßige Ausgaben prüfen` nutzt dieselbe Route und
-ergänzt die Hauptnavigation nicht.
+Der Bereich `Analysen` begann mit der Ansicht `Ausgabenstruktur`. Sie vergleicht
+gemessene Ausgaben zwischen zwei Zeiträumen, zeigt deren Klassifikation und
+führt bis zu den beitragenden Positionen zurück. Weitere Analysen wie
+`Regelmäßige Ausgaben prüfen` und die daraus abgeleitete `Optimierungsliste`
+nutzen dieselbe Route und ergänzen die Hauptnavigation nicht.
 
 Die Ansicht bewertet Ausgaben nicht und formuliert keine Empfehlungen. Sie
 stellt ausschließlich Beträge, Veränderungen, Klassifikationen und bekannte
@@ -40,6 +40,24 @@ Filter und der geöffnete Kandidat sind als teilbarer URL-Zustand abgelegt. Die
 URL enthält nur pseudonymisierte Kandidatenschlüssel. Lade-, Frische-, Teil-,
 Leer- und Fehlerzustände benennen die verfügbare Datenbasis, ohne fehlende
 Werte als Null auszugeben.
+
+## Optimierungsliste
+
+Die Optimierungsliste übernimmt ausschließlich nutzerbestätigte Ausgaben der
+Klassen `Gestaltbar`, `Vermeidbar` und `Unklar`. `Grundbedarf` und als
+`Kein Kandidat` markierte Treffer bleiben ausgeschlossen. Pro Eintrag werden
+der Maßnahmenstatus `Prüfen`, `Kündigung / Änderung geplant`,
+`Gekündigt / umgesetzt` oder `Bewusst beibehalten`, ein optionales
+Wirksamkeitsdatum, eine optionale jährliche Entlastung und eine bewusst vom
+Nutzer gesetzte Priorität gespeichert.
+
+Die aus Betrag und Rhythmus abgeleiteten Jahreskosten tragen immer
+`[SCHÄTZUNG]`. Eine erwartete Gesamtentlastung wird nur gebildet, wenn für jede
+geplante oder umgesetzte Maßnahme eine Entlastung ausdrücklich gespeichert
+wurde; offene Werte werden nie als null interpretiert. Die Maßnahmen speichern
+keine Händler-, Konto- oder Buchungsbezeichner und werden durch denselben
+Beleg-Fingerprint gegen stilles Weiterverwenden nach geänderter Buchungslage
+geschützt.
 
 ## Informationshierarchie
 

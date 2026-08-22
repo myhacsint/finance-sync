@@ -67,6 +67,41 @@ test("Entscheidungen zu regelmäßigen Ausgaben werden getrennt und idempotent g
   db.close();
 });
 
+test("Optimierungsmaßnahmen speichern nur abstrakte Entscheidung und Wirkung", () => {
+  const root = mkdtempSync(join(tmpdir(), "finance-sync-recurring-optimization-"));
+  const db = new FinanceDatabase(join(root, "finance.sqlite"));
+  const created = db.setRecurringExpenseOptimization(
+    "recurring-0123456789abcdef01",
+    "evidence-0123456789abcdef0123",
+    "GEPLANT",
+    "2026-12-01",
+    15_000,
+    "HOCH",
+    new Date("2026-08-22T10:00:00.000Z")
+  );
+  assert.equal(created.status, "GEPLANT");
+  assert.equal(created.expectedAnnualSavingsMinor, 15_000);
+  const updated = db.setRecurringExpenseOptimization(
+    created.candidateKey,
+    created.evidenceHash,
+    "GEKUENDIGT",
+    null,
+    15_000,
+    "HOCH",
+    new Date("2026-08-22T11:00:00.000Z")
+  );
+  assert.equal(updated.createdAt, created.createdAt);
+  assert.equal(updated.updatedAt, "2026-08-22T11:00:00.000Z");
+  assert.deepEqual(
+    Object.keys(updated).sort(),
+    [
+      "candidateKey", "createdAt", "effectiveDate", "evidenceHash",
+      "expectedAnnualSavingsMinor", "priority", "status", "updatedAt"
+    ].sort()
+  );
+  db.close();
+});
+
 test("korrigierte Normalisierung aktualisiert denselben Saldo-Snapshot", () => {
   const root = mkdtempSync(join(tmpdir(), "finance-sync-balance-"));
   const db = new FinanceDatabase(join(root, "finance.sqlite"));

@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import type { ActualSpendingRangeSnapshot, SpendingLine } from "./dashboard-spending.js";
 import type {
   RecurringExpenseDecision,
-  RecurringExpenseDecisionRecord
+  RecurringExpenseDecisionRecord,
+  RecurringExpenseOptimizationRecord
 } from "./types.js";
 
 export type RecurringRhythm = "monatlich" | "vierteljaehrlich" | "jaehrlich";
@@ -124,6 +125,31 @@ export interface DashboardRecurringExpenseDetail {
     amountMinor: number;
     category: string;
     kind: "payment" | "refund" | "exception";
+  }>;
+  warnings: string[];
+  basis: string[];
+}
+
+export interface DashboardRecurringExpenseOptimizations {
+  generatedAt: string;
+  state: DashboardRecurringExpenses["state"];
+  source: "Actual";
+  freshness: DashboardRecurringExpenses["freshness"];
+  summary: {
+    candidates: number;
+    actioned: number;
+    plannedOrCancelled: number;
+    expectedAnnualSavingsMinor: number | null;
+  };
+  items: Array<{
+    key: string;
+    label: string;
+    classification: DashboardRecurringCandidate["classification"];
+    rhythm: DashboardRecurringCandidate["rhythm"];
+    estimatedAnnualCostMinor: number;
+    estimate: true;
+    evidenceHash: string;
+    optimization: (RecurringExpenseOptimizationRecord & { stale: boolean }) | null;
   }>;
   warnings: string[];
   basis: string[];
@@ -586,6 +612,74 @@ export function buildDashboardRecurringExpenseDetail(
     payments,
     warnings: overview.warnings,
     basis: overview.basis
+  };
+}
+
+export function buildDashboardRecurringExpenseOptimizations(
+  snapshot: ActualSpendingRangeSnapshot,
+  decisionRows: RecurringExpenseDecisionRecord[],
+  optimizationRows: RecurringExpenseOptimizationRecord[],
+  options: { stale?: boolean } = {}
+): DashboardRecurringExpenseOptimizations {
+  const overview = buildDashboardRecurringExpenses(
+    snapshot,
+    decisionRows,
+    { review: "bestaetigt" },
+    options
+  );
+  const optimizationMap = new Map(
+    optimizationRows.map((row) => [row.candidateKey, row])
+  );
+  const factors: Record<RecurringRhythm, number> = {
+    monatlich: 12,
+    vierteljaehrlich: 4,
+    jaehrlich: 1
+  };
+  const items = overview.candidates
+    .filter((candidate) => candidate.classification.value !== "GRUNDBEDARF")
+    .map((candidate) => {
+      const saved = optimizationMap.get(candidate.key);
+      const optimization = saved ? {
+        ...saved,
+        stale: saved.evidenceHash !== candidate.evidence.evidenceHash
+      } : null;
+      return {
+        key: candidate.key,
+        label: candidate.label,
+        classification: candidate.classification,
+        rhythm: candidate.rhythm,
+        estimatedAnnualCostMinor: candidate.amount.typicalMinor * factors[candidate.rhythm.kind],
+        estimate: true as const,
+        evidenceHash: candidate.evidence.evidenceHash,
+        optimization
+      };
+    })
+    .sort((left, right) => right.estimatedAnnualCostMinor - left.estimatedAnnualCostMinor);
+  const active = items
+    .map((item) => item.optimization)
+    .filter((row): row is RecurringExpenseOptimizationRecord & { stale: false } => Boolean(row && !row.stale));
+  const planned = active.filter((row) => row.status === "GEPLANT" || row.status === "GEKUENDIGT");
+  const savings = planned.map((row) => row.expectedAnnualSavingsMinor);
+  return {
+    generatedAt: overview.generatedAt,
+    state: overview.state,
+    source: overview.source,
+    freshness: overview.freshness,
+    summary: {
+      candidates: items.length,
+      actioned: active.filter((row) => row.status !== "PRUEFEN").length,
+      plannedOrCancelled: planned.length,
+      expectedAnnualSavingsMinor: planned.length > 0 && savings.every((value) => value !== null)
+        ? savings.reduce((sum, value) => sum + (value ?? 0), 0)
+        : null
+    },
+    items,
+    warnings: overview.warnings,
+    basis: [
+      "Nur vom Nutzer bestätigte gestaltbare, vermeidbare oder unklare Ausgaben",
+      "Jahreskosten aus typischem Betrag und erkanntem Rhythmus [SCHÄTZUNG]",
+      "Entlastung wird nur aus ausdrücklich gespeicherten Maßnahmen gebildet"
+    ]
   };
 }
 

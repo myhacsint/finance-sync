@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildDashboardRecurringExpenseDetail,
   buildDashboardRecurringExpenses,
+  buildDashboardRecurringExpenseOptimizations,
   detectRecurringCandidates,
   recurringExpenseRange
 } from "./dashboard-recurring-expenses.js";
@@ -164,4 +165,37 @@ test("Nutzerentscheidung wird nur bei passendem Beleg-Fingerprint angewendet", (
   assert.equal(stale.candidates[0].reviewStatus, "moeglich");
   assert.equal(stale.candidates[0].decision?.stale, true);
   assert.equal(stale.candidates[0].decisionLabEligible, false);
+});
+
+test("Optimierungsliste trennt geschätzte Jahreskosten von bestätigter Entlastung", () => {
+  const dates = [
+    "2025-12-05", "2026-01-05", "2026-02-05", "2026-03-05",
+    "2026-04-05", "2026-05-05", "2026-06-05", "2026-07-05"
+  ];
+  const input = snapshot(dates.map((date, index) => line(`payment-${index}`, date, 3_000)));
+  const candidate = detectRecurringCandidates(input).candidates[0];
+  const decision: RecurringExpenseDecisionRecord = {
+    candidateKey: candidate.key,
+    decision: "VERMEIDBAR",
+    evidenceHash: candidate.evidenceHash,
+    fingerprintVersion: 1,
+    createdAt: "2026-08-22T09:00:00.000Z",
+    updatedAt: "2026-08-22T09:00:00.000Z"
+  };
+  const empty = buildDashboardRecurringExpenseOptimizations(input, [decision], []);
+  assert.equal(empty.items[0].estimatedAnnualCostMinor, 36_000);
+  assert.equal(empty.summary.expectedAnnualSavingsMinor, null);
+  const planned = buildDashboardRecurringExpenseOptimizations(input, [decision], [{
+    candidateKey: candidate.key,
+    evidenceHash: candidate.evidenceHash,
+    status: "GEPLANT",
+    effectiveDate: "2026-12-01",
+    expectedAnnualSavingsMinor: 30_000,
+    priority: "HOCH",
+    createdAt: "2026-08-22T10:00:00.000Z",
+    updatedAt: "2026-08-22T10:00:00.000Z"
+  }]);
+  assert.equal(planned.summary.plannedOrCancelled, 1);
+  assert.equal(planned.summary.expectedAnnualSavingsMinor, 30_000);
+  assert.equal(planned.items[0].estimate, true);
 });

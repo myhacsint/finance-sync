@@ -5,7 +5,11 @@ import { timingSafeEqual } from "node:crypto";
 import { loadConfig, paths, readSecret } from "./config.js";
 import { FinanceDatabase } from "./database.js";
 import { FinanceService, FinanceServiceError } from "./service.js";
-import type { RecurringExpenseDecision } from "./types.js";
+import type {
+  RecurringExpenseDecision,
+  RecurringExpenseOptimizationPriority,
+  RecurringExpenseOptimizationStatus
+} from "./types.js";
 import { exportAll } from "./exporter.js";
 import { manualSnapshotBundle } from "./connectors/manual.js";
 import { importBundle } from "./importer.js";
@@ -160,6 +164,16 @@ const server = createServer(async (req, res) => {
         )
       );
     }
+    if (req.method === "GET"
+      && url.pathname === "/api/dashboard/analyses/recurring-expenses/optimizations") {
+      return json(
+        res,
+        200,
+        await service.getDashboardRecurringExpenseOptimizations(
+          url.searchParams.get("refresh") === "1"
+        )
+      );
+    }
     const recurringDetailMatch = /^\/api\/dashboard\/analyses\/recurring-expenses\/(recurring-[a-f0-9]{18})$/
       .exec(url.pathname);
     if (req.method === "GET" && recurringDetailMatch) {
@@ -189,6 +203,37 @@ const server = createServer(async (req, res) => {
           String(payload.decision ?? "") as RecurringExpenseDecision,
           String(payload.expectedEvidenceHash ?? "")
         )
+      );
+    }
+    const recurringOptimizationMatch = /^\/api\/decisions\/recurring-expenses\/(recurring-[a-f0-9]{18})\/optimization$/
+      .exec(url.pathname);
+    if (req.method === "PUT" && recurringOptimizationMatch) {
+      const payload = await body(req, 4096).catch(() => {
+        throw new FinanceServiceError("Ungültige Maßnahmenanfrage", 400);
+      }) as {
+        status?: RecurringExpenseOptimizationStatus;
+        effectiveDate?: string | null;
+        expectedAnnualSavingsMinor?: number | null;
+        priority?: RecurringExpenseOptimizationPriority | null;
+        expectedEvidenceHash?: string;
+      };
+      return json(
+        res,
+        200,
+        await service.setRecurringExpenseOptimization(recurringOptimizationMatch[1], {
+          status: String(payload.status ?? "") as RecurringExpenseOptimizationStatus,
+          effectiveDate: payload.effectiveDate === null || typeof payload.effectiveDate === "string"
+            ? payload.effectiveDate
+            : null,
+          expectedAnnualSavingsMinor: payload.expectedAnnualSavingsMinor === null
+            || typeof payload.expectedAnnualSavingsMinor === "number"
+            ? payload.expectedAnnualSavingsMinor
+            : null,
+          priority: payload.priority === null || typeof payload.priority === "string"
+            ? payload.priority as RecurringExpenseOptimizationPriority | null
+            : null,
+          expectedEvidenceHash: String(payload.expectedEvidenceHash ?? "")
+        })
       );
     }
     if (req.method === "GET" && url.pathname === "/api/dashboard/status") {

@@ -9,6 +9,9 @@ import type {
   ImportBundle,
   RecurringExpenseDecision,
   RecurringExpenseDecisionRecord,
+  RecurringExpenseOptimizationPriority,
+  RecurringExpenseOptimizationRecord,
+  RecurringExpenseOptimizationStatus,
   SyncState
 } from "./types.js";
 
@@ -132,6 +135,20 @@ export class FinanceDatabase {
         )),
         evidence_hash TEXT NOT NULL,
         fingerprint_version INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS recurring_expense_optimizations (
+        candidate_key TEXT PRIMARY KEY,
+        evidence_hash TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN (
+          'PRUEFEN', 'GEPLANT', 'GEKUENDIGT', 'BEIBEHALTEN'
+        )),
+        effective_date TEXT,
+        expected_annual_savings_minor INTEGER CHECK(
+          expected_annual_savings_minor IS NULL OR expected_annual_savings_minor >= 0
+        ),
+        priority TEXT CHECK(priority IS NULL OR priority IN ('HOCH', 'MITTEL', 'NIEDRIG')),
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -433,6 +450,70 @@ export class FinanceDatabase {
         updated_at=excluded.updated_at
     `).run(candidateKey, decision, evidenceHash, fingerprintVersion, timestamp, timestamp);
     return this.listRecurringExpenseDecisions()
+      .find((row) => row.candidateKey === candidateKey)!;
+  }
+
+  listRecurringExpenseOptimizations(): RecurringExpenseOptimizationRecord[] {
+    const rows = this.db.prepare(`
+      SELECT candidate_key, evidence_hash, status, effective_date,
+        expected_annual_savings_minor, priority, created_at, updated_at
+      FROM recurring_expense_optimizations
+      ORDER BY candidate_key
+    `).all() as Array<{
+      candidate_key: string;
+      evidence_hash: string;
+      status: RecurringExpenseOptimizationStatus;
+      effective_date: string | null;
+      expected_annual_savings_minor: number | null;
+      priority: RecurringExpenseOptimizationPriority | null;
+      created_at: string;
+      updated_at: string;
+    }>;
+    return rows.map((row) => ({
+      candidateKey: row.candidate_key,
+      evidenceHash: row.evidence_hash,
+      status: row.status,
+      effectiveDate: row.effective_date,
+      expectedAnnualSavingsMinor: row.expected_annual_savings_minor,
+      priority: row.priority,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
+  }
+
+  setRecurringExpenseOptimization(
+    candidateKey: string,
+    evidenceHash: string,
+    status: RecurringExpenseOptimizationStatus,
+    effectiveDate: string | null,
+    expectedAnnualSavingsMinor: number | null,
+    priority: RecurringExpenseOptimizationPriority | null,
+    now = new Date()
+  ): RecurringExpenseOptimizationRecord {
+    const timestamp = now.toISOString();
+    this.db.prepare(`
+      INSERT INTO recurring_expense_optimizations(
+        candidate_key, evidence_hash, status, effective_date,
+        expected_annual_savings_minor, priority, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(candidate_key) DO UPDATE SET
+        evidence_hash=excluded.evidence_hash,
+        status=excluded.status,
+        effective_date=excluded.effective_date,
+        expected_annual_savings_minor=excluded.expected_annual_savings_minor,
+        priority=excluded.priority,
+        updated_at=excluded.updated_at
+    `).run(
+      candidateKey,
+      evidenceHash,
+      status,
+      effectiveDate,
+      expectedAnnualSavingsMinor,
+      priority,
+      timestamp,
+      timestamp
+    );
+    return this.listRecurringExpenseOptimizations()
       .find((row) => row.candidateKey === candidateKey)!;
   }
 

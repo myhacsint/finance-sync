@@ -37,6 +37,25 @@ export interface RecurringExpenseDecisionRecord {
   updatedAt: string;
 }
 
+export type RecurringExpenseOptimizationStatus =
+  | "PRUEFEN"
+  | "GEPLANT"
+  | "GEKUENDIGT"
+  | "BEIBEHALTEN";
+
+export type RecurringExpenseOptimizationPriority = "HOCH" | "MITTEL" | "NIEDRIG";
+
+export interface RecurringExpenseOptimizationRecord {
+  candidateKey: string;
+  evidenceHash: string;
+  status: RecurringExpenseOptimizationStatus;
+  effectiveDate: string | null;
+  expectedAnnualSavingsMinor: number | null;
+  priority: RecurringExpenseOptimizationPriority | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ExpenseAnalysisAdjustment {
   id: string;
   label: string;
