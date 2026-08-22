@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { DashboardAssets } from "./dashboard-assets.js";
+import type { DashboardAnalyses } from "./dashboard-analyses.js";
 import type { DashboardSavingsBaseline } from "./dashboard-savings-baseline.js";
 import type { DashboardRecurringExpenseOptimizations } from "./dashboard-recurring-expenses.js";
 import {
@@ -86,6 +87,24 @@ const optimizations = {
   basis: []
 } satisfies DashboardRecurringExpenseOptimizations;
 
+const analyses = {
+  generatedAt: "2026-08-22T12:00:00.000Z",
+  state: "current",
+  source: "Actual + FinanceSync-Konfiguration",
+  selection: { view: "expense-structure", periodYear: 2026, comparisonYear: 2025 },
+  availableYears: [2026, 2025],
+  period: { year: 2026, label: "2026 (Jan–07)", startDate: "2026-01-01", endDate: "2026-07-31", totalMinor: 4_600_000, estimate: false },
+  comparison: { year: 2025, label: "2025", startDate: "2025-01-01", endDate: "2025-12-31", totalMinor: 7_200_000, estimate: false },
+  changePercent: null,
+  unknownMinor: 0,
+  unknownPercent: 0,
+  categories: [],
+  classes: [],
+  positions: [],
+  warnings: [],
+  basis: []
+} satisfies DashboardAnalyses;
+
 test("Entscheidungslabor begrenzt Annahmen und verwendet konservative Standardwerte", () => {
   assert.deepEqual(decisionLabInputs({
     trendBasis: "current-year",
@@ -99,7 +118,9 @@ test("Entscheidungslabor begrenzt Annahmen und verwendet konservative Standardwe
     monthlyChangeMinor: 1_000_000,
     oneTimeMinor: -100_000_000,
     fireTargetAge: 60,
-    fireActionKeys: []
+    fireActionKeys: [],
+    fireCategoryCuts: [],
+    fireOneTimeKeys: []
   });
 });
 
@@ -121,7 +142,7 @@ test("aktuelles Jahr verbindet YTD-Bilanz und typischen Monat als Standard", () 
 });
 
 test("Jahresausblick vergleicht Ist mit Median-Pfad und schreibt nur Restmonate fort", () => {
-  const result = buildDashboardDecisionLab(assets, cashflow, optimizations);
+  const result = buildDashboardDecisionLab(assets, cashflow, optimizations, analyses);
   assert.deepEqual(result.basis.annualOutlook, {
     available: true,
     year: 2026,
@@ -159,7 +180,7 @@ test("Jahresausblick vergleicht Ist mit Median-Pfad und schreibt nur Restmonate 
 });
 
 test("Basis und Szenario bleiben getrennt und alle Werte sind Schätzungen", () => {
-  const result = buildDashboardDecisionLab(assets, cashflow, optimizations, {
+  const result = buildDashboardDecisionLab(assets, cashflow, optimizations, analyses, {
     trendBasis: "ytd-plus-last-year",
     realReturnBps: 0,
     monthlyChangeMinor: 30_000,
@@ -208,7 +229,7 @@ test("Einnahmen und Vermögensbildung werden transparent getrennt", () => {
         }
       : month)
   } satisfies DashboardSavingsBaseline;
-  const result = buildDashboardDecisionLab(assets, enriched, optimizations, { trendBasis: "current-year" });
+  const result = buildDashboardDecisionLab(assets, enriched, optimizations, analyses, { trendBasis: "current-year" });
   assert.ok(result.basis.selectedTrend.incomeBreakdown);
   assert.ok(result.basis.selectedTrend.wealthBuilding);
   assert.equal(result.basis.selectedTrend.incomeBreakdown.investmentReturnsExcludedMinor, 0);
@@ -231,6 +252,7 @@ test("aktueller unvollständiger Monat bleibt sichtbar, aber außerhalb der Proj
     assets,
     withCurrentMonth,
     optimizations,
+    analyses,
     {},
     new Date("2026-08-22T12:02:00.000Z")
   );
@@ -272,7 +294,7 @@ test("offener Kartenstand ergänzt nur den laufenden Monat und bleibt aus der Pr
     },
     months: [...cashflow.months, current]
   } satisfies DashboardSavingsBaseline;
-  const result = buildDashboardDecisionLab(assets, withPendingCard, optimizations);
+  const result = buildDashboardDecisionLab(assets, withPendingCard, optimizations, analyses);
   assert.equal(result.basis.projectedMonthlyCapacityMinor, 150_000);
   assert.equal(result.basis.currentMonthProgress.expensesMinor, 284_781);
   assert.equal(result.basis.currentMonthProgress.netMinor, 15_219);
@@ -288,6 +310,7 @@ test("fehlende Vermögens- oder Sparratenbasis erzeugt keine erfundene Projektio
     { ...assets, state: "partial", totalMinor: null, warnings: ["Depotwert fehlt"] },
     { ...cashflow, state: "partial", months: [] },
     optimizations,
+    analyses,
     {},
     new Date("2026-08-22T12:02:00.000Z")
   );
@@ -303,6 +326,7 @@ test("aufgebrauchtes Finanzvermögen wird bei null begrenzt statt als Schuld for
     { ...assets, totalMinor: 100_000 },
     { ...cashflow, months: [trendMonth("2026-07", 0, 100_000)] },
     optimizations,
+    analyses,
     { realReturnBps: 0 },
     new Date("2026-08-22T12:02:00.000Z")
   );

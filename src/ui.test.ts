@@ -178,6 +178,13 @@ test("Analysenansicht besitzt ein zugängliches Entscheidungslabor", () => {
   assert.match(html, /estimatedAnnualCostMinor/);
   assert.match(html, /Mögliche Entlastung erst nach Prüfung/);
   assert.match(html, /Grundbedarf bleibt ausgeschlossen/);
+  assert.match(html, /Variable Ausgabenkategorien/);
+  assert.match(html, /fireCategoryCuts/);
+  assert.match(html, /fire-category-cut/);
+  assert.match(html, /Historische Einzelposten als Zukunftsszenario/);
+  assert.match(html, /fireOneTimeKeys/);
+  assert.match(html, /fire-one-time/);
+  assert.match(html, /Vergangene Ausgaben werden nicht rückwirkend gespart/);
   assert.match(html, /fireTargetAge/);
   assert.match(html, /fireActionKeys/);
   assert.match(html, /decision-milestones/);

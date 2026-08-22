@@ -1,4 +1,5 @@
 import type { DashboardAssets } from "./dashboard-assets.js";
+import type { DashboardAnalyses } from "./dashboard-analyses.js";
 import type { DashboardSavingsBaseline } from "./dashboard-savings-baseline.js";
 import { buildDashboardFireTracking, type DashboardFireTracking } from "./dashboard-fire.js";
 import type { DashboardRecurringExpenseOptimizations } from "./dashboard-recurring-expenses.js";
@@ -10,6 +11,8 @@ export interface DecisionLabRequest {
   oneTimeMinor?: number;
   fireTargetAge?: number;
   fireActionKeys?: string[];
+  fireCategoryCuts?: string[];
+  fireOneTimeKeys?: string[];
 }
 
 export type DecisionTrendBasis = "current-year" | "ytd-plus-last-year";
@@ -96,6 +99,8 @@ export interface DashboardDecisionLab {
     oneTimeMinor: number;
     fireTargetAge: number;
     fireActionKeys: string[];
+    fireCategoryCuts: string[];
+    fireOneTimeKeys: string[];
   };
   basis: {
     startingAssetsMinor: number | null;
@@ -164,6 +169,12 @@ export function decisionLabInputs(request: DecisionLabRequest = {}): DashboardDe
     fireTargetAge: clampInteger(request.fireTargetAge, 60, 50, 67),
     fireActionKeys: Array.isArray(request.fireActionKeys)
       ? request.fireActionKeys.filter((key) => key === "none" || /^recurring-[a-f0-9]{18}$/.test(key)).slice(0, 50)
+      : [],
+    fireCategoryCuts: Array.isArray(request.fireCategoryCuts)
+      ? request.fireCategoryCuts.filter((value) => /^category-[a-f0-9]{10}:(10|25|50)$/.test(value)).slice(0, 30)
+      : [],
+    fireOneTimeKeys: Array.isArray(request.fireOneTimeKeys)
+      ? request.fireOneTimeKeys.filter((key) => /^position-[a-f0-9]{12}$/.test(key)).slice(0, 20)
       : []
   };
 }
@@ -476,6 +487,7 @@ export function buildDashboardDecisionLab(
   assets: DashboardAssets,
   cashflow: DashboardSavingsBaseline,
   optimizations: DashboardRecurringExpenseOptimizations,
+  analyses: DashboardAnalyses,
   request: DecisionLabRequest = {},
   now = new Date()
 ): DashboardDecisionLab {
@@ -504,7 +516,8 @@ export function buildDashboardDecisionLab(
   const fire = buildDashboardFireTracking(assets, {
     liveProjectedAnnualExpensesMinor: annual.projectedYearEnd.expensesMinor,
     normalizedAnnualExpensesMinor: annual.medianFullYear.expensesMinor
-  }, optimizations, inputs.fireTargetAge, inputs.fireActionKeys);
+  }, optimizations, analyses, inputs.fireTargetAge, inputs.fireActionKeys,
+  inputs.fireCategoryCuts, inputs.fireOneTimeKeys);
   const warnings = [...assets.warnings];
   if (startingAssetsMinor === null) {
     warnings.push("Das aktuelle Finanzvermögen ist unvollständig; die Projektion ist nicht verfügbar.");

@@ -914,6 +914,16 @@ export function renderUi(): string {
     .fire-action-main small, .fire-action-saving small { color: var(--muted); line-height: 1.35; }
     .fire-action-saving { text-align: right; }
     .fire-action-saving strong { font-variant-numeric: tabular-nums; }
+    .fire-lever-group { margin-top: 22px; }
+    .fire-lever-group:first-of-type { margin-top: 12px; }
+    .fire-lever-group-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; }
+    .fire-lever-group-head h4 { margin: 0; font-size: 14px; }
+    .fire-lever-group-head p { margin-top: 3px; color: var(--muted); font-size: 12px; }
+    .fire-variable-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(135px, auto) minmax(170px, auto); gap: 12px; align-items: center; min-height: 74px; padding: 10px 4px; border-bottom: 1px solid var(--line-soft); }
+    .fire-variable-main, .fire-variable-effect { display: grid; gap: 3px; }
+    .fire-variable-main small, .fire-variable-effect small { color: var(--muted); line-height: 1.35; }
+    .fire-variable-row select { min-height: 44px; }
+    .fire-variable-effect { text-align: right; }
     .fire-action-umgesetzt { box-shadow: inset 3px 0 #5cc99a; }
     .fire-action-klar { box-shadow: inset 3px 0 #6ea8ff; }
     .fire-action-pruefen { box-shadow: inset 3px 0 #d8a24d; }
@@ -1208,6 +1218,9 @@ export function renderUi(): string {
       .fire-levers-head { display: grid; }
       .fire-action { grid-template-columns: 22px minmax(0, 1fr); align-items: start; padding: 13px 4px; }
       .fire-action-saving { grid-column: 2; text-align: left; }
+      .fire-lever-group-head { display: grid; }
+      .fire-variable-row { grid-template-columns: 1fr; padding: 13px 4px; }
+      .fire-variable-effect { text-align: left; }
       .recurring-detail-grid { grid-template-columns: 1fr; }
       .recurring-payment { grid-template-columns: 1fr auto; }
       .recurring-payment span:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
@@ -1511,7 +1524,9 @@ function analysisSelection(){
     decisionMonthly:boundedParam("decisionMonthly",0,-10000,10000),
     decisionOneTime:boundedParam("decisionOneTime",0,-1000000,1000000),
     fireTargetAge:boundedParam("fireTargetAge",60,50,67),
-    fireActionKeys:(params.get("fireActionKeys")||"").split(",").filter(key=>/^recurring-[a-f0-9]{18}$/.test(key))
+    fireActionKeys:(params.get("fireActionKeys")||"").split(",").filter(key=>/^recurring-[a-f0-9]{18}$/.test(key)),
+    fireCategoryCuts:(params.get("fireCategoryCuts")||"").split(",").filter(value=>/^category-[a-f0-9]{10}:(10|25|50)$/.test(value)),
+    fireOneTimeKeys:(params.get("fireOneTimeKeys")||"").split(",").filter(key=>/^position-[a-f0-9]{12}$/.test(key))
   };
 }
 function setAnalysisView(value){
@@ -1569,6 +1584,10 @@ function applyFireScenario(event){
   if(target===60)params.delete("fireTargetAge");else params.set("fireTargetAge",String(target));
   const keys=[...document.querySelectorAll('input[name="fire-action"]:checked')].map(input=>input.value).filter(key=>/^recurring-[a-f0-9]{18}$/.test(key));
   if(keys.length)params.set("fireActionKeys",keys.join(","));else params.set("fireActionKeys","none");
+  const cuts=[...document.querySelectorAll('select[name="fire-category-cut"]')].map(input=>String(input.dataset.key||"")+":"+String(input.value||"0")).filter(value=>/^category-[a-f0-9]{10}:(10|25|50)$/.test(value));
+  if(cuts.length)params.set("fireCategoryCuts",cuts.join(","));else params.delete("fireCategoryCuts");
+  const oneTime=[...document.querySelectorAll('input[name="fire-one-time"]:checked')].map(input=>input.value).filter(key=>/^position-[a-f0-9]{12}$/.test(key));
+  if(oneTime.length)params.set("fireOneTimeKeys",oneTime.join(","));else params.delete("fireOneTimeKeys");
   const query=params.toString();history.pushState(null,"",(query?"?"+query:location.pathname)+location.hash);refresh();
 }
 function toggleRecurringCandidate(key){
@@ -2099,9 +2118,24 @@ function renderFireTracking(fire){
     return '<label class="fire-action fire-action-'+esc(action.leverQuality)+'"><input type="checkbox" name="fire-action" value="'+esc(action.key)+'" '+(checked?'checked ':'')+(disabled?'disabled ':'')+'><span class="fire-action-main"><strong>'+esc(action.label)+'</strong><small>'+esc(action.leverLabel)+' · '+esc(action.classificationLabel)+' · '+esc(action.statusLabel)+'</small></span><span class="fire-action-saving"><strong>'+saving+'</strong><small>'+esc(impact)+' '+analysisEstimate(true)+'</small></span></label>';
   }).join('');
   const noActions='<div class="fire-empty">Noch keine bestätigten Optimierungsmaßnahmen verfügbar.</div>';
+  const variableRows=fire.variableCategories.map(category=>{
+    const options=[0,10,25,50].map(value=>'<option value="'+value+'" '+(value===category.selectedReductionPercent?'selected ':'')+'>'+(value===0?'Keine Reduktion':value+' % reduzieren')+'</option>').join('');
+    const saving=category.annualSavingsMinor>0?money(category.annualSavingsMinor)+' Entlastung / Jahr':'Noch nicht ausgewählt';
+    const impact=category.yearsGained&&category.yearsGained>0?category.yearsGained+' '+(category.yearsGained===1?'Jahr':'Jahre')+' früher':'Wirkung nach Auswahl';
+    const excluded=category.recurringSavingsExcludedMinor>0?' · bereits laufend angesetzt '+money(category.recurringSavingsExcludedMinor):'';
+    return '<div class="fire-variable-row"><span class="fire-variable-main"><strong>'+esc(category.label)+'</strong><small>Laufendes Jahr '+money(category.currentPeriodMinor)+' · Vorjahr '+money(category.previousYearMinor)+'</small><small>Geglättete Jahresbasis '+money(category.planningAnnualMinor)+excluded+' '+analysisEstimate(true)+'</small></span><select name="fire-category-cut" data-key="'+esc(category.key)+'" aria-label="Reduktion für '+esc(category.label)+'">'+options+'</select><span class="fire-variable-effect"><strong>'+saving+'</strong><small>'+esc(impact)+' '+analysisEstimate(true)+'</small></span></div>';
+  }).join('');
+  const oneTimeRows=fire.oneTimeCandidates.map(item=>{
+    const impact=item.yearsGained&&item.yearsGained>0?item.yearsGained+' '+(item.yearsGained===1?'Jahr':'Jahre')+' früher':'Einmalige Kapitalwirkung';
+    const counted=item.selected?money(item.countedOneTimeMinor)+' angesetzt':money(item.observedMinor)+' beobachtet';
+    return '<label class="fire-action"><input type="checkbox" name="fire-one-time" value="'+esc(item.key)+'" '+(item.selected?'checked ':'')+'><span class="fire-action-main"><strong>'+esc(item.label)+'</strong><small>'+esc(item.category)+' · '+analysisMonthLabel(item.month)+' · historischer Einzelposten</small></span><span class="fire-action-saving"><strong>'+counted+'</strong><small>'+esc(impact)+' '+analysisEstimate(true)+'</small></span></label>';
+  }).join('');
+  const recurringGroup='<section class="fire-lever-group"><div class="fire-lever-group-head"><div><h4>Laufende Verträge und Abos</h4><p>Nur bereits gespeicherte Entlastungen wirken auf das Szenario.</p></div><strong>'+moneyWhole(fire.selectedRecurringAnnualSavingsMinor)+' / Jahr</strong></div><div class="fire-action-list">'+(actionRows||noActions)+'</div></section>';
+  const variableGroup='<section class="fire-lever-group"><div class="fire-lever-group-head"><div><h4>Variable Ausgabenkategorien</h4><p>Teilreduktion auf einer geglätteten Jahresbasis; keine Kategorie wird automatisch gekürzt.</p></div><strong>'+moneyWhole(fire.selectedVariableAnnualSavingsMinor)+' / Jahr</strong></div><div class="fire-action-list">'+(variableRows||'<div class="fire-empty">Keine dispositiven Kategorien im aktuellen Zeitraum verfügbar.</div>')+'</div></section>';
+  const oneTimeGroup='<section class="fire-lever-group"><div class="fire-lever-group-head"><div><h4>Historische Einzelposten als Zukunftsszenario</h4><p>Auswahl bedeutet: Einen vergleichbaren künftigen Posten einmal vermeiden. Vergangene Ausgaben werden nicht rückwirkend gespart.</p></div><strong>'+moneyWhole(fire.selectedOneTimeSavingsMinor)+' einmalig</strong></div><div class="fire-action-list">'+(oneTimeRows||'<div class="fire-empty">Keine geeigneten Einzelposten verfügbar.</div>')+'</div></section>';
   const basis=fire.basis.map(item=>'<li>'+esc(item)+'</li>').join('');
   const warnings=fire.warnings.map(warning=>'<div class="analysis-warning" role="status">'+icons.warning+'<span>'+esc(warning)+'</span></div>').join('');
-  return '<section class="analysis-panel fire-cockpit" aria-labelledby="fire-title"><div class="analysis-panel-head"><div><h2 id="fire-title">FIRE-Kurs und konkrete Stellschrauben</h2><p>Welche Ausgabenänderung das früheste tragfähige Ausstiegsalter tatsächlich verändert.</p></div><span class="fire-model">'+esc(fire.modelVersion)+' · '+analysisEstimate(true)+'</span></div><div class="fire-course"><div><span>Aktueller Kurs</span><strong class="'+(current!==null&&current<=fire.targetAge?'tone-ok':'tone-warning')+'">'+esc(fireExit(current))+'</strong><small>Bei 3 % Realrendite, ohne Erbschaft</small></div><div><span>Zielalter</span><strong>'+fire.targetAge+'</strong><small>Aktuell gewähltes Arbeitsziel</small></div><div><span>Lücke zum Ziel</span><strong class="'+(gap===0?'tone-ok':'tone-warning')+'">'+(gap===null?'–':moneyWhole(gap)+' / Jahr')+'</strong><small>'+(fire.central.monthlyGapToTargetMinor===null?'Nicht verfügbar':moneyWhole(fire.central.monthlyGapToTargetMinor)+' pro Monat')+' '+analysisEstimate(true)+'</small></div><div><span>Mit ausgewählten Hebeln</span><strong class="'+(scenario!==null&&scenario<=fire.targetAge?'tone-ok':'tone-warning')+'">'+esc(fireExit(scenario))+'</strong><small>'+moneyWhole(fire.selectedAnnualSavingsMinor)+' Entlastung · '+(years===null?'Wirkung offen':years+' Jahre gewonnen')+'</small></div></div><div class="fire-capital"><div><span>Überbrückungskapital heute</span><strong>'+(fire.bridgeCapitalMinor===null?'–':moneyWhole(fire.bridgeCapitalMinor))+'</strong><small>Liquidität, Depots, Krypto und Gold</small></div><div><span>Gebundene Vorsorge</span><strong>'+(fire.lockedPensionMinor===null?'–':moneyWhole(fire.lockedPensionMinor))+'</strong><small>Separat zu den vorgesehenen Leistungszeitpunkten</small></div><div><span>Aktuelle Ausgaben-Hochrechnung</span><strong>'+(fire.liveProjectedAnnualExpensesMinor===null?'–':moneyWhole(fire.liveProjectedAnnualExpensesMinor))+'</strong><small>Normalisiert '+(fire.normalizedAnnualExpensesMinor===null?'–':moneyWhole(fire.normalizedAnnualExpensesMinor))+' '+analysisEstimate(true)+'</small></div><div><span>Tragbar beim Zielalter</span><strong>'+(fire.central.maximumExpensesAtTargetMinor===null?'–':moneyWhole(fire.central.maximumExpensesAtTargetMinor))+'</strong><small>Bei 3 % real '+analysisEstimate(true)+'</small></div></div><div class="fire-workspace"><form class="fire-controls" onsubmit="applyFireScenario(event)"><label for="fire-target-age">Gewünschtes Zielalter<select id="fire-target-age" autocomplete="off">'+targetOptions+'</select></label><div class="fire-band"><table><thead><tr><th scope="col">Renditeband</th><th scope="col">Aktuell</th><th scope="col">Mit Hebeln</th></tr></thead><tbody>'+bandRows+'</tbody></table></div><button class="button" type="submit">FIRE-Szenario aktualisieren</button></form><div class="fire-levers"><div class="fire-levers-head"><div><h3>Reale Ausgabenhebel</h3><p>Nur gespeicherte Entlastungen können ausgewählt werden. Grundbedarf bleibt ausgeschlossen.</p></div><strong>'+moneyWhole(fire.selectedAnnualSavingsMinor)+' / Jahr</strong></div><div class="fire-action-list">'+(actionRows||noActions)+'</div></div></div><details class="fire-basis"><summary>Modellannahmen und Grenzen</summary><ul>'+basis+'</ul></details>'+warnings+'</section>';
+  return '<section class="analysis-panel fire-cockpit" aria-labelledby="fire-title"><div class="analysis-panel-head"><div><h2 id="fire-title">FIRE-Kurs und konkrete Stellschrauben</h2><p>Welche Ausgabenänderung das früheste tragfähige Ausstiegsalter tatsächlich verändert.</p></div><span class="fire-model">'+esc(fire.modelVersion)+' · '+analysisEstimate(true)+'</span></div><div class="fire-course"><div><span>Aktueller Kurs</span><strong class="'+(current!==null&&current<=fire.targetAge?'tone-ok':'tone-warning')+'">'+esc(fireExit(current))+'</strong><small>Bei 3 % Realrendite, ohne Erbschaft</small></div><div><span>Zielalter</span><strong>'+fire.targetAge+'</strong><small>Aktuell gewähltes Arbeitsziel</small></div><div><span>Lücke zum Ziel</span><strong class="'+(gap===0?'tone-ok':'tone-warning')+'">'+(gap===null?'–':moneyWhole(gap)+' / Jahr')+'</strong><small>'+(fire.central.monthlyGapToTargetMinor===null?'Nicht verfügbar':moneyWhole(fire.central.monthlyGapToTargetMinor)+' pro Monat')+' '+analysisEstimate(true)+'</small></div><div><span>Mit ausgewählten Hebeln</span><strong class="'+(scenario!==null&&scenario<=fire.targetAge?'tone-ok':'tone-warning')+'">'+esc(fireExit(scenario))+'</strong><small>'+moneyWhole(fire.selectedAnnualSavingsMinor)+' jährlich · '+moneyWhole(fire.selectedOneTimeSavingsMinor)+' einmalig · '+(years===null?'Wirkung offen':years+' Jahre gewonnen')+'</small></div></div><div class="fire-capital"><div><span>Überbrückungskapital heute</span><strong>'+(fire.bridgeCapitalMinor===null?'–':moneyWhole(fire.bridgeCapitalMinor))+'</strong><small>Liquidität, Depots, Krypto und Gold</small></div><div><span>Gebundene Vorsorge</span><strong>'+(fire.lockedPensionMinor===null?'–':moneyWhole(fire.lockedPensionMinor))+'</strong><small>Separat zu den vorgesehenen Leistungszeitpunkten</small></div><div><span>Aktuelle Ausgaben-Hochrechnung</span><strong>'+(fire.liveProjectedAnnualExpensesMinor===null?'–':moneyWhole(fire.liveProjectedAnnualExpensesMinor))+'</strong><small>Normalisiert '+(fire.normalizedAnnualExpensesMinor===null?'–':moneyWhole(fire.normalizedAnnualExpensesMinor))+' '+analysisEstimate(true)+'</small></div><div><span>Tragbar beim Zielalter</span><strong>'+(fire.central.maximumExpensesAtTargetMinor===null?'–':moneyWhole(fire.central.maximumExpensesAtTargetMinor))+'</strong><small>Bei 3 % real '+analysisEstimate(true)+'</small></div></div><div class="fire-workspace"><form class="fire-controls" onsubmit="applyFireScenario(event)"><label for="fire-target-age">Gewünschtes Zielalter<select id="fire-target-age" autocomplete="off">'+targetOptions+'</select></label><div class="fire-band"><table><thead><tr><th scope="col">Renditeband</th><th scope="col">Aktuell</th><th scope="col">Mit Hebeln</th></tr></thead><tbody>'+bandRows+'</tbody></table></div><button class="button" type="submit">FIRE-Szenario aktualisieren</button></form><div class="fire-levers"><div class="fire-levers-head"><div><h3>Reale Ausgabenhebel</h3><p>Grundbedarf bleibt ausgeschlossen. Variable Kategorien und Einzelposten werden erst nach deiner Auswahl angesetzt.</p></div><strong>'+moneyWhole(fire.selectedAnnualSavingsMinor)+' / Jahr</strong></div>'+recurringGroup+variableGroup+oneTimeGroup+'</div></div><details class="fire-basis"><summary>Modellannahmen und Grenzen</summary><ul>'+basis+'</ul></details>'+warnings+'</section>';
 }
 function renderDecisionLab(data){
   currentDecisionLabData=data;
@@ -2256,6 +2290,8 @@ async function refresh(force=false){
         params.set("fireTargetAge",String(selection.fireTargetAge));
         if(selection.fireActionKeys.length)params.set("fireActionKeys",selection.fireActionKeys.join(","));
         else if(new URLSearchParams(location.search).has("fireActionKeys"))params.set("fireActionKeys","none");
+        if(selection.fireCategoryCuts.length)params.set("fireCategoryCuts",selection.fireCategoryCuts.join(","));
+        if(selection.fireOneTimeKeys.length)params.set("fireOneTimeKeys",selection.fireOneTimeKeys.join(","));
         if(force)params.set("refresh","1");
         const data=await call("/api/dashboard/analyses/decision-lab?"+params.toString());renderDecisionLab(data);
       }else if(selection.view==="crypto-origin-tax"){

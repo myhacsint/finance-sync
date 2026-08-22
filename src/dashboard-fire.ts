@@ -1,4 +1,5 @@
 import type { DashboardAssets } from "./dashboard-assets.js";
+import type { DashboardAnalyses } from "./dashboard-analyses.js";
 import type { DashboardRecurringExpenseOptimizations } from "./dashboard-recurring-expenses.js";
 
 const MODEL_YEAR = 2026;
@@ -65,8 +66,12 @@ export interface DashboardFireTracking {
   economicMeansAnnualMinor: number;
   bridgeCapitalMinor: number | null;
   lockedPensionMinor: number | null;
+  selectedRecurringAnnualSavingsMinor: number;
+  selectedVariableAnnualSavingsMinor: number;
   selectedAnnualSavingsMinor: number;
+  selectedOneTimeSavingsMinor: number;
   scenarioAnnualExpensesMinor: number | null;
+  scenarioBridgeCapitalMinor: number | null;
   central: {
     realReturnBps: 300;
     currentExitAge: number | null;
@@ -83,8 +88,43 @@ export interface DashboardFireTracking {
   }>;
   actions: FireActionImpact[];
   selectedActionKeys: string[];
+  variableCategories: FireVariableCategoryImpact[];
+  selectedCategoryCuts: string[];
+  oneTimeCandidates: FireOneTimeImpact[];
+  selectedOneTimeKeys: string[];
   basis: string[];
   warnings: string[];
+}
+
+export interface FireVariableCategoryImpact {
+  key: string;
+  label: string;
+  currentPeriodMinor: number;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  previousYearMinor: number;
+  annualizedCurrentMinor: number;
+  grossPlanningAnnualMinor: number;
+  planningAnnualMinor: number;
+  recurringSavingsExcludedMinor: number;
+  selectedReductionPercent: 0 | 10 | 25 | 50;
+  annualSavingsMinor: number;
+  exitAgeIfApplied: number | null;
+  yearsGained: number | null;
+  estimate: true;
+}
+
+export interface FireOneTimeImpact {
+  key: string;
+  label: string;
+  category: string;
+  month: string;
+  observedMinor: number;
+  selected: boolean;
+  countedOneTimeMinor: number;
+  exitAgeIfApplied: number | null;
+  yearsGained: number | null;
+  estimate: true;
 }
 
 function freeCapitalMinor(assets: DashboardAssets): number | null {
@@ -241,6 +281,117 @@ function actionImpacts(
   });
 }
 
+function normalizedLabel(value: string): string {
+  return value.toLocaleLowerCase("de-DE").replace(/[^a-z0-9äöüß]+/g, " ").trim();
+}
+
+function monthsInclusive(start: string, end: string): number {
+  const [startYear, startMonth] = start.slice(0, 7).split("-").map(Number);
+  const [endYear, endMonth] = end.slice(0, 7).split("-").map(Number);
+  return Math.max(1, (endYear - startYear) * 12 + endMonth - startMonth + 1);
+}
+
+function variableCategoryImpacts(
+  analyses: DashboardAnalyses,
+  requestedCuts: string[],
+  recurringSavingsByCategory: Map<string, number>,
+  annualExpensesMinor: number | null,
+  bridgeCapital: number | null,
+  baselineExitAge: number | null
+): FireVariableCategoryImpact[] {
+  const cuts = new Map<string, 10 | 25 | 50>();
+  for (const value of requestedCuts) {
+    const match = /^(category-[a-f0-9]{10}):(10|25|50)$/.exec(value);
+    if (match) cuts.set(match[1], Number(match[2]) as 10 | 25 | 50);
+  }
+  const discretionary = new Set(
+    analyses.positions.filter((position) => position.class === "DISPOSITIV")
+      .map((position) => position.category)
+  );
+  const periodMonths = monthsInclusive(analyses.period.startDate, analyses.period.endDate);
+  return analyses.categories
+    .filter((category) => discretionary.has(category.label) && category.periodMinor > 0)
+    .map((category) => {
+      const annualizedCurrentMinor = Math.round(category.periodMinor / periodMonths * 12);
+      const grossPlanningAnnualMinor = category.comparisonMinor > 0
+        ? Math.round((annualizedCurrentMinor + category.comparisonMinor) / 2)
+        : annualizedCurrentMinor;
+      const recurringSavingsExcludedMinor = Math.min(
+        grossPlanningAnnualMinor,
+        recurringSavingsByCategory.get(category.label) ?? 0
+      );
+      const planningAnnualMinor = grossPlanningAnnualMinor - recurringSavingsExcludedMinor;
+      const selectedReductionPercent: 0 | 10 | 25 | 50 = cuts.get(category.key) ?? 0;
+      const annualSavingsMinor = Math.round(planningAnnualMinor * selectedReductionPercent / 100);
+      const exitAgeIfApplied = annualExpensesMinor === null ? null
+        : earliestExitAge(Math.max(0, annualExpensesMinor - annualSavingsMinor), bridgeCapital, 300);
+      return {
+        key: category.key,
+        label: category.label,
+        currentPeriodMinor: category.periodMinor,
+        currentPeriodStart: analyses.period.startDate,
+        currentPeriodEnd: analyses.period.endDate,
+        previousYearMinor: category.comparisonMinor,
+        annualizedCurrentMinor,
+        grossPlanningAnnualMinor,
+        planningAnnualMinor,
+        recurringSavingsExcludedMinor,
+        selectedReductionPercent,
+        annualSavingsMinor,
+        exitAgeIfApplied,
+        yearsGained: baselineExitAge !== null && exitAgeIfApplied !== null
+          ? Math.max(0, baselineExitAge - exitAgeIfApplied) : null,
+        estimate: true as const
+      };
+    })
+    .sort((left, right) => right.planningAnnualMinor - left.planningAnnualMinor
+      || left.label.localeCompare(right.label, "de"));
+}
+
+function oneTimeImpacts(
+  analyses: DashboardAnalyses,
+  optimizations: DashboardRecurringExpenseOptimizations,
+  selectedKeys: string[],
+  selectedCuts: Map<string, number>,
+  annualExpensesMinor: number | null,
+  bridgeCapital: number | null,
+  baselineExitAge: number | null
+): FireOneTimeImpact[] {
+  const recurringLabels = new Set(optimizations.items.map((item) => normalizedLabel(item.label)));
+  const categoryKeys = new Map(analyses.categories.map((category) => [category.label, category.key]));
+  const allowedKeys = new Set(selectedKeys.filter((key) => /^position-[a-f0-9]{12}$/.test(key)));
+  return analyses.positions
+    .filter((position) => position.class === "DISPOSITIV"
+      && position.amountMinor > 0
+      && position.months.length === 1
+      && !recurringLabels.has(normalizedLabel(position.label)))
+    .sort((left, right) => right.amountMinor - left.amountMinor)
+    .slice(0, 10)
+    .map((position) => {
+      const selected = allowedKeys.has(position.key);
+      const categoryCut = selectedCuts.get(categoryKeys.get(position.category) ?? "") ?? 0;
+      const potentialOneTimeMinor = Math.round(position.amountMinor * (100 - categoryCut) / 100);
+      const countedOneTimeMinor = selected
+        ? potentialOneTimeMinor
+        : 0;
+      const exitAgeIfApplied = annualExpensesMinor === null || bridgeCapital === null ? null
+        : earliestExitAge(annualExpensesMinor, bridgeCapital + potentialOneTimeMinor, 300);
+      return {
+        key: position.key,
+        label: position.label,
+        category: position.category,
+        month: position.months[0].month,
+        observedMinor: position.amountMinor,
+        selected,
+        countedOneTimeMinor,
+        exitAgeIfApplied,
+        yearsGained: baselineExitAge !== null && exitAgeIfApplied !== null
+          ? Math.max(0, baselineExitAge - exitAgeIfApplied) : null,
+        estimate: true as const
+      };
+    });
+}
+
 export function buildDashboardFireTracking(
   assets: DashboardAssets,
   annual: {
@@ -248,8 +399,11 @@ export function buildDashboardFireTracking(
     normalizedAnnualExpensesMinor: number | null;
   },
   optimizations: DashboardRecurringExpenseOptimizations,
+  analyses: DashboardAnalyses,
   targetAge = 60,
-  requestedActionKeys: string[] = []
+  requestedActionKeys: string[] = [],
+  requestedCategoryCuts: string[] = [],
+  requestedOneTimeKeys: string[] = []
 ): DashboardFireTracking {
   const safeTargetAge = Math.max(50, Math.min(67, Math.round(targetAge)));
   const bridgeCapital = freeCapitalMinor(assets);
@@ -262,11 +416,56 @@ export function buildDashboardFireTracking(
   const defaultKeys = actions.filter((action) => action.countedByDefault).map((action) => action.key);
   const selectedActionKeys = (requestedActionKeys.length ? requestedActionKeys : defaultKeys)
     .filter((key, index, keys) => allowedKeys.has(key) && keys.indexOf(key) === index);
-  const selectedAnnualSavingsMinor = actions
+  const selectedRecurringAnnualSavingsMinor = actions
     .filter((action) => selectedActionKeys.includes(action.key))
     .reduce((sum, action) => sum + (action.expectedAnnualSavingsMinor ?? 0), 0);
+  const selectedRecurringLabels = new Map(actions
+    .filter((action) => selectedActionKeys.includes(action.key))
+    .map((action) => [normalizedLabel(action.label), action.expectedAnnualSavingsMinor ?? 0]));
+  const recurringSavingsByCategory = new Map<string, number>();
+  for (const position of analyses.positions) {
+    const saving = selectedRecurringLabels.get(normalizedLabel(position.label));
+    if (!saving) continue;
+    recurringSavingsByCategory.set(
+      position.category,
+      (recurringSavingsByCategory.get(position.category) ?? 0) + saving
+    );
+  }
+  const variableCategories = variableCategoryImpacts(
+    analyses,
+    requestedCategoryCuts,
+    recurringSavingsByCategory,
+    trackedAnnualExpensesMinor,
+    bridgeCapital,
+    baselineExitAge
+  );
+  const selectedCategoryCuts = variableCategories
+    .filter((category) => category.selectedReductionPercent > 0)
+    .map((category) => `${category.key}:${category.selectedReductionPercent}`);
+  const selectedCuts = new Map(variableCategories.map((category) => [
+    category.key,
+    category.selectedReductionPercent
+  ]));
+  const selectedVariableAnnualSavingsMinor = variableCategories
+    .reduce((sum, category) => sum + category.annualSavingsMinor, 0);
+  const oneTimeCandidates = oneTimeImpacts(
+    analyses,
+    optimizations,
+    requestedOneTimeKeys,
+    selectedCuts,
+    trackedAnnualExpensesMinor,
+    bridgeCapital,
+    baselineExitAge
+  );
+  const selectedOneTimeKeys = oneTimeCandidates.filter((item) => item.selected).map((item) => item.key);
+  const selectedOneTimeSavingsMinor = oneTimeCandidates
+    .reduce((sum, item) => sum + item.countedOneTimeMinor, 0);
+  const selectedAnnualSavingsMinor = selectedRecurringAnnualSavingsMinor
+    + selectedVariableAnnualSavingsMinor;
   const scenarioAnnualExpensesMinor = trackedAnnualExpensesMinor === null ? null
     : Math.max(0, trackedAnnualExpensesMinor - selectedAnnualSavingsMinor);
+  const scenarioBridgeCapitalMinor = bridgeCapital === null ? null
+    : bridgeCapital + selectedOneTimeSavingsMinor;
   const maximumAtTarget = maximumExpensesAtTarget(safeTargetAge, bridgeCapital, 300);
   const gap = trackedAnnualExpensesMinor === null || maximumAtTarget === null ? null
     : Math.max(0, trackedAnnualExpensesMinor - maximumAtTarget);
@@ -275,7 +474,7 @@ export function buildDashboardFireTracking(
     currentExitAge: trackedAnnualExpensesMinor === null ? null
       : earliestExitAge(trackedAnnualExpensesMinor, bridgeCapital, realReturnBps),
     scenarioExitAge: scenarioAnnualExpensesMinor === null ? null
-      : earliestExitAge(scenarioAnnualExpensesMinor, bridgeCapital, realReturnBps)
+      : earliestExitAge(scenarioAnnualExpensesMinor, scenarioBridgeCapitalMinor, realReturnBps)
   }));
   const centralCurrent = returnBand.find((row) => row.realReturnBps === 300)!.currentExitAge;
   const centralScenario = returnBand.find((row) => row.realReturnBps === 300)!.scenarioExitAge;
@@ -296,8 +495,12 @@ export function buildDashboardFireTracking(
     economicMeansAnnualMinor: HOUSEHOLD_ECONOMIC_MEANS_MINOR,
     bridgeCapitalMinor: bridgeCapital,
     lockedPensionMinor: pensionCapitalMinor(assets),
+    selectedRecurringAnnualSavingsMinor,
+    selectedVariableAnnualSavingsMinor,
     selectedAnnualSavingsMinor,
+    selectedOneTimeSavingsMinor,
     scenarioAnnualExpensesMinor,
+    scenarioBridgeCapitalMinor,
     central: {
       realReturnBps: 300,
       currentExitAge: centralCurrent,
@@ -311,12 +514,18 @@ export function buildDashboardFireTracking(
     returnBand,
     actions,
     selectedActionKeys,
+    variableCategories,
+    selectedCategoryCuts,
+    oneTimeCandidates,
+    selectedOneTimeKeys,
     basis: [
       "FIRE-Phasenmodell v3.1; Basisjahr 2026, Modellende 2071",
       "3 % Realrendite als Mitte; 2 % und 4 % als Sensitivität [SCHÄTZUNG]",
       "Haushaltsmittel 157.000 € real pro Jahr aus der geprüften Modellannahme [SCHÄTZUNG]",
       "Kinderkosten sinken ab 2030 und 2048 und werden vollständig der Sparrate zugeführt [SCHÄTZUNG]",
-      "Erbschaft und unbelegte Riester-Kapitalhöhe werden nicht angesetzt"
+      "Erbschaft und unbelegte Riester-Kapitalhöhe werden nicht angesetzt",
+      "Variable Kategorien verwenden den Mittelwert aus laufender Jahreshochrechnung und Vorjahr [SCHÄTZUNG]",
+      "Einzelposten wirken nur einmal auf das Überbrückungskapital; vergangene Ausgaben werden nicht rückwirkend als Ersparnis gezählt [SCHÄTZUNG]"
     ],
     warnings
   };

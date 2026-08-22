@@ -69,6 +69,23 @@ geschützt.
 5. Größte Positionen als Tabelle beziehungsweise mobile Liste mit Drill-down.
 6. Datenqualitätswarnungen direkt an der betroffenen Analyse.
 
+## FIRE-Hebel
+
+Das Entscheidungslabor trennt drei Wirkungsarten. Bestätigte laufende
+Verträge und Abos wirken als jährliche Entlastung. Dispositive variable
+Kategorien können ausschließlich nach Nutzerauswahl um 10, 25 oder 50 Prozent
+reduziert werden; ihre Planungsbasis ist der Mittelwert aus der annualisierten
+laufenden Jahressicht und dem Vorjahr und trägt `[SCHÄTZUNG]`. Bereits separat
+angesetzte laufende Entlastungen werden vor der Kategorienreduktion abgezogen.
+
+Historische Einzelposten sind nur rückblickende Entscheidungshilfen. Ihre
+Auswahl bedeutet ausdrücklich, einen vergleichbaren künftigen Posten einmalig
+zu vermeiden; vergangene Ausgaben werden nicht rückwirkend als Ersparnis
+ausgewiesen und die Wirkung wird nicht jährlich fortgeschrieben. Grundbedarf,
+strukturelle Ausgaben, unbekannte Zuordnungen, interne Überträge und
+Vermögensbildung bleiben aus diesen beiden zusätzlichen Hebellisten
+ausgeschlossen.
+
 ## Datenbedeutung
 
 - Interne Überträge sind keine Ausgaben.

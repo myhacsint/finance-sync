@@ -173,6 +173,12 @@ const server = createServer(async (req, res) => {
           fireTargetAge: numberParam("fireTargetAge"),
           fireActionKeys: (url.searchParams.get("fireActionKeys") ?? "")
             .split(",")
+            .filter(Boolean),
+          fireCategoryCuts: (url.searchParams.get("fireCategoryCuts") ?? "")
+            .split(",")
+            .filter(Boolean),
+          fireOneTimeKeys: (url.searchParams.get("fireOneTimeKeys") ?? "")
+            .split(",")
             .filter(Boolean)
         })
       );

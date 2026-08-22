@@ -386,10 +386,18 @@ export class FinanceService {
         this.savingsHistoryLoading = undefined;
       }
     };
-    const [assets, cashflow, recurring] = await Promise.all([
+    const currentYear = Number(new Intl.DateTimeFormat("en-CA", {
+      timeZone: this.config.timezone,
+      year: "numeric"
+    }).format(new Date()));
+    const [assets, cashflow, recurring, analyses] = await Promise.all([
       this.getDashboardAssets(force),
       loadHistory(),
-      this.getRecurringSnapshot(force, true)
+      this.getRecurringSnapshot(force, true),
+      this.getDashboardAnalyses(force, {
+        periodYear: currentYear,
+        comparisonYear: currentYear - 1
+      })
     ]);
     const optimizations = buildDashboardRecurringExpenseOptimizations(
       recurring.snapshot,
@@ -397,7 +405,7 @@ export class FinanceService {
       this.db.listRecurringExpenseOptimizations(),
       { stale: recurring.stale }
     );
-    return buildDashboardDecisionLab(assets, cashflow, optimizations, request);
+    return buildDashboardDecisionLab(assets, cashflow, optimizations, analyses, request);
   }
 
   getDashboardCryptoAnalysis(): DashboardCryptoAnalysis {
