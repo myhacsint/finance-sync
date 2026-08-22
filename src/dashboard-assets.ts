@@ -6,6 +6,7 @@ import {
   configuredPhysicalAssets,
   latestPhysicalAssetValuation
 } from "./physical-assets.js";
+import { marketSnapshotDate } from "./market-snapshots.js";
 
 export type AssetAreaKey = "cash" | "depots" | "pensions" | "crypto" | "precious-metals";
 export type AssetPositionState = "current" | "confirmed" | "stale" | "error" | "unavailable";
@@ -20,6 +21,10 @@ export interface DashboardAssets {
   state: "current" | "stale" | "partial";
   totalMinor: number | null;
   basis: "latest-available";
+  marketHistory: {
+    status: "current" | "pending";
+    latestDate?: string;
+  };
   summary: {
     automaticCurrent: number;
     automaticTotal: number;
@@ -326,12 +331,17 @@ export function buildDashboardAssets(
   const hasMissing = sortedPositions.some((position) =>
     position.status === "error" || position.status === "unavailable"
   );
+  const latestMarketDate = db.latestAssetMarketSnapshotDate();
   return {
     generatedAt: now.toISOString(),
     state: hasMissing ? "partial"
       : sortedPositions.some((position) => position.status === "stale") ? "stale" : "current",
     totalMinor,
     basis: "latest-available",
+    marketHistory: {
+      status: latestMarketDate === marketSnapshotDate(now, config.timezone) ? "current" : "pending",
+      latestDate: latestMarketDate
+    },
     summary: {
       automaticCurrent,
       automaticTotal: automaticSources.length,

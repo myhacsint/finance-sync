@@ -85,6 +85,10 @@ import {
   lastCompletedMonthEnd,
   readCoinGeckoSolPrice
 } from "./dashboard-asset-comparison.js";
+import {
+  archiveGhostfolioMarketSnapshot,
+  marketSnapshotDate
+} from "./market-snapshots.js";
 
 export class FinanceServiceError extends Error {
   constructor(message: string, readonly status: number) {
@@ -106,6 +110,8 @@ export class FinanceService {
   private recurringLoading?: Promise<ActualSpendingRangeSnapshot>;
   private assetsCache?: { expiresAt: number; value: DashboardAssets };
   private assetsLoading?: Promise<DashboardAssets>;
+  private marketArchiveLoading?: Promise<void>;
+  private marketArchiveLastFailureAt = 0;
 
   constructor(readonly db: FinanceDatabase, readonly config: AppConfig) {
     for (const source of config.sources) {
@@ -764,9 +770,45 @@ export class FinanceService {
           void this.sync(source.id);
         }
       }
+      void this.archiveDailyMarketValues();
     };
     void tick();
     return setInterval(() => void tick(), 60_000);
+  }
+
+  private async archiveDailyMarketValues(): Promise<void> {
+    if (!this.config.ghostfolio?.enabled
+      || Object.keys(this.config.ghostfolio.accountMap).length === 0) return;
+    const today = marketSnapshotDate(new Date(), this.config.timezone);
+    if (this.db.latestAssetMarketSnapshotDate() === today) return;
+    if (this.marketArchiveLoading) return this.marketArchiveLoading;
+    if (Date.now() - this.marketArchiveLastFailureAt < 15 * 60_000) return;
+    const load = async (): Promise<void> => {
+      try {
+        const snapshot = await readGhostfolioAssets(this.config.ghostfolio!);
+        const result = archiveGhostfolioMarketSnapshot(
+          this.db,
+          snapshot,
+          this.config.timezone,
+          new Date(),
+          Object.keys(this.config.ghostfolio!.accountMap)
+        );
+        this.db.setSetting("ghostfolio-market-archive:last-success", result.valuationDate);
+        this.db.setSetting("ghostfolio-market-archive:last-error", "");
+      } catch (error) {
+        this.marketArchiveLastFailureAt = Date.now();
+        this.db.setSetting(
+          "ghostfolio-market-archive:last-error",
+          error instanceof Error ? error.message.slice(0, 240) : "Unbekannter Fehler"
+        );
+      }
+    };
+    this.marketArchiveLoading = load();
+    try {
+      await this.marketArchiveLoading;
+    } finally {
+      this.marketArchiveLoading = undefined;
+    }
   }
 
   async startEnableBanking(id: string): Promise<{ url: string }> {

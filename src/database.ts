@@ -152,10 +152,22 @@ export class FinanceDatabase {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS asset_market_snapshots (
+        valuation_date TEXT NOT NULL,
+        source_id TEXT NOT NULL,
+        account_id TEXT NOT NULL,
+        captured_at TEXT NOT NULL,
+        amount_minor INTEGER NOT NULL,
+        currency TEXT NOT NULL CHECK(currency='EUR'),
+        provider TEXT NOT NULL CHECK(provider='Ghostfolio'),
+        PRIMARY KEY(valuation_date, source_id, account_id)
+      );
       CREATE INDEX IF NOT EXISTS idx_transactions_account_date
         ON transactions(account_id, booked_at);
       CREATE INDEX IF NOT EXISTS idx_balances_account_date
         ON balances(account_id, captured_at);
+      CREATE INDEX IF NOT EXISTS idx_asset_market_snapshots_account_date
+        ON asset_market_snapshots(source_id, account_id, valuation_date);
     `);
     const holdingColumns = new Set(
       (this.db.prepare("PRAGMA table_info(holdings)").all() as Array<{ name: string }>)
@@ -173,6 +185,62 @@ export class FinanceDatabase {
         this.db.exec(`ALTER TABLE holdings ADD COLUMN ${name} ${type}`);
       }
     }
+  }
+
+  assetAccountSources(): Map<string, string> {
+    const rows = this.db.prepare(`
+      SELECT account_id, min(source_id) AS source_id
+      FROM (
+        SELECT account_id, source_id FROM balances
+        UNION ALL
+        SELECT account_id, source_id FROM holdings
+      )
+      GROUP BY account_id
+    `).all() as Array<{ account_id: string; source_id: string }>;
+    return new Map(rows.map((row) => [row.account_id, row.source_id]));
+  }
+
+  upsertAssetMarketSnapshots(items: Array<{
+    valuationDate: string;
+    sourceId: string;
+    accountId: string;
+    capturedAt: string;
+    amountMinor: number;
+  }>): number {
+    const stmt = this.db.prepare(`
+      INSERT INTO asset_market_snapshots(
+        valuation_date, source_id, account_id, captured_at, amount_minor, currency, provider
+      ) VALUES (?, ?, ?, ?, ?, 'EUR', 'Ghostfolio')
+      ON CONFLICT(valuation_date, source_id, account_id) DO UPDATE SET
+        captured_at=excluded.captured_at,
+        amount_minor=excluded.amount_minor
+    `);
+    let changed = 0;
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      for (const item of items) {
+        const result = stmt.run(
+          item.valuationDate,
+          item.sourceId,
+          item.accountId,
+          item.capturedAt,
+          item.amountMinor
+        );
+        changed += Number(result.changes);
+      }
+      this.db.exec("COMMIT");
+      return changed;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  latestAssetMarketSnapshotDate(): string | undefined {
+    const row = this.db.prepare(`
+      SELECT max(valuation_date) AS valuation_date FROM asset_market_snapshots
+    `).get() as { valuation_date?: string | null } | undefined;
+    return row?.valuation_date ?? undefined;
   }
 
   registerSource(id: string, kind: string, enabled: boolean): void {
