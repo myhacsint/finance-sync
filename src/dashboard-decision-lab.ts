@@ -50,6 +50,27 @@ export interface DecisionTrendOption {
   wealthBuilding: DecisionMonthlyWealthBuilding | null;
 }
 
+export interface DecisionAnnualValues {
+  incomeMinor: number | null;
+  expensesMinor: number | null;
+  netMinor: number | null;
+}
+
+export interface DecisionAnnualOutlook {
+  available: boolean;
+  year: number | null;
+  throughMonth: string | null;
+  completedMonths: number;
+  remainingMonths: number | null;
+  actualToDate: DecisionAnnualValues;
+  expectedToDate: DecisionAnnualValues;
+  varianceToExpected: DecisionAnnualValues;
+  projectedYearEnd: DecisionAnnualValues;
+  medianFullYear: DecisionAnnualValues;
+  currentMonthExcluded: boolean;
+  estimate: true;
+}
+
 export interface DashboardDecisionLab {
   generatedAt: string;
   state: "current" | "partial";
@@ -75,6 +96,7 @@ export interface DashboardDecisionLab {
     selectedTrend: DecisionTrendOption;
     trendOptions: DecisionTrendOption[];
     projectedMonthlyCapacityMinor: number | null;
+    annualOutlook: DecisionAnnualOutlook;
     lastMonthComparison: {
       month: string | null;
       incomeMinor: number | null;
@@ -361,6 +383,84 @@ function project(
   return { values, depletedAfterMonths };
 }
 
+function annualValues(
+  incomeMinor: number | null,
+  expensesMinor: number | null
+): DecisionAnnualValues {
+  return {
+    incomeMinor,
+    expensesMinor,
+    netMinor: incomeMinor === null || expensesMinor === null
+      ? null
+      : incomeMinor - expensesMinor
+  };
+}
+
+function annualOutlook(
+  trend: DecisionTrendOption,
+  currentMonthExcluded: boolean
+): DecisionAnnualOutlook {
+  const year = trend.periodEnd ? Number(trend.periodEnd.slice(0, 4)) : null;
+  const available = trend.available
+    && year !== null
+    && trend.months > 0
+    && trend.incomeMinor !== null
+    && trend.expensesMinor !== null
+    && trend.monthlyIncomeMinor !== null
+    && trend.monthlyExpensesMinor !== null;
+  if (!available) {
+    const unavailable = annualValues(null, null);
+    return {
+      available: false,
+      year,
+      throughMonth: trend.periodEnd,
+      completedMonths: trend.months,
+      remainingMonths: year === null ? null : Math.max(0, 12 - trend.months),
+      actualToDate: unavailable,
+      expectedToDate: unavailable,
+      varianceToExpected: unavailable,
+      projectedYearEnd: unavailable,
+      medianFullYear: unavailable,
+      currentMonthExcluded,
+      estimate: true
+    };
+  }
+  const actualIncomeMinor = trend.incomeMinor!;
+  const actualExpensesMinor = trend.expensesMinor!;
+  const monthlyIncomeMinor = trend.monthlyIncomeMinor!;
+  const monthlyExpensesMinor = trend.monthlyExpensesMinor!;
+  const remainingMonths = Math.max(0, 12 - trend.months);
+  const actualToDate = annualValues(actualIncomeMinor, actualExpensesMinor);
+  const expectedToDate = annualValues(
+    monthlyIncomeMinor * trend.months,
+    monthlyExpensesMinor * trend.months
+  );
+  const projectedYearEnd = annualValues(
+    actualIncomeMinor + monthlyIncomeMinor * remainingMonths,
+    actualExpensesMinor + monthlyExpensesMinor * remainingMonths
+  );
+  return {
+    available: true,
+    year,
+    throughMonth: trend.periodEnd,
+    completedMonths: trend.months,
+    remainingMonths,
+    actualToDate,
+    expectedToDate,
+    varianceToExpected: annualValues(
+      actualIncomeMinor - expectedToDate.incomeMinor!,
+      actualExpensesMinor - expectedToDate.expensesMinor!
+    ),
+    projectedYearEnd,
+    medianFullYear: annualValues(
+      monthlyIncomeMinor * 12,
+      monthlyExpensesMinor * 12
+    ),
+    currentMonthExcluded,
+    estimate: true
+  };
+}
+
 export function buildDashboardDecisionLab(
   assets: DashboardAssets,
   cashflow: DashboardSavingsBaseline,
@@ -458,6 +558,7 @@ export function buildDashboardDecisionLab(
       selectedTrend,
       trendOptions,
       projectedMonthlyCapacityMinor,
+      annualOutlook: annualOutlook(typicalTrend, cashflow.window.currentMonthIncluded),
       lastMonthComparison: {
         month: lastMonth?.month ?? null,
         incomeMinor: lastMonthValues?.incomeMinor ?? null,
@@ -506,6 +607,7 @@ export function buildDashboardDecisionLab(
       "Einnahmen und Ausgaben nach der gewählten historischen Basis fortgeschrieben [SCHÄTZUNG]",
       "Kostenerstattungen mit Ausgaben verrechnet; interne Überträge und Kapitalerträge ausgeschlossen",
       "Der typische Monat ist ein realer Referenzmonat nahe dem Median der monatlichen Überschüsse; der letzte Monat dient nur als Vergleich [SCHÄTZUNG]",
+      "Der Jahresausblick verbindet den tatsächlichen Stand abgeschlossener Monate mit dem typischen Median-Monat; der laufende Monat bleibt ausgeschlossen [SCHÄTZUNG]",
       "Mitarbeiteraktienvorteile sind nur enthalten, wenn sie als eigener Arbeitgeberzufluss gebucht wurden",
       "Offene Kreditkartenstände im laufenden Monat sind gemessen, aber bis zur Abrechnung noch nicht einzeln kategorisiert",
       "Bei aufgebrauchtem Finanzvermögen wird nicht automatisch eine Verschuldung unterstellt"

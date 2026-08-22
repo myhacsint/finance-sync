@@ -101,6 +101,44 @@ test("aktuelles Jahr verbindet YTD-Bilanz und typischen Monat als Standard", () 
   assert.equal(options[0].monthlyExpensesMinor, 650_000);
 });
 
+test("Jahresausblick vergleicht Ist mit Median-Pfad und schreibt nur Restmonate fort", () => {
+  const result = buildDashboardDecisionLab(assets, cashflow);
+  assert.deepEqual(result.basis.annualOutlook, {
+    available: true,
+    year: 2026,
+    throughMonth: "2026-07",
+    completedMonths: 7,
+    remainingMonths: 5,
+    actualToDate: {
+      incomeMinor: 5_700_000,
+      expensesMinor: 4_600_000,
+      netMinor: 1_100_000
+    },
+    expectedToDate: {
+      incomeMinor: 5_600_000,
+      expensesMinor: 4_550_000,
+      netMinor: 1_050_000
+    },
+    varianceToExpected: {
+      incomeMinor: 100_000,
+      expensesMinor: 50_000,
+      netMinor: 50_000
+    },
+    projectedYearEnd: {
+      incomeMinor: 9_700_000,
+      expensesMinor: 7_850_000,
+      netMinor: 1_850_000
+    },
+    medianFullYear: {
+      incomeMinor: 9_600_000,
+      expensesMinor: 7_800_000,
+      netMinor: 1_800_000
+    },
+    currentMonthExcluded: false,
+    estimate: true
+  });
+});
+
 test("Basis und Szenario bleiben getrennt und alle Werte sind Schätzungen", () => {
   const result = buildDashboardDecisionLab(assets, cashflow, {
     trendBasis: "ytd-plus-last-year",
@@ -220,6 +258,9 @@ test("offener Kartenstand ergänzt nur den laufenden Monat und bleibt aus der Pr
   assert.equal(result.basis.currentMonthProgress.netMinor, 15_219);
   assert.equal(result.basis.currentMonthProgress.pendingCardExpensesMinor, 34_781);
   assert.equal(result.basis.currentMonthProgress.pendingCardLabel, "Miles & More Kreditkarte");
+  assert.equal(result.basis.annualOutlook.currentMonthExcluded, true);
+  assert.equal(result.basis.annualOutlook.actualToDate.netMinor, 1_100_000);
+  assert.equal(result.basis.annualOutlook.projectedYearEnd.netMinor, 1_850_000);
 });
 
 test("fehlende Vermögens- oder Sparratenbasis erzeugt keine erfundene Projektion", () => {
@@ -232,6 +273,7 @@ test("fehlende Vermögens- oder Sparratenbasis erzeugt keine erfundene Projektio
   assert.equal(result.state, "partial");
   assert.equal(result.series.length, 0);
   assert.equal(result.milestones.length, 0);
+  assert.equal(result.basis.annualOutlook.available, false);
   assert.match(result.warnings.join(" "), /nicht verfügbar/);
 });
 
