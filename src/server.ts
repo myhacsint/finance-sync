@@ -153,6 +153,25 @@ const server = createServer(async (req, res) => {
       );
     }
     if (req.method === "GET"
+      && url.pathname === "/api/dashboard/analyses/decision-lab") {
+      const numberParam = (name: string): number | undefined => {
+        const value = url.searchParams.get(name);
+        if (value === null || value.trim() === "") return undefined;
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : undefined;
+      };
+      return json(
+        res,
+        200,
+        await service.getDashboardDecisionLab(url.searchParams.get("refresh") === "1", {
+          realReturnBps: numberParam("realReturnBps"),
+          variableIncomeShareBps: numberParam("variableIncomeShareBps"),
+          monthlyChangeMinor: numberParam("monthlyChangeMinor"),
+          oneTimeMinor: numberParam("oneTimeMinor")
+        })
+      );
+    }
+    if (req.method === "GET"
       && url.pathname === "/api/dashboard/analyses/crypto-position") {
       return json(res, 200, service.getDashboardCryptoAnalysis());
     }

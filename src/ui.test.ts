@@ -135,6 +135,25 @@ test("Analysenansicht besitzt eine konkrete Optimierungsliste", () => {
   assert.match(html, /Nicht gesetzt/);
 });
 
+test("Analysenansicht besitzt ein zugängliches Entscheidungslabor", () => {
+  const html = renderUi();
+  assert.match(html, /Entscheidungslabor/);
+  assert.match(html, /analysisView/);
+  assert.match(html, /decisionReturn/);
+  assert.match(html, /decisionVariableShare/);
+  assert.match(html, /decisionMonthly/);
+  assert.match(html, /decisionOneTime/);
+  assert.match(html, /\/api\/dashboard\/analyses\/decision-lab/);
+  assert.match(html, /Realrendite pro Jahr/);
+  assert.match(html, /Variable Jahreseinnahmen berücksichtigen/);
+  assert.match(html, /Monatliche Veränderung/);
+  assert.match(html, /Einmaliger Zu- oder Abfluss/);
+  assert.match(html, /Finanzvermögen über 20 Jahre/);
+  assert.match(html, /decision-milestones/);
+  assert.match(html, /stroke-dasharray/);
+  assert.match(html, /\[SCHÄTZUNG\]/);
+});
+
 test("Analysenansicht trennt Kryptoherkunft, Investmentbasis und Steuerprüfung", () => {
   const html = renderUi();
   assert.match(html, /Krypto · Herkunft &amp; Steuerstatus/);

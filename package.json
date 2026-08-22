@@ -1,6 +1,6 @@
 {
   "name": "finance-sync",
-  "version": "0.19.1",
+  "version": "0.20.0",
   "private": true,
   "description": "Self-hosted finance ingestion, archive and export service for Unraid",
   "type": "module",

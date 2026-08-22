@@ -94,6 +94,11 @@ import {
   readActualSavingsCashflow,
   type DashboardSavingsBaseline
 } from "./dashboard-savings-baseline.js";
+import {
+  buildDashboardDecisionLab,
+  type DashboardDecisionLab,
+  type DecisionLabRequest
+} from "./dashboard-decision-lab.js";
 
 export class FinanceServiceError extends Error {
   constructor(message: string, readonly status: number) {
@@ -347,6 +352,17 @@ export class FinanceService {
     } finally {
       this.savingsBaselineLoading = undefined;
     }
+  }
+
+  async getDashboardDecisionLab(
+    force = false,
+    request: DecisionLabRequest = {}
+  ): Promise<DashboardDecisionLab> {
+    const [assets, cashflow] = await Promise.all([
+      this.getDashboardAssets(force),
+      this.getDashboardSavingsBaseline(force)
+    ]);
+    return buildDashboardDecisionLab(assets, cashflow, request);
   }
 
   getDashboardCryptoAnalysis(): DashboardCryptoAnalysis {

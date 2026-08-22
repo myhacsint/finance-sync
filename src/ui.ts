@@ -880,6 +880,39 @@ export function renderUi(): string {
     .optimization-card label { color: var(--muted); font-size: 12px; }
     .optimization-card select, .optimization-card input { width: 100%; margin-top: 6px; }
     .optimization-stale { grid-column: 1 / -1; color: #ffbd55; font-size: 12px; }
+    .decision-toolbar { grid-template-columns: minmax(260px, 1fr); }
+    .decision-summary { grid-template-columns: 1.35fr 1fr 1fr; }
+    .decision-layout { display: grid; grid-template-columns: minmax(280px, .62fr) minmax(0, 1.38fr); gap: 12px; margin-top: 12px; }
+    .decision-assumptions form { display: grid; gap: 16px; }
+    .decision-assumptions label { margin: 0; color: var(--muted); font-size: 12px; }
+    .decision-assumptions input { width: 100%; min-height: 44px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+    .decision-assumptions small { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .decision-assumptions .button { width: 100%; margin-top: 2px; }
+    .decision-chart { margin: 0; }
+    .decision-chart svg { display: block; width: 100%; min-height: 270px; }
+    .decision-chart figcaption { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .decision-grid path { fill: none; stroke: var(--line-soft); stroke-width: 1; }
+    .decision-axis { fill: var(--muted); font-size: 11px; }
+    .decision-line { fill: none; stroke-width: 3; vector-effect: non-scaling-stroke; }
+    .decision-line.baseline { stroke: #7f91ad; }
+    .decision-line.scenario { stroke: #6ea8ff; stroke-dasharray: 9 6; }
+    .decision-legend { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px 18px; margin-bottom: 4px; color: var(--muted); font-size: 12px; }
+    .decision-legend span { display: inline-flex; align-items: center; gap: 7px; }
+    .decision-legend i { width: 28px; height: 0; border-top: 3px solid #7f91ad; }
+    .decision-legend i.scenario { border-top-color: #6ea8ff; border-top-style: dashed; }
+    .decision-depletion { margin-top: 10px; }
+    .decision-details { margin-top: 12px; }
+    .decision-milestones { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--line-soft); border-radius: 10px; }
+    .decision-milestone { min-width: 0; padding: 15px; }
+    .decision-milestone + .decision-milestone { border-left: 1px solid var(--line-soft); }
+    .decision-milestone > span { color: var(--muted); font-size: 12px; }
+    .decision-milestone > div { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: 8px; margin-top: 10px; }
+    .decision-milestone small { color: var(--muted); }
+    .decision-milestone strong { overflow: hidden; font-size: 17px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; }
+    .decision-milestone p { margin-top: 10px; font-size: 12px; }
+    .decision-source { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 20px; margin-top: 18px; padding-top: 17px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: 12px; }
+    .decision-source ul { margin: 0; padding-left: 18px; }
+    .decision-source li + li { margin-top: 5px; }
     .mobile-nav { display: none; }
     @media (max-width: 980px) {
       .sidebar { width: 216px; }
@@ -902,6 +935,10 @@ export function renderUi(): string {
       .assets-workspace { grid-template-columns: minmax(230px, .7fr) minmax(480px, 1.5fr); }
       .analysis-grid { grid-template-columns: 1fr; }
       .crypto-layout { grid-template-columns: 1fr; }
+      .decision-layout { grid-template-columns: 1fr; }
+      .decision-milestones { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .decision-milestone:nth-child(3) { border-left: 0; border-top: 1px solid var(--line-soft); }
+      .decision-milestone:nth-child(4) { border-top: 1px solid var(--line-soft); }
       .system-item:nth-child(3) { border-left: 0; border-top: 1px solid var(--line-soft); }
       .system-item:nth-child(4) { border-top: 1px solid var(--line-soft); }
     }
@@ -990,6 +1027,10 @@ export function renderUi(): string {
       .optimization-card { grid-template-columns: 1fr 1fr; }
       .optimization-title { grid-column: 1 / -1; }
       .optimization-card .button { width: 100%; }
+      .decision-summary { grid-template-columns: 1fr 1fr; }
+      .decision-summary > div:first-child { grid-column: 1 / -1; }
+      .decision-chart svg { min-height: 230px; }
+      .decision-source { grid-template-columns: 1fr; gap: 12px; }
       .overview-panel { padding: 18px 16px; }
       .overview-panel .panel-header { gap: 8px; }
       .overview-panel .panel-header h2 { font-size: 18px; }
@@ -1073,6 +1114,12 @@ export function renderUi(): string {
       .recurring-summary > div + div { border-left: 0; border-top: 1px solid var(--line-soft); }
       .optimization-card { grid-template-columns: 1fr; }
       .optimization-title { grid-column: auto; }
+      .decision-summary { grid-template-columns: 1fr; }
+      .decision-summary > div:first-child { grid-column: auto; }
+      .decision-milestones { grid-template-columns: 1fr; }
+      .decision-milestone + .decision-milestone { border-left: 0; border-top: 1px solid var(--line-soft); }
+      .decision-chart svg { min-height: 205px; }
+      .decision-axis { font-size: 10px; }
       .recurring-detail-grid { grid-template-columns: 1fr; }
       .recurring-payment { grid-template-columns: 1fr auto; }
       .recurring-payment span:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
@@ -1169,8 +1216,9 @@ let currentRecurringData=null;
 let currentRecurringDetail=null;
 let currentOptimizationData=null;
 let currentCryptoData=null;
+let currentDecisionLabData=null;
 
-function headerAction(){if(activeView()==="analyses"&&!['recurring-expenses','expense-optimizations'].includes(analysisSelection().view))exportAnalysisCsv();else refresh(true)}
+function headerAction(){if(activeView()==="analyses"&&!['recurring-expenses','expense-optimizations','decision-lab'].includes(analysisSelection().view))exportAnalysisCsv();else refresh(true)}
 
 function requestToken(){
   const request=document.getElementById("token-request");
@@ -1358,8 +1406,9 @@ function analysisSelection(){
   const params=new URLSearchParams(location.search);
   const period=Number(params.get("analysisPeriod")||0);
   const comparison=Number(params.get("analysisComparison")||0);
+  const boundedParam=(name,fallback,min,max)=>{if(!params.has(name))return fallback;const value=Number(params.get(name));return Number.isFinite(value)?Math.max(min,Math.min(max,value)):fallback};
   return {
-    view:params.get("analysisView")==="recurring-expenses"?"recurring-expenses":params.get("analysisView")==="expense-optimizations"?"expense-optimizations":params.get("analysisView")==="crypto-origin-tax"?"crypto-origin-tax":"expense-structure",
+    view:params.get("analysisView")==="recurring-expenses"?"recurring-expenses":params.get("analysisView")==="expense-optimizations"?"expense-optimizations":params.get("analysisView")==="crypto-origin-tax"?"crypto-origin-tax":params.get("analysisView")==="decision-lab"?"decision-lab":"expense-structure",
     period:Number.isInteger(period)&&period>0?period:0,
     comparison:Number.isInteger(comparison)&&comparison>0?comparison:0,
     expanded:params.get("analysisCategoriesExpanded")==="1",
@@ -1368,12 +1417,16 @@ function analysisSelection(){
     review:["alle","bestaetigt","kein-kandidat"].includes(params.get("recurringReview"))?params.get("recurringReview"):"moeglich",
     classification:["GRUNDBEDARF","GESTALTBAR","VERMEIDBAR","UNKLAR"].includes(params.get("recurringClassification"))?params.get("recurringClassification"):"alle",
     confidence:["hoch","mittel"].includes(params.get("recurringConfidence"))?params.get("recurringConfidence"):"alle",
-    candidate:/^recurring-[a-f0-9]{18}$/.test(params.get("recurringCandidate")||"")?params.get("recurringCandidate"):""
+    candidate:/^recurring-[a-f0-9]{18}$/.test(params.get("recurringCandidate")||"")?params.get("recurringCandidate"):"",
+    decisionReturn:boundedParam("decisionReturn",2,-5,10),
+    decisionVariableShare:boundedParam("decisionVariableShare",0,0,100),
+    decisionMonthly:boundedParam("decisionMonthly",0,-10000,10000),
+    decisionOneTime:boundedParam("decisionOneTime",0,-1000000,1000000)
   };
 }
 function setAnalysisView(value){
   const params=new URLSearchParams(location.search);
-  if(value==="recurring-expenses"||value==="expense-optimizations"||value==="crypto-origin-tax")params.set("analysisView",value);else params.delete("analysisView");
+  if(value==="recurring-expenses"||value==="expense-optimizations"||value==="crypto-origin-tax"||value==="decision-lab")params.set("analysisView",value);else params.delete("analysisView");
   params.delete("analysisPosition");params.delete("recurringCandidate");
   const query=params.toString();history.pushState(null,"",(query?"?"+query:location.pathname)+location.hash);refresh();
 }
@@ -1399,6 +1452,23 @@ function applyRecurringFilters(){
   Object.entries(values).forEach(([name,value])=>{const defaultValue=name==="recurringReview"?"moeglich":"alle";if(value===defaultValue)params.delete(name);else params.set(name,value)});
   params.delete("recurringCandidate");
   const query=params.toString();history.pushState(null,"",(query?"?"+query:location.pathname)+location.hash);currentRecurringDetail=null;refresh();
+}
+function applyDecisionLab(event){
+  event?.preventDefault();
+  const params=new URLSearchParams(location.search);
+  const values={
+    decisionReturn:Number(document.getElementById("decision-return")?.value||2),
+    decisionVariableShare:Number(document.getElementById("decision-variable-share")?.value||0),
+    decisionMonthly:Number(document.getElementById("decision-monthly")?.value||0),
+    decisionOneTime:Number(document.getElementById("decision-one-time")?.value||0)
+  };
+  const rules={decisionReturn:[2,-5,10],decisionVariableShare:[0,0,100],decisionMonthly:[0,-10000,10000],decisionOneTime:[0,-1000000,1000000]};
+  for(const [name,value] of Object.entries(values)){
+    const [fallback,min,max]=rules[name];
+    const safe=Number.isFinite(value)?Math.max(min,Math.min(max,value)):fallback;
+    if(safe===fallback)params.delete(name);else params.set(name,String(safe));
+  }
+  const query=params.toString();history.pushState(null,"",(query?"?"+query:location.pathname)+location.hash);refresh();
 }
 function toggleRecurringCandidate(key){
   const params=new URLSearchParams(location.search);
@@ -1715,7 +1785,7 @@ function renderAnalyses(data){
   const state=analysisSelection();
   const periodOptions=analysisYearOptions(data.availableYears,data.selection.periodYear,0);
   const comparisonOptions=analysisYearOptions(data.availableYears,data.selection.comparisonYear,data.selection.periodYear);
-  const toolbar='<section class="analysis-toolbar" aria-label="Analysefilter"><label>Ansicht<select name="analysis-view" onchange="setAnalysisView(this.value)"><option value="expense-structure" selected>Ausgabenstruktur</option><option value="recurring-expenses">Regelmäßige Ausgaben prüfen</option><option value="expense-optimizations">Optimierungsliste</option><option value="crypto-origin-tax">Krypto · Herkunft &amp; Steuerstatus</option></select></label><label>Zeitraum<select id="analysis-period" name="analysis-period" autocomplete="off">'+periodOptions+'</select></label><label>Vergleich<select id="analysis-comparison" name="analysis-comparison" autocomplete="off">'+comparisonOptions+'</select></label><button class="button" type="button" onclick="applyAnalysisFilters()">Anwenden</button></section>';
+  const toolbar='<section class="analysis-toolbar" aria-label="Analysefilter"><label>Ansicht<select name="analysis-view" onchange="setAnalysisView(this.value)"><option value="expense-structure" selected>Ausgabenstruktur</option><option value="recurring-expenses">Regelmäßige Ausgaben prüfen</option><option value="expense-optimizations">Optimierungsliste</option><option value="decision-lab">Entscheidungslabor</option><option value="crypto-origin-tax">Krypto · Herkunft &amp; Steuerstatus</option></select></label><label>Zeitraum<select id="analysis-period" name="analysis-period" autocomplete="off">'+periodOptions+'</select></label><label>Vergleich<select id="analysis-comparison" name="analysis-comparison" autocomplete="off">'+comparisonOptions+'</select></label><button class="button" type="button" onclick="applyAnalysisFilters()">Anwenden</button></section>';
   const change=data.changePercent===null?'–':new Intl.NumberFormat("de-DE",{signDisplay:"always",maximumFractionDigits:1}).format(data.changePercent)+' %';
   const changeTone=data.changePercent===null?'':data.changePercent<=0?' tone-ok':' tone-warning';
   const summary='<section class="analysis-summary" aria-label="Zusammenfassung Ausgabenstruktur"><div><span>Wirtschaftliche Ausgaben '+esc(data.period.label)+'</span><strong class="analysis-total">'+(data.state==="empty"?'–':moneyWhole(data.period.totalMinor))+'</strong><p class="analysis-basis">Gebucht, Zusatzwerte einbezogen, interne Überträge ausgeschlossen '+analysisEstimate(data.period.estimate)+'</p></div><div><span>Veränderung zu '+esc(data.comparison.label)+' '+analysisEstimate(data.comparison.estimate)+'</span><strong class="'+changeTone+'">'+change+'</strong></div><div><span>Nicht zuordenbar</span><strong>'+new Intl.NumberFormat("de-DE",{maximumFractionDigits:1}).format(data.unknownPercent)+' %</strong><p class="analysis-basis">'+moneyWhole(data.unknownMinor)+'</p></div></section>';
@@ -1763,7 +1833,7 @@ function renderCryptoError(error){
 }
 function renderCryptoAnalysis(data){
   currentCryptoData=data;
-  const toolbar='<section class="analysis-toolbar crypto-toolbar" aria-label="Auswahl und Datenstand der Kryptoanalyse"><label>Ansicht<select name="analysis-view" autocomplete="off" onchange="setAnalysisView(this.value)"><option value="expense-structure">Ausgabenstruktur</option><option value="recurring-expenses">Regelmäßige Ausgaben prüfen</option><option value="expense-optimizations">Optimierungsliste</option><option value="crypto-origin-tax" selected>Krypto · Herkunft &amp; Steuerstatus</option></select></label><div class="crypto-toolbar-meta"><span>Prüfumfang</span><strong>Ab '+data.selection.scopeStartYear+'</strong></div><div class="crypto-toolbar-meta"><span>Rekonstruktionsstand</span><strong>'+esc(formatDate(data.capturedAt,true))+'</strong></div></section>';
+  const toolbar='<section class="analysis-toolbar crypto-toolbar" aria-label="Auswahl und Datenstand der Kryptoanalyse"><label>Ansicht<select name="analysis-view" autocomplete="off" onchange="setAnalysisView(this.value)"><option value="expense-structure">Ausgabenstruktur</option><option value="recurring-expenses">Regelmäßige Ausgaben prüfen</option><option value="expense-optimizations">Optimierungsliste</option><option value="decision-lab">Entscheidungslabor</option><option value="crypto-origin-tax" selected>Krypto · Herkunft &amp; Steuerstatus</option></select></label><div class="crypto-toolbar-meta"><span>Prüfumfang</span><strong>Ab '+data.selection.scopeStartYear+'</strong></div><div class="crypto-toolbar-meta"><span>Rekonstruktionsstand</span><strong>'+esc(formatDate(data.capturedAt,true))+'</strong></div></section>';
   const summary='<section class="analysis-summary crypto-summary" aria-label="Zusammenfassung der Solana-Position"><div><span>Aktueller Gesamtbestand zum Rekonstruktionsstand</span><strong class="analysis-total">'+solAmount(data.holdings.totalSol)+' SOL</strong><p class="analysis-basis">Quelle: '+esc(data.source)+' · Stake ist kein Abfluss</p></div><div><span>Davon Staking Rewards</span><strong>'+solAmount(data.holdings.rewardsSol)+' SOL</strong><p class="analysis-basis">'+new Intl.NumberFormat("de-DE",{maximumFractionDigits:2}).format(data.holdings.rewardsPercent)+' % des Bestands</p></div><div><span>In Stake-Accounts</span><strong>'+solAmount(data.holdings.stakeTotalSol)+' SOL</strong><p class="analysis-basis">Deaktiviert: '+solAmount(data.holdings.inactiveStakeSol)+' SOL</p></div></section>';
   const investment='<section class="analysis-panel" aria-labelledby="crypto-investment-title"><div class="analysis-panel-head"><div><h2 id="crypto-investment-title">Investmentbasis</h2><p>Ökonomische Average-Cost-Sicht, getrennt von der Steuerbasis</p></div></div><div class="crypto-basis-list"><div class="crypto-basis-row"><div><strong>A. Übergang ETH → SOL</strong><span>Marktwert beim Übergang / erhaltene SOL '+analysisEstimate(true)+'</span></div><strong>'+perSol(data.transition.conversionBasisEurPerSol)+'<small>'+perSol(data.transition.conversionBasisUsdPerSol,"USD")+'</small></strong></div><div class="crypto-basis-row"><div><strong>B. Effektiv inklusive Staking</strong><span>Fortgeführte Kapitalbasis / heutiger Bestand '+analysisEstimate(true)+'</span></div><strong>'+perSol(data.investment.effectiveBasisEurPerSol)+'<small>'+perSol(data.investment.effectiveBasisUsdPerSol,"USD")+'</small></strong></div><div class="crypto-basis-row"><div><strong>C. Netto-Fiatkapital</strong><span>Einzahlungen abzüglich bestätigter Fiat-Auszahlungen · keine steuerliche Cost Basis</span></div><strong>'+money(data.investment.netFiatCapitalEurMinor)+'<small>'+perSol(data.investment.netFiatPerCurrentSolEur)+'</small></strong></div></div><div class="crypto-break-even"><span>Break-even der heutigen Position vor Steuern und Verkaufskosten '+analysisEstimate(true)+'</span><strong>'+perSol(data.investment.breakEvenEurPerSol)+'</strong></div></section>';
   const holdings='<section class="analysis-panel" aria-labelledby="crypto-holdings-title"><div class="analysis-panel-head"><div><h2 id="crypto-holdings-title">Bestandszusammensetzung</h2><p>Mengen sind nicht mit Anschaffungskosten gleichzusetzen</p></div></div><div class="crypto-holdings-list"><div class="crypto-holding-row"><div><strong>Liquide</strong><span>Hauptwallet</span></div><strong>'+solAmount(data.holdings.liquidSol)+' SOL</strong></div><div class="crypto-holding-row"><div><strong>Aktiv delegiert</strong><span>Native Stake-Delegation</span></div><strong>'+solAmount(data.holdings.delegatedSol)+' SOL</strong></div><div class="crypto-holding-row"><div><strong>Noch nicht delegiert</strong><span>Jito-Tips im Stake-Account</span></div><strong>'+solAmount(data.holdings.undelegatedStakeSol)+' SOL</strong></div><div class="crypto-holding-row"><div><strong>Rent-Reserve</strong><span>Grundsätzlich bei Kontoschließung rückholbar</span></div><strong>'+solAmount(data.holdings.rentReserveSol)+' SOL</strong></div><div class="crypto-holding-row"><div><strong>Gekauft oder konvertiert</strong><span>Heutiger Bestand vor Rewards</span></div><strong>'+solAmount(data.holdings.acquiredOrConvertedSol)+' SOL</strong></div></div></section>';
@@ -1804,7 +1874,7 @@ function recurringDetailMarkup(candidate,detail,instance){
 function renderRecurringExpenses(data){
   currentRecurringData=data;
   const state=analysisSelection();
-  const toolbar='<section class="analysis-toolbar recurring-toolbar" aria-label="Filter für regelmäßige Ausgaben"><label>Ansicht<select name="analysis-view" autocomplete="off" onchange="setAnalysisView(this.value)"><option value="expense-structure">Ausgabenstruktur</option><option value="recurring-expenses" selected>Regelmäßige Ausgaben prüfen</option><option value="expense-optimizations">Optimierungsliste</option><option value="crypto-origin-tax">Krypto · Herkunft &amp; Steuerstatus</option></select></label><label>Rhythmus<select id="recurring-rhythm" name="recurring-rhythm" autocomplete="off">'+selectedOption("alle",data.selection.rhythm,"Alle")+selectedOption("monatlich",data.selection.rhythm,"Monatlich")+selectedOption("vierteljaehrlich",data.selection.rhythm,"Vierteljährlich")+selectedOption("jaehrlich",data.selection.rhythm,"Jährlich")+'</select></label><label>Prüfstatus<select id="recurring-review" name="recurring-review" autocomplete="off">'+selectedOption("moeglich",data.selection.review,"Möglich")+selectedOption("bestaetigt",data.selection.review,"Bestätigt")+selectedOption("kein-kandidat",data.selection.review,"Kein Kandidat")+selectedOption("alle",data.selection.review,"Alle")+'</select></label><label>Einordnung<select id="recurring-classification" name="recurring-classification" autocomplete="off">'+selectedOption("alle",data.selection.classification,"Alle")+selectedOption("GRUNDBEDARF",data.selection.classification,"Grundbedarf")+selectedOption("GESTALTBAR",data.selection.classification,"Gestaltbar")+selectedOption("VERMEIDBAR",data.selection.classification,"Vermeidbar")+selectedOption("UNKLAR",data.selection.classification,"Unklar")+'</select></label><label>Rhythmussicherheit<select id="recurring-confidence" name="recurring-confidence" autocomplete="off">'+selectedOption("alle",data.selection.confidence,"Alle")+selectedOption("hoch",data.selection.confidence,"Hoch")+selectedOption("mittel",data.selection.confidence,"Mittel")+'</select></label><button class="button" type="button" onclick="applyRecurringFilters()">Anwenden</button></section>';
+  const toolbar='<section class="analysis-toolbar recurring-toolbar" aria-label="Filter für regelmäßige Ausgaben"><label>Ansicht<select name="analysis-view" autocomplete="off" onchange="setAnalysisView(this.value)"><option value="expense-structure">Ausgabenstruktur</option><option value="recurring-expenses" selected>Regelmäßige Ausgaben prüfen</option><option value="expense-optimizations">Optimierungsliste</option><option value="decision-lab">Entscheidungslabor</option><option value="crypto-origin-tax">Krypto · Herkunft &amp; Steuerstatus</option></select></label><label>Rhythmus<select id="recurring-rhythm" name="recurring-rhythm" autocomplete="off">'+selectedOption("alle",data.selection.rhythm,"Alle")+selectedOption("monatlich",data.selection.rhythm,"Monatlich")+selectedOption("vierteljaehrlich",data.selection.rhythm,"Vierteljährlich")+selectedOption("jaehrlich",data.selection.rhythm,"Jährlich")+'</select></label><label>Prüfstatus<select id="recurring-review" name="recurring-review" autocomplete="off">'+selectedOption("moeglich",data.selection.review,"Möglich")+selectedOption("bestaetigt",data.selection.review,"Bestätigt")+selectedOption("kein-kandidat",data.selection.review,"Kein Kandidat")+selectedOption("alle",data.selection.review,"Alle")+'</select></label><label>Einordnung<select id="recurring-classification" name="recurring-classification" autocomplete="off">'+selectedOption("alle",data.selection.classification,"Alle")+selectedOption("GRUNDBEDARF",data.selection.classification,"Grundbedarf")+selectedOption("GESTALTBAR",data.selection.classification,"Gestaltbar")+selectedOption("VERMEIDBAR",data.selection.classification,"Vermeidbar")+selectedOption("UNKLAR",data.selection.classification,"Unklar")+'</select></label><label>Rhythmussicherheit<select id="recurring-confidence" name="recurring-confidence" autocomplete="off">'+selectedOption("alle",data.selection.confidence,"Alle")+selectedOption("hoch",data.selection.confidence,"Hoch")+selectedOption("mittel",data.selection.confidence,"Mittel")+'</select></label><button class="button" type="button" onclick="applyRecurringFilters()">Anwenden</button></section>';
   const summary='<section class="recurring-summary" aria-label="Prüfbestand"><div><span>Mögliche regelmäßige Zahlungen</span><strong>'+data.summary.possible+'</strong></div><div><span>Vom Nutzer bestätigt</span><strong>'+data.summary.confirmed+'</strong></div><div><span>Als kein Kandidat markiert</span><strong>'+data.summary.notCandidate+'</strong></div></section>';
   const freshness='<div class="recurring-freshness"><span>Quelle: '+esc(data.source)+'</span><span>Beobachtet: '+esc(formatDate(data.freshness.windowStart))+'–'+esc(formatDate(data.freshness.windowEnd))+'</span><span>Letzter vollständiger Monat: '+esc(analysisMonthLabel(data.freshness.lastCompleteMonth))+'</span><span>Stand: '+esc(formatDate(data.freshness.lastSuccessfulAt,true))+'</span></div>';
   const warnings=data.warnings.map(warning=>'<div class="analysis-warning" role="status">'+icons.warning+'<span>'+esc(warning)+'</span></div>').join("");
@@ -1870,7 +1940,7 @@ async function saveRecurringOptimization(key){
 }
 function renderRecurringOptimizations(data){
   currentOptimizationData=data;
-  const toolbar='<section class="analysis-toolbar optimization-toolbar" aria-label="Optimierungsliste"><label>Ansicht<select name="analysis-view" autocomplete="off" onchange="setAnalysisView(this.value)"><option value="expense-structure">Ausgabenstruktur</option><option value="recurring-expenses">Regelmäßige Ausgaben prüfen</option><option value="expense-optimizations" selected>Optimierungsliste</option><option value="crypto-origin-tax">Krypto · Herkunft &amp; Steuerstatus</option></select></label></section>';
+  const toolbar='<section class="analysis-toolbar optimization-toolbar" aria-label="Optimierungsliste"><label>Ansicht<select name="analysis-view" autocomplete="off" onchange="setAnalysisView(this.value)"><option value="expense-structure">Ausgabenstruktur</option><option value="recurring-expenses">Regelmäßige Ausgaben prüfen</option><option value="expense-optimizations" selected>Optimierungsliste</option><option value="decision-lab">Entscheidungslabor</option><option value="crypto-origin-tax">Krypto · Herkunft &amp; Steuerstatus</option></select></label></section>';
   const savings=data.summary.expectedAnnualSavingsMinor===null?'Noch offen':money(data.summary.expectedAnnualSavingsMinor)+' <small>[SCHÄTZUNG]</small>';
   const summary='<section class="recurring-summary optimization-summary" aria-label="Optimierungsstand"><div><span>Prüfbare Ausgaben</span><strong>'+data.summary.candidates+'</strong></div><div><span>Entschiedene Maßnahmen</span><strong>'+data.summary.actioned+'</strong></div><div><span>Erwartete jährliche Entlastung</span><strong>'+savings+'</strong></div></section>';
   const freshness='<div class="recurring-freshness"><span>Quelle: '+esc(data.source)+'</span><span>Beobachtet bis: '+esc(formatDate(data.freshness.windowEnd))+'</span><span>Stand: '+esc(formatDate(data.generatedAt,true))+'</span></div>';
@@ -1896,6 +1966,44 @@ function renderOptimizationError(error){
   document.getElementById("dashboard").innerHTML=expenseState("Nicht verfügbar","Die Optimierungsliste konnte nicht geladen werden. Bitte versuche es erneut.","refresh(true)","Erneut versuchen");
   document.getElementById("dashboard").setAttribute("aria-busy","false");
   msg(error?.message||"Die Optimierungsliste konnte nicht geladen werden.",true);
+}
+
+function signedMoneyWhole(value){return new Intl.NumberFormat("de-DE",{style:"currency",currency:"EUR",maximumFractionDigits:0,signDisplay:"always"}).format(Number(value||0)/100)}
+function decisionDuration(months){if(months===null)return "Nicht aufgebraucht";if(months===0)return "Sofort";const years=Math.floor(months/12);const rest=months%12;return (years?years+" "+(years===1?"Jahr":"Jahre")+(rest?" und ":""):"")+(rest?rest+" "+(rest===1?"Monat":"Monate"):"")}
+function decisionPath(series,key,maxValue){return series.map((point,index)=>{const x=58+point.year/20*704;const y=24+(1-Math.max(0,point[key])/maxValue)*218;return (index?"L":"M")+x.toFixed(1)+" "+y.toFixed(1)}).join(" ")}
+function decisionChart(data){
+  const maxValue=Math.max(1,...data.series.flatMap(point=>[point.baselineMinor,point.scenarioMinor]));
+  const baselinePath=decisionPath(data.series,"baselineMinor",maxValue);
+  const scenarioPath=decisionPath(data.series,"scenarioMinor",maxValue);
+  const top=moneyWhole(maxValue);const middle=moneyWhole(Math.round(maxValue/2));
+  const label="20-Jahres-Projektion [SCHÄTZUNG]. Basis nach 20 Jahren "+moneyWhole(data.series.at(-1).baselineMinor)+", Szenario "+moneyWhole(data.series.at(-1).scenarioMinor)+".";
+  return '<figure class="decision-chart"><div class="decision-legend" aria-hidden="true"><span><i class="baseline"></i>Basis</span><span><i class="scenario"></i>Szenario</span></div><svg viewBox="0 0 800 286" role="img" aria-label="'+esc(label)+'"><g class="decision-grid"><path d="M58 24H762M58 133H762M58 242H762"/><path d="M58 24V242M234 24V242M410 24V242M586 24V242M762 24V242"/></g><g class="decision-axis"><text x="50" y="28" text-anchor="end">'+esc(top)+'</text><text x="50" y="137" text-anchor="end">'+esc(middle)+'</text><text x="50" y="246" text-anchor="end">0 €</text><text x="58" y="270" text-anchor="middle">Heute</text><text x="234" y="270" text-anchor="middle">5 J.</text><text x="410" y="270" text-anchor="middle">10 J.</text><text x="586" y="270" text-anchor="middle">15 J.</text><text x="762" y="270" text-anchor="middle">20 J.</text></g><path class="decision-line baseline" d="'+baselinePath+'"/><path class="decision-line scenario" d="'+scenarioPath+'"/></svg><figcaption>'+esc(label)+'</figcaption></figure>';
+}
+function renderDecisionLab(data){
+  currentDecisionLabData=data;
+  const toolbar='<section class="analysis-toolbar decision-toolbar" aria-label="Entscheidungslabor"><label>Ansicht<select name="analysis-view" autocomplete="off" onchange="setAnalysisView(this.value)"><option value="expense-structure">Ausgabenstruktur</option><option value="recurring-expenses">Regelmäßige Ausgaben prüfen</option><option value="expense-optimizations">Optimierungsliste</option><option value="decision-lab" selected>Entscheidungslabor</option><option value="crypto-origin-tax">Krypto · Herkunft &amp; Steuerstatus</option></select></label></section>';
+  const summary='<section class="analysis-summary decision-summary" aria-label="Ausgangslage für die Projektion"><div><span>Finanzvermögen heute</span><strong class="analysis-total">'+(data.basis.startingAssetsMinor===null?'–':moneyWhole(data.basis.startingAssetsMinor))+'</strong><p class="analysis-basis">Ohne Immobilien · '+esc(data.scope.includes.join(", "))+' '+analysisEstimate(true)+'</p></div><div><span>Reguläre Monatsbasis</span><strong class="'+(data.basis.regularMonthlyCapacityMinor<0?'tone-warning':'tone-ok')+'">'+(data.basis.regularMonthlyCapacityMinor===null?'–':signedMoneyWhole(data.basis.regularMonthlyCapacityMinor))+'</strong><p class="analysis-basis">Median aus zwölf vollständigen Monaten '+analysisEstimate(true)+'</p></div><div><span>Variable Einnahmen pro Jahr</span><strong>'+moneyWhole(data.basis.variableAnnualIncomeMinor)+'</strong><p class="analysis-basis">Davon '+new Intl.NumberFormat("de-DE",{maximumFractionDigits:1}).format(data.inputs.variableIncomeShareBps/100)+' % berücksichtigt '+analysisEstimate(true)+'</p></div></section>';
+  if(data.series.length===0){
+    const warnings=data.warnings.map(warning=>'<div class="analysis-warning" role="status">'+icons.warning+'<span>'+esc(warning)+'</span></div>').join("");
+    document.getElementById("dashboard").innerHTML=toolbar+summary+'<div style="margin-top:12px">'+expenseState("Projektion nicht verfügbar","Für eine Trajektorie werden ein vollständiger Vermögensstand und eine vollständige Sparratenbasis benötigt.","refresh(true)","Neu prüfen","warning")+'</div>'+warnings;
+    document.getElementById("dashboard").setAttribute("aria-busy","false");return;
+  }
+  const assumptions='<section class="analysis-panel decision-assumptions" aria-labelledby="decision-assumptions-title"><div class="analysis-panel-head"><div><h2 id="decision-assumptions-title">Annahmen</h2><p>Alle Projektionen sind veränderbare Schätzungen.</p></div></div><form onsubmit="applyDecisionLab(event)"><label for="decision-return">Realrendite pro Jahr (%)<input id="decision-return" name="decision-return" type="number" inputmode="decimal" autocomplete="off" min="-5" max="10" step="0.1" value="'+esc(data.inputs.realReturnBps/100)+'"><small>Nach Inflation; konservativer Startwert 2 %.</small></label><label for="decision-variable-share">Variable Jahreseinnahmen berücksichtigen (%)<input id="decision-variable-share" name="decision-variable-share" type="number" inputmode="decimal" autocomplete="off" min="0" max="100" step="5" value="'+esc(data.inputs.variableIncomeShareBps/100)+'"><small>0 % lässt Bonus und einmalige Einnahmen vollständig außen vor.</small></label><label for="decision-monthly">Monatliche Veränderung (€)<input id="decision-monthly" name="decision-monthly" type="number" inputmode="decimal" autocomplete="off" min="-10000" max="10000" step="10" value="'+esc(data.inputs.monthlyChangeMinor/100)+'"><small>Positiv spart mehr; negativ erhöht laufende Ausgaben.</small></label><label for="decision-one-time">Einmaliger Zu- oder Abfluss (€)<input id="decision-one-time" name="decision-one-time" type="number" inputmode="decimal" autocomplete="off" min="-1000000" max="1000000" step="100" value="'+esc(data.inputs.oneTimeMinor/100)+'"><small>Negativ für eine Ausgabe, positiv für zusätzliches Vermögen.</small></label><button class="button" type="submit">Szenario berechnen</button></form></section>';
+  const baselineEnd=data.series.at(-1).baselineMinor;const scenarioEnd=data.series.at(-1).scenarioMinor;
+  const depletion=(data.depletion.baselineAfterMonths!==null||data.depletion.scenarioAfterMonths!==null)?'<div class="analysis-warning decision-depletion" role="status">'+icons.warning+'<span>Finanzvermögen aufgebraucht: Basis '+esc(decisionDuration(data.depletion.baselineAfterMonths))+' · Szenario '+esc(decisionDuration(data.depletion.scenarioAfterMonths))+'. Eine Verschuldung wird nicht unterstellt.</span></div>':'';
+  const projection='<section class="analysis-panel decision-projection" aria-labelledby="decision-projection-title"><div class="analysis-panel-head"><div><h2 id="decision-projection-title">Finanzvermögen über 20 Jahre</h2><p>Basis '+moneyWhole(baselineEnd)+' · Szenario '+moneyWhole(scenarioEnd)+' '+analysisEstimate(true)+'</p></div></div>'+decisionChart(data)+depletion+'</section>';
+  const milestones=data.milestones.map(item=>'<article class="decision-milestone"><span>Nach '+item.year+' '+(item.year===1?'Jahr':'Jahren')+'</span><div><small>Basis</small><strong>'+moneyWhole(item.baselineMinor)+'</strong></div><div><small>Szenario</small><strong>'+moneyWhole(item.scenarioMinor)+'</strong></div><p class="'+(item.differenceMinor<0?'tone-warning':'tone-ok')+'">Differenz '+signedMoneyWhole(item.differenceMinor)+' '+analysisEstimate(true)+'</p></article>').join("");
+  const basisNotes=data.basisNotes.map(note=>'<li>'+esc(note)+'</li>').join("");
+  const notes='<section class="analysis-panel decision-details" aria-labelledby="decision-details-title"><div class="analysis-panel-head"><div><h2 id="decision-details-title">Meilensteine und Datenbasis</h2><p>Exakte Werte ergänzen die Trenddarstellung.</p></div></div><div class="decision-milestones">'+milestones+'</div><div class="decision-source"><p>Vermögensstand '+esc(formatDate(data.freshness.assetsGeneratedAt,true))+' · Zahlungsbasis '+esc(formatDate(data.freshness.cashflowGeneratedAt,true))+' · Quelle '+esc(data.source)+'</p><ul>'+basisNotes+'</ul></div></section>';
+  const warnings=data.warnings.map(warning=>'<div class="analysis-warning" role="status">'+icons.warning+'<span>'+esc(warning)+'</span></div>').join("");
+  document.getElementById("dashboard").innerHTML=toolbar+summary+'<div class="decision-layout">'+assumptions+projection+'</div>'+notes+warnings;
+  document.getElementById("dashboard").setAttribute("aria-busy","false");
+}
+function renderDecisionLabError(error){
+  currentDecisionLabData=null;
+  document.getElementById("dashboard").innerHTML=expenseState("Nicht verfügbar","Das Entscheidungslabor konnte nicht geladen werden. Bitte versuche es erneut.","refresh(true)","Erneut versuchen");
+  document.getElementById("dashboard").setAttribute("aria-busy","false");
+  msg(error?.message||"Das Entscheidungslabor konnte nicht geladen werden.",true);
 }
 
 function renderTask(task){
@@ -1941,13 +2049,14 @@ function renderHeader(view){
   }[view];
   if(view==="analyses"&&analysisSelection().view==="crypto-origin-tax")content.subtitle="Krypto-Herkunft, Investmentbasis und Steuerstatus nachvollziehen.";
   if(view==="analyses"&&analysisSelection().view==="expense-optimizations")content.subtitle="Prüfbare Ausgaben in konkrete, nachvollziehbare Maßnahmen überführen.";
+  if(view==="analyses"&&analysisSelection().view==="decision-lab")content.subtitle="Finanzielle Entscheidungen über 20 Jahre als nachvollziehbare Szenarien vergleichen.";
   document.title=content.title+" · Finance Hub";
   const eyebrow=document.getElementById("page-eyebrow");
   eyebrow.hidden=view!=="status";
   document.getElementById("page-title").textContent=content.title;
   document.getElementById("page-subtitle").textContent=content.subtitle;
   const action=document.getElementById("refresh-button");
-  const analysisExport=view==="analyses"&&!['recurring-expenses','expense-optimizations'].includes(analysisSelection().view);
+  const analysisExport=view==="analyses"&&!['recurring-expenses','expense-optimizations','decision-lab'].includes(analysisSelection().view);
   action.setAttribute("aria-label",analysisExport?"Aktuelle Analyse als CSV exportieren":content.title+" aktualisieren");
   action.querySelector("[aria-hidden]").textContent=analysisExport?"↓":"↻";
   action.querySelector(".desktop-label").textContent=analysisExport?"CSV exportieren":"Aktualisieren";
@@ -1993,7 +2102,14 @@ async function refresh(force=false){
     }else if(view==="analyses"){
       const selection=analysisSelection();
       const params=new URLSearchParams();
-      if(selection.view==="crypto-origin-tax"){
+      if(selection.view==="decision-lab"){
+        params.set("realReturnBps",String(Math.round(selection.decisionReturn*100)));
+        params.set("variableIncomeShareBps",String(Math.round(selection.decisionVariableShare*100)));
+        params.set("monthlyChangeMinor",String(Math.round(selection.decisionMonthly*100)));
+        params.set("oneTimeMinor",String(Math.round(selection.decisionOneTime*100)));
+        if(force)params.set("refresh","1");
+        const data=await call("/api/dashboard/analyses/decision-lab?"+params.toString());renderDecisionLab(data);
+      }else if(selection.view==="crypto-origin-tax"){
         const data=await call("/api/dashboard/analyses/crypto-position");renderCryptoAnalysis(data);
       }else if(selection.view==="expense-optimizations"){
         const data=await call("/api/dashboard/analyses/recurring-expenses/optimizations"+(force?"?refresh=1":""));renderRecurringOptimizations(data);
@@ -2016,7 +2132,7 @@ async function refresh(force=false){
     }
     msg("");
   }
-  catch(error){if(view==="spending")renderSpendingError(error);else if(view==="assets")renderAssetsError(error);else if(view==="analyses"&&analysisSelection().view==="recurring-expenses")renderRecurringError(error);else if(view==="analyses"&&analysisSelection().view==="expense-optimizations")renderOptimizationError(error);else if(view==="analyses"&&analysisSelection().view==="crypto-origin-tax")renderCryptoError(error);else if(view==="analyses")renderAnalysesError(error);else{msg(error.message,true);document.getElementById("dashboard").setAttribute("aria-busy","false")}}
+  catch(error){if(view==="spending")renderSpendingError(error);else if(view==="assets")renderAssetsError(error);else if(view==="analyses"&&analysisSelection().view==="recurring-expenses")renderRecurringError(error);else if(view==="analyses"&&analysisSelection().view==="expense-optimizations")renderOptimizationError(error);else if(view==="analyses"&&analysisSelection().view==="decision-lab")renderDecisionLabError(error);else if(view==="analyses"&&analysisSelection().view==="crypto-origin-tax")renderCryptoError(error);else if(view==="analyses")renderAnalysesError(error);else{msg(error.message,true);document.getElementById("dashboard").setAttribute("aria-busy","false")}}
   finally{button.disabled=false}
 }
 async function syncSource(id){try{msg("Abruf läuft …");const result=await call("/api/sync/"+id,{method:"POST"});msg(result.message);await refresh()}catch(error){msg(error.message,true)}}
