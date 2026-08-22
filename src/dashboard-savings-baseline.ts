@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readSecret } from "./config.js";
-import type { AppConfig } from "./types.js";
+import type { AppConfig, SavingsIncomeTreatment } from "./types.js";
 
 interface ActualAccount {
   id: string;
@@ -89,14 +89,22 @@ export interface DashboardSavingsBaseline {
     estimate: true;
   };
   otherIncome: {
-    amountMinor: number;
+    regularMonthlyMinor: number | null;
+    regularAnnualMinor: number;
+    variableAnnualMinor: number;
+    reimbursementsAnnualMinor: number;
+    passThroughAnnualMinor: number;
+    investmentReturnAnnualMinor: number;
+    internalTransferAnnualMinor: number;
+    unreviewedMinor: number;
     unknownPositiveMinor: number;
+    estimate: true;
   };
   consumption: {
     typicalMonthlyMinor: number | null;
     estimate: true;
   };
-  savingsCapacityMonthlyMinor: null;
+  savingsCapacityMonthlyMinor: number | null;
   months: Array<{
     month: string;
     payrollRegularMinor: number;
@@ -104,7 +112,13 @@ export interface DashboardSavingsBaseline {
     secondIncomeRegularMinor: number;
     secondIncomeVariableMinor: number;
     manualForwardedUnassignedMinor: number;
-    otherIncomeMinor: number;
+    otherIncomeRegularMinor: number;
+    otherIncomeVariableMinor: number;
+    reimbursementMinor: number;
+    passThroughMinor: number;
+    investmentReturnMinor: number;
+    internalTransferMinor: number;
+    unreviewedIncomeMinor: number;
     unknownPositiveMinor: number;
     consumptionMinor: number;
   }>;
@@ -188,6 +202,8 @@ export function buildDashboardSavingsBaseline(
     config.analysis?.savingsBaseline?.manualForwardedIncomeMerchantKeys ?? []
   );
   const assignments = config.analysis?.savingsBaseline?.manualForwardedIncomeAssignments ?? {};
+  const merchantRules = config.analysis?.savingsBaseline?.incomeMerchantRules ?? {};
+  const bookingRules = config.analysis?.savingsBaseline?.incomeBookingRules ?? {};
   const months = new Map<string, DashboardSavingsBaseline["months"][number]>();
   for (let month = range.startMonth; month <= range.endMonth; month = shiftMonth(month, 1)) {
     months.set(month, {
@@ -197,7 +213,13 @@ export function buildDashboardSavingsBaseline(
       secondIncomeRegularMinor: 0,
       secondIncomeVariableMinor: 0,
       manualForwardedUnassignedMinor: 0,
-      otherIncomeMinor: 0,
+      otherIncomeRegularMinor: 0,
+      otherIncomeVariableMinor: 0,
+      reimbursementMinor: 0,
+      passThroughMinor: 0,
+      investmentReturnMinor: 0,
+      internalTransferMinor: 0,
+      unreviewedIncomeMinor: 0,
       unknownPositiveMinor: 0,
       consumptionMinor: 0
     });
@@ -257,8 +279,22 @@ export function buildDashboardSavingsBaseline(
       }
       continue;
     }
+    const treatment: SavingsIncomeTreatment | undefined = line.amountMinor > 0
+      ? bookingRules[line.bookingKey] ?? merchantRules[line.merchantKey]
+      : undefined;
+    if (treatment) {
+      if (treatment === "REGULAR") item.otherIncomeRegularMinor += line.amountMinor;
+      else if (treatment === "VARIABLE") item.otherIncomeVariableMinor += line.amountMinor;
+      else if (treatment === "REIMBURSEMENT") {
+        item.reimbursementMinor += line.amountMinor;
+        item.consumptionMinor -= line.amountMinor;
+      } else if (treatment === "PASSTHROUGH") item.passThroughMinor += line.amountMinor;
+      else if (treatment === "INVESTMENT_RETURN") item.investmentReturnMinor += line.amountMinor;
+      else if (treatment === "INTERNAL_TRANSFER") item.internalTransferMinor += line.amountMinor;
+      continue;
+    }
     if (line.categoryIsIncome && line.amountMinor > 0) {
-      item.otherIncomeMinor += line.amountMinor;
+      item.unreviewedIncomeMinor += line.amountMinor;
       continue;
     }
     if (line.amountMinor > 0 && !line.categoryLabel) {
@@ -281,6 +317,10 @@ export function buildDashboardSavingsBaseline(
     (sum, month) => sum + month.unknownPositiveMinor,
     0
   );
+  const unreviewedIncomeMinor = resultMonths.reduce(
+    (sum, month) => sum + month.unreviewedIncomeMinor,
+    0
+  );
   const warnings: string[] = [];
   if (assignedOccurrences < manualOccurrences) {
     warnings.push(
@@ -290,12 +330,27 @@ export function buildDashboardSavingsBaseline(
   if (unknownPositiveMinor > 0) {
     warnings.push("Nicht zugeordnete positive Buchungen sind nicht in der Sparratenbasis enthalten.");
   }
+  if (unreviewedIncomeMinor > 0) {
+    warnings.push("Noch nicht geprüfte sonstige Einnahmen sind nicht in der Sparratenbasis enthalten.");
+  }
+  const typicalConsumptionMinor = median(resultMonths.map((month) => month.consumptionMinor));
+  const regularHouseholdIncomeMinor = median(resultMonths.map((month) =>
+    month.payrollRegularMinor
+      + month.secondIncomeRegularMinor
+      + month.otherIncomeRegularMinor
+  ));
+  const savingsCapacityMonthlyMinor = warnings.length === 0
+    && typicalConsumptionMinor !== null
+    && regularHouseholdIncomeMinor !== null
+    ? regularHouseholdIncomeMinor - typicalConsumptionMinor
+    : null;
   return {
     generatedAt: snapshot.generatedAt,
     state: resultMonths.every((month) =>
       month.consumptionMinor === 0
       && month.payrollRegularMinor === 0
-      && month.otherIncomeMinor === 0
+      && month.otherIncomeRegularMinor === 0
+      && month.otherIncomeVariableMinor === 0
       && month.secondIncomeRegularMinor === 0
       && month.manualForwardedUnassignedMinor === 0
     ) ? "empty" : warnings.length > 0 ? "partial" : "current",
@@ -327,22 +382,50 @@ export function buildDashboardSavingsBaseline(
       estimate: true
     },
     otherIncome: {
-      amountMinor: resultMonths.reduce((sum, month) => sum + month.otherIncomeMinor, 0),
-      unknownPositiveMinor
-    },
-    consumption: {
-      typicalMonthlyMinor: median(resultMonths.map((month) => month.consumptionMinor)),
+      regularMonthlyMinor: median(resultMonths.map((month) => month.otherIncomeRegularMinor)),
+      regularAnnualMinor: resultMonths.reduce(
+        (sum, month) => sum + month.otherIncomeRegularMinor,
+        0
+      ),
+      variableAnnualMinor: resultMonths.reduce(
+        (sum, month) => sum + month.otherIncomeVariableMinor,
+        0
+      ),
+      reimbursementsAnnualMinor: resultMonths.reduce(
+        (sum, month) => sum + month.reimbursementMinor,
+        0
+      ),
+      passThroughAnnualMinor: resultMonths.reduce(
+        (sum, month) => sum + month.passThroughMinor,
+        0
+      ),
+      investmentReturnAnnualMinor: resultMonths.reduce(
+        (sum, month) => sum + month.investmentReturnMinor,
+        0
+      ),
+      internalTransferAnnualMinor: resultMonths.reduce(
+        (sum, month) => sum + month.internalTransferMinor,
+        0
+      ),
+      unreviewedMinor: unreviewedIncomeMinor,
+      unknownPositiveMinor,
       estimate: true
     },
-    savingsCapacityMonthlyMinor: null,
+    consumption: {
+      typicalMonthlyMinor: typicalConsumptionMinor,
+      estimate: true
+    },
+    savingsCapacityMonthlyMinor,
     months: resultMonths,
     warnings,
     basis: [
       "Payroll-Zahlungen nach dem im Verwendungszweck codierten Leistungsmonat",
       "Arbeitgeber-Einmalzahlungen getrennt vom regelmäßigen Gehalt [SCHÄTZUNG]",
       "Manuell weitergeleitetes zweites Gehalt nach bestätigtem Wirtschaftsmonat",
+      "Regelmäßige, variable und zweckgebundene Einnahmen getrennt [SCHÄTZUNG]",
+      "Kostenerstattungen mit Ausgaben verrechnet; Kapitalerträge nicht als Sparleistung gezählt",
       "Interne Überträge sowie Sparen & Investieren nicht als Konsum gezählt",
-      "Sparratenbasis bleibt bis zur vollständigen Einkommenszuordnung nicht verfügbar"
+      "Regelmäßige Sparratenbasis aus Median der zwölf vollständigen Monate [SCHÄTZUNG]"
     ]
   };
 }

@@ -21,6 +21,14 @@ export type ExpenseClass =
   | "DISPOSITIV"
   | "UNBEKANNT";
 
+export type SavingsIncomeTreatment =
+  | "REGULAR"
+  | "VARIABLE"
+  | "REIMBURSEMENT"
+  | "PASSTHROUGH"
+  | "INVESTMENT_RETURN"
+  | "INTERNAL_TRANSFER";
+
 export type RecurringExpenseDecision =
   | "GRUNDBEDARF"
   | "GESTALTBAR"
@@ -185,6 +193,8 @@ export interface AppConfig {
     savingsBaseline?: {
       manualForwardedIncomeMerchantKeys?: string[];
       manualForwardedIncomeAssignments?: Record<string, string>;
+      incomeMerchantRules?: Record<string, SavingsIncomeTreatment>;
+      incomeBookingRules?: Record<string, SavingsIncomeTreatment>;
     };
     expenseStructure?: {
       oldestYear?: number;

@@ -99,7 +99,7 @@ test("manuell weitergeleitetes Zweitgehalt bleibt bis zur Monatszuordnung ausges
     variableAnnualMinor: 0,
     estimate: true
   });
-  assert.equal(result.otherIncome.amountMinor, 0);
+  assert.equal(result.otherIncome.unreviewedMinor, 0);
   assert.equal(result.savingsCapacityMonthlyMinor, null);
 });
 
@@ -141,8 +141,43 @@ test("interne Überträge und Sparen werden nicht als Konsum oder Einkommen gez�
     line({ amountMinor: -100_000, categoryLabel: "Sparen & Investieren" }),
     line({ amountMinor: -80_000, categoryLabel: "Lebensmittel" })
   ]), config, new Date("2026-08-22T10:00:00.000Z"));
-  assert.equal(result.otherIncome.amountMinor, 0);
+  assert.equal(result.otherIncome.unreviewedMinor, 0);
   assert.equal(result.months.find((month) => month.month === "2026-07")?.consumptionMinor, 80_000);
+});
+
+test("sonstige Einnahmeregeln trennen laufend, variabel, Erstattung und Durchlauf", () => {
+  const rulesConfig: AppConfig = {
+    ...config,
+    analysis: {
+      savingsBaseline: {
+        incomeMerchantRules: {
+          "merchant-1111111111111111": "REGULAR",
+          "merchant-2222222222222222": "VARIABLE",
+          "merchant-3333333333333333": "REIMBURSEMENT",
+          "merchant-4444444444444444": "PASSTHROUGH",
+          "merchant-5555555555555555": "INVESTMENT_RETURN",
+          "merchant-6666666666666666": "INTERNAL_TRANSFER"
+        }
+      }
+    }
+  };
+  const result = buildDashboardSavingsBaseline(snapshot([
+    line({ amountMinor: 51_800, categoryIsIncome: true, merchantKey: "merchant-1111111111111111" }),
+    line({ amountMinor: 1_000_000, categoryIsIncome: true, merchantKey: "merchant-2222222222222222" }),
+    line({ amountMinor: 20_000, categoryIsIncome: true, merchantKey: "merchant-3333333333333333" }),
+    line({ amountMinor: 10_000, categoryIsIncome: true, merchantKey: "merchant-4444444444444444" }),
+    line({ amountMinor: 3_500, categoryIsIncome: true, merchantKey: "merchant-5555555555555555" }),
+    line({ amountMinor: 120_000, categoryIsIncome: true, merchantKey: "merchant-6666666666666666" }),
+    line({ amountMinor: -80_000, categoryLabel: "Lebensmittel" })
+  ]), rulesConfig, new Date("2026-08-22T10:00:00.000Z"));
+  assert.equal(result.state, "current");
+  assert.equal(result.otherIncome.regularAnnualMinor, 51_800);
+  assert.equal(result.otherIncome.variableAnnualMinor, 1_000_000);
+  assert.equal(result.otherIncome.reimbursementsAnnualMinor, 20_000);
+  assert.equal(result.otherIncome.passThroughAnnualMinor, 10_000);
+  assert.equal(result.otherIncome.investmentReturnAnnualMinor, 3_500);
+  assert.equal(result.otherIncome.internalTransferAnnualMinor, 120_000);
+  assert.equal(result.months.find((month) => month.month === "2026-07")?.consumptionMinor, 60_000);
 });
 
 test("Actual-Leser bildet nur pseudonyme Gegenparteischlüssel und erkennt Transfers", async () => {

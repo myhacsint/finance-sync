@@ -1,6 +1,22 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { AppConfig } from "./types.js";
+import type { AppConfig, SavingsIncomeTreatment } from "./types.js";
+
+const savingsIncomeTreatments = new Set([
+  "REGULAR", "VARIABLE", "REIMBURSEMENT", "PASSTHROUGH",
+  "INVESTMENT_RETURN", "INTERNAL_TRANSFER"
+]);
+
+function savingsIncomeRules(
+  value: Record<string, unknown> | undefined,
+  keyPattern: RegExp
+): Record<string, SavingsIncomeTreatment> {
+  return Object.fromEntries(
+    Object.entries(value ?? {}).filter(([key, treatment]) =>
+      keyPattern.test(key) && savingsIncomeTreatments.has(String(treatment))
+    )
+  ) as Record<string, SavingsIncomeTreatment>;
+}
 
 export const paths = {
   data: process.env.FINANCE_DATA_DIR ?? "/app/data",
@@ -53,6 +69,14 @@ export function loadConfig(): AppConfig {
                 /^booking-[a-f0-9]{20}$/.test(key)
                   && /^\d{4}-(0[1-9]|1[0-2])$/.test(String(month))
               )
+            ),
+            incomeMerchantRules: savingsIncomeRules(
+              parsed.analysis.savingsBaseline.incomeMerchantRules,
+              /^merchant-[a-f0-9]{16}$/
+            ),
+            incomeBookingRules: savingsIncomeRules(
+              parsed.analysis.savingsBaseline.incomeBookingRules,
+              /^booking-[a-f0-9]{20}$/
             )
           }
         : undefined,
