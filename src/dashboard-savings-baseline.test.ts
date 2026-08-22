@@ -70,6 +70,35 @@ test("Arbeitgeber-Einmalzahlung bleibt vom regelmäßigen Gehalt getrennt", () =
   assert.equal(result.payroll.variableAnnualMinor, 1_130_000);
 });
 
+test("offener Kreditkartenstand wird nur im laufenden Monat vorläufig ergänzt", () => {
+  const pendingConfig: AppConfig = {
+    ...config,
+    analysis: {
+      savingsBaseline: {
+        ...config.analysis?.savingsBaseline,
+        pendingCreditCardBalances: [{
+          id: "miles-more",
+          label: "Miles & More Kreditkarte",
+          amountMinor: 34_781,
+          capturedAt: "2026-08-22",
+          source: "Kreditkarten-Banking"
+        }]
+      }
+    }
+  };
+  const result = buildDashboardSavingsBaseline(
+    snapshot([]),
+    pendingConfig,
+    new Date("2026-08-22T10:00:00.000Z"),
+    12,
+    true
+  );
+  assert.equal(result.months.at(-1)?.month, "2026-08");
+  assert.equal(result.months.at(-1)?.pendingCardExpenseMinor, 34_781);
+  assert.equal(result.pendingCreditCardBalances?.totalMinor, 34_781);
+  assert.equal(result.months.at(-2)?.pendingCardExpenseMinor, 0);
+});
+
 test("manuell weitergeleitetes Zweitgehalt bleibt bis zur Monatszuordnung ausgeschlossen", () => {
   const result = buildDashboardSavingsBaseline(snapshot([
     line({

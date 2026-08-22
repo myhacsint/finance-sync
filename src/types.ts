@@ -196,6 +196,13 @@ export interface AppConfig {
       incomeMerchantRules?: Record<string, SavingsIncomeTreatment>;
       incomeBookingRules?: Record<string, SavingsIncomeTreatment>;
       committedOutflowBookingKeys?: string[];
+      pendingCreditCardBalances?: Array<{
+        id: string;
+        label: string;
+        amountMinor: number;
+        capturedAt: string;
+        source: string;
+      }>;
     };
     expenseStructure?: {
       oldestYear?: number;

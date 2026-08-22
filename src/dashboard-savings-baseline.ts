@@ -114,6 +114,16 @@ export interface DashboardSavingsBaseline {
     estimate: true;
   };
   savingsCapacityMonthlyMinor: number | null;
+  pendingCreditCardBalances?: {
+    totalMinor: number;
+    entries: Array<{
+      id: string;
+      label: string;
+      amountMinor: number;
+      capturedAt: string;
+      source: string;
+    }>;
+  };
   months: Array<{
     month: string;
     payrollRegularMinor: number;
@@ -132,6 +142,7 @@ export interface DashboardSavingsBaseline {
     consumptionMinor: number;
     committedOutflowMinor: number;
     investmentOutflowMinor: number;
+    pendingCardExpenseMinor?: number;
   }>;
   warnings: string[];
   basis: string[];
@@ -251,8 +262,21 @@ export function buildDashboardSavingsBaseline(
       unknownPositiveMinor: 0,
       consumptionMinor: 0,
       committedOutflowMinor: 0,
-      investmentOutflowMinor: 0
+      investmentOutflowMinor: 0,
+      pendingCardExpenseMinor: 0
     });
+  }
+
+  const pendingCreditCardBalances = includeCurrentMonth
+    ? (config.analysis?.savingsBaseline?.pendingCreditCardBalances ?? [])
+      .filter((item) => item.capturedAt.slice(0, 7) === range.endMonth)
+    : [];
+  const currentPendingMinor = pendingCreditCardBalances.reduce(
+    (sum, item) => sum + item.amountMinor,
+    0
+  );
+  if (currentPendingMinor > 0) {
+    months.get(range.endMonth)!.pendingCardExpenseMinor = currentPendingMinor;
   }
 
   const payrollLines = snapshot.lines.flatMap((line) => {
@@ -482,6 +506,10 @@ export function buildDashboardSavingsBaseline(
       estimate: true
     },
     savingsCapacityMonthlyMinor,
+    pendingCreditCardBalances: {
+      totalMinor: currentPendingMinor,
+      entries: pendingCreditCardBalances
+    },
     months: resultMonths,
     warnings,
     basis: [
@@ -492,6 +520,7 @@ export function buildDashboardSavingsBaseline(
       "Kostenerstattungen mit Ausgaben verrechnet; Kapitalerträge nicht als Sparleistung gezählt",
       "Zweckgebundene Sparbeiträge nur mit dem eigenen Haushaltsanteil belastet [SCHÄTZUNG]",
       "Interne Überträge sowie Sparen & Investieren nicht als Konsum gezählt",
+      "Offener Kreditkartenstand nur im laufenden Monat vorläufig als Ausgabe berücksichtigt",
       "Regelmäßige Sparratenbasis aus Median der zwölf vollständigen Monate [SCHÄTZUNG]"
     ]
   };

@@ -94,6 +94,9 @@ export interface DashboardDecisionLab {
       expensesDifferenceMinor: number | null;
       netDifferenceMinor: number | null;
       excludedIncomeMinor: number;
+      pendingCardExpensesMinor: number;
+      pendingCardCapturedAt: string | null;
+      pendingCardLabel: string | null;
     };
   };
   series: Array<{
@@ -155,7 +158,9 @@ function trendMonthValues(month: DashboardSavingsBaseline["months"][number]): {
       + incomeBreakdown.otherRegularMinor
       + incomeBreakdown.otherVariableMinor
       + incomeBreakdown.earmarkedFundingMinor,
-    expensesMinor: month.consumptionMinor + month.committedOutflowMinor,
+    expensesMinor: month.consumptionMinor
+      + month.committedOutflowMinor
+      + (month.pendingCardExpenseMinor ?? 0),
     incomeBreakdown,
     wealthBuilding: {
       bookedInvestingMinor: month.investmentOutflowMinor,
@@ -381,6 +386,8 @@ export function buildDashboardDecisionLab(
   const currentMonthNetMinor = currentMonthValues
     ? currentMonthValues.incomeMinor - currentMonthValues.expensesMinor
     : null;
+  const pendingCardEntries = cashflow.pendingCreditCardBalances?.entries ?? [];
+  const pendingCardExpensesMinor = currentMonth?.pendingCardExpenseMinor ?? 0;
   const warnings = [...assets.warnings];
   if (startingAssetsMinor === null) {
     warnings.push("Das aktuelle Finanzvermögen ist unvollständig; die Projektion ist nicht verfügbar.");
@@ -481,7 +488,12 @@ export function buildDashboardDecisionLab(
         netDifferenceMinor: currentMonthNetMinor !== null && typicalTrend.averageMonthlyNetMinor !== null
           ? currentMonthNetMinor - typicalTrend.averageMonthlyNetMinor
           : null,
-        excludedIncomeMinor: currentMonthValues?.incomeBreakdown.unreviewedExcludedMinor ?? 0
+        excludedIncomeMinor: currentMonthValues?.incomeBreakdown.unreviewedExcludedMinor ?? 0,
+        pendingCardExpensesMinor,
+        pendingCardCapturedAt: pendingCardEntries.at(-1)?.capturedAt ?? null,
+        pendingCardLabel: pendingCardEntries.length === 1
+          ? pendingCardEntries[0].label
+          : pendingCardEntries.length > 1 ? "Kreditkarten" : null
       }
     },
     series,
@@ -495,6 +507,7 @@ export function buildDashboardDecisionLab(
       "Kostenerstattungen mit Ausgaben verrechnet; interne Überträge und Kapitalerträge ausgeschlossen",
       "Der typische Monat ist ein realer Referenzmonat nahe dem Median der monatlichen Überschüsse; der letzte Monat dient nur als Vergleich [SCHÄTZUNG]",
       "Mitarbeiteraktienvorteile sind nur enthalten, wenn sie als eigener Arbeitgeberzufluss gebucht wurden",
+      "Offene Kreditkartenstände im laufenden Monat sind gemessen, aber bis zur Abrechnung noch nicht einzeln kategorisiert",
       "Bei aufgebrauchtem Finanzvermögen wird nicht automatisch eine Verschuldung unterstellt"
     ]
   };

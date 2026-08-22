@@ -80,7 +80,17 @@ export function loadConfig(): AppConfig {
             ),
             committedOutflowBookingKeys:
               parsed.analysis.savingsBaseline.committedOutflowBookingKeys
-                ?.filter((key) => /^booking-[a-f0-9]{20}$/.test(key))
+                ?.filter((key) => /^booking-[a-f0-9]{20}$/.test(key)),
+            pendingCreditCardBalances:
+              parsed.analysis.savingsBaseline.pendingCreditCardBalances
+                ?.filter((item) =>
+                  /^[a-z0-9-]{3,40}$/.test(item.id)
+                    && item.label.length >= 2 && item.label.length <= 80
+                    && Number.isSafeInteger(item.amountMinor)
+                    && item.amountMinor >= 0 && item.amountMinor <= 10_000_000
+                    && /^\d{4}-\d{2}-\d{2}$/.test(item.capturedAt)
+                    && item.source.length >= 2 && item.source.length <= 120
+                )
           }
         : undefined,
       expenseStructure: parsed.analysis.expenseStructure

@@ -187,8 +187,39 @@ test("aktueller unvollständiger Monat bleibt sichtbar, aber außerhalb der Proj
     incomeDifferenceMinor: -500_000,
     expensesDifferenceMinor: -400_000,
     netDifferenceMinor: -100_000,
-    excludedIncomeMinor: 0
+    excludedIncomeMinor: 0,
+    pendingCardExpensesMinor: 0,
+    pendingCardCapturedAt: null,
+    pendingCardLabel: null
   });
+});
+
+test("offener Kartenstand ergänzt nur den laufenden Monat und bleibt aus der Projektion", () => {
+  const current = {
+    ...trendMonth("2026-08", 300_000, 250_000),
+    pendingCardExpenseMinor: 34_781
+  };
+  const withPendingCard = {
+    ...cashflow,
+    window: { start: "2025-08", end: "2026-08", months: 13, currentMonthIncluded: true },
+    pendingCreditCardBalances: {
+      totalMinor: 34_781,
+      entries: [{
+        id: "miles-more",
+        label: "Miles & More Kreditkarte",
+        amountMinor: 34_781,
+        capturedAt: "2026-08-22",
+        source: "Kreditkarten-Banking"
+      }]
+    },
+    months: [...cashflow.months, current]
+  } satisfies DashboardSavingsBaseline;
+  const result = buildDashboardDecisionLab(assets, withPendingCard);
+  assert.equal(result.basis.projectedMonthlyCapacityMinor, 150_000);
+  assert.equal(result.basis.currentMonthProgress.expensesMinor, 284_781);
+  assert.equal(result.basis.currentMonthProgress.netMinor, 15_219);
+  assert.equal(result.basis.currentMonthProgress.pendingCardExpensesMinor, 34_781);
+  assert.equal(result.basis.currentMonthProgress.pendingCardLabel, "Miles & More Kreditkarte");
 });
 
 test("fehlende Vermögens- oder Sparratenbasis erzeugt keine erfundene Projektion", () => {
