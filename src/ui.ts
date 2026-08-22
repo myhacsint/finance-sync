@@ -1149,6 +1149,8 @@ export function renderUi(): string {
       .decision-context-table tbody td { padding: 5px 3px; border: 0; text-align: right; }
       .decision-context-table tbody td:first-child { grid-column: 1 / -1; width: auto; padding: 3px 3px 8px; border-bottom: 1px solid var(--line-soft); text-align: left; }
       .decision-context-table tbody td:not(:first-child)::before { display: block; margin-bottom: 2px; color: var(--muted); font-size: 10px; font-weight: 400; content: attr(data-label); }
+      .decision-annual-variance { grid-template-columns: 1fr; gap: 3px; }
+      .decision-annual-variance strong { min-width: 0; overflow-wrap: anywhere; }
       .decision-milestone + .decision-milestone { border-left: 0; border-top: 1px solid var(--line-soft); }
       .decision-chart svg { min-height: 205px; }
       .decision-axis { font-size: 10px; }
