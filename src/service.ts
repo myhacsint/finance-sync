@@ -89,6 +89,11 @@ import {
   archiveGhostfolioMarketSnapshot,
   marketSnapshotDate
 } from "./market-snapshots.js";
+import {
+  buildDashboardSavingsBaseline,
+  readActualSavingsCashflow,
+  type DashboardSavingsBaseline
+} from "./dashboard-savings-baseline.js";
 
 export class FinanceServiceError extends Error {
   constructor(message: string, readonly status: number) {
@@ -106,6 +111,8 @@ export class FinanceService {
   private spendingLoading = new Map<string, Promise<ActualSpendingMonthSnapshot>>();
   private analysesCache = new Map<string, { expiresAt: number; value: DashboardAnalyses }>();
   private analysesLoading = new Map<string, Promise<DashboardAnalyses>>();
+  private savingsBaselineCache?: { expiresAt: number; value: DashboardSavingsBaseline };
+  private savingsBaselineLoading?: Promise<DashboardSavingsBaseline>;
   private recurringCache?: { expiresAt: number; value: ActualSpendingRangeSnapshot };
   private recurringLoading?: Promise<ActualSpendingRangeSnapshot>;
   private assetsCache?: { expiresAt: number; value: DashboardAssets };
@@ -313,6 +320,32 @@ export class FinanceService {
       return await loading;
     } finally {
       this.analysesLoading.delete(cacheKey);
+    }
+  }
+
+  async getDashboardSavingsBaseline(force = false): Promise<DashboardSavingsBaseline> {
+    if (!this.config.actual?.enabled) throw new Error("Actual ist deaktiviert");
+    if (!force && this.savingsBaselineCache
+      && this.savingsBaselineCache.expiresAt > Date.now()) {
+      return this.savingsBaselineCache.value;
+    }
+    if (this.savingsBaselineLoading) return this.savingsBaselineLoading;
+    const load = async (): Promise<DashboardSavingsBaseline> => {
+      const generatedAt = new Date();
+      const snapshot = await this.withActual(() => readActualSavingsCashflow(
+        this.config.actual!,
+        this.config.timezone,
+        generatedAt
+      ));
+      const value = buildDashboardSavingsBaseline(snapshot, this.config, generatedAt);
+      this.savingsBaselineCache = { expiresAt: Date.now() + 5 * 60_000, value };
+      return value;
+    };
+    this.savingsBaselineLoading = load();
+    try {
+      return await this.savingsBaselineLoading;
+    } finally {
+      this.savingsBaselineLoading = undefined;
     }
   }
 

@@ -41,6 +41,13 @@ export function loadConfig(): AppConfig {
       : defaultConfig.ghostfolio,
     analysis: parsed.analysis ? {
       ...parsed.analysis,
+      savingsBaseline: parsed.analysis.savingsBaseline
+        ? {
+            manualForwardedIncomeMerchantKeys:
+              parsed.analysis.savingsBaseline.manualForwardedIncomeMerchantKeys
+                ?.filter((key) => /^merchant-[a-f0-9]{16}$/.test(key))
+          }
+        : undefined,
       expenseStructure: parsed.analysis.expenseStructure
         ? { ...parsed.analysis.expenseStructure }
         : undefined,

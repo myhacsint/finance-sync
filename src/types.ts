@@ -182,6 +182,9 @@ export interface AppConfig {
     }>;
   };
   analysis?: {
+    savingsBaseline?: {
+      manualForwardedIncomeMerchantKeys?: string[];
+    };
     expenseStructure?: {
       oldestYear?: number;
       categoryClasses?: Record<string, ExpenseClass>;

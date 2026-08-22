@@ -145,6 +145,14 @@ const server = createServer(async (req, res) => {
       );
     }
     if (req.method === "GET"
+      && url.pathname === "/api/dashboard/analyses/savings-baseline") {
+      return json(
+        res,
+        200,
+        await service.getDashboardSavingsBaseline(url.searchParams.get("refresh") === "1")
+      );
+    }
+    if (req.method === "GET"
       && url.pathname === "/api/dashboard/analyses/crypto-position") {
       return json(res, 200, service.getDashboardCryptoAnalysis());
     }
