@@ -150,6 +150,11 @@ test("Analysenansicht besitzt ein zugängliches Entscheidungslabor", () => {
   assert.match(html, /Einnahmen/);
   assert.match(html, /Ausgaben/);
   assert.match(html, /Aktueller Trend/);
+  assert.match(html, /Typischer Monat/);
+  assert.match(html, /Aktueller Monat bis heute/);
+  assert.match(html, /Was in die Monatsbasis einfließt/);
+  assert.match(html, /Mitarbeiteraktienvorteil/);
+  assert.match(html, /Kapitalerträge · ausgeschlossen/);
   assert.match(html, /Monatliche Veränderung/);
   assert.match(html, /Einmaliger Zu- oder Abfluss/);
   assert.match(html, /Finanzvermögen über 20 Jahre/);

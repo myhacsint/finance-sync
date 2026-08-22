@@ -9,8 +9,7 @@ Das Entscheidungslabor vergleicht das vorhandene Finanzvermögen ohne Immobilie 
 ## Bedienung
 
 - Realrendite nach Inflation, konservativ mit 2 % vorbelegt
-- Ausgangsbasis mit `Aktuelles Jahr (YTD)` als Standard
-- alternative Basis `Letzter vollständiger Monat`
+- Ausgangsbasis `Aktuelles Jahr` als Standard: tatsächliche YTD-Bilanz plus typischer Monat anhand des Medians der realen Monatsüberschüsse
 - geglättete Basis `YTD + letztes Jahr`
 - monatliche Veränderung für zusätzliche Einsparungen oder Ausgaben
 - einmaliger Zu- oder Abfluss für Vorhaben wie eine Renovierung
@@ -19,7 +18,10 @@ Das Entscheidungslabor vergleicht das vorhandene Finanzvermögen ohne Immobilie 
 ## Ergebnis
 
 - durchgezogene Basislinie und gestrichelte Szenariolinie über 20 Jahre
-- Einnahmen, Ausgaben, durchschnittlicher Monatsüberschuss und annualisierter Überschuss der gewählten Basis
+- Einnahmen, Ausgaben, tatsächliche Periodenbilanz, typische Monatswerte und annualisierter Überschuss der gewählten Basis
+- letzter vollständiger Monat sowie aktueller Monat bis heute als Vergleich zum typischen Monat; beide verändern die Projektion nicht
+- getrennte Aufschlüsselung von Arbeitseinkommen, sonstigen und zweckgebundenen Einnahmen, Kapitalerträgen und Vermögensbildung
+- Mitarbeiteraktienvorteile bleiben ausdrücklich nicht verfügbar, solange sie nicht als eigener Arbeitgeberzufluss gebucht sind
 - exakte Vergleichswerte nach 1, 5, 10 und 20 Jahren
 - sichtbare Differenz zur Basis
 - Warnung, falls das Finanzvermögen in einem Szenario aufgebraucht wird
@@ -33,7 +35,8 @@ Die Ansicht übernimmt Navigation, Typografie, Farben, Abstände und Karten des 
 
 - Standardannahmen erzeugen identische Basis- und Szenariowerte.
 - Einmalbetrag wirkt ab Start, monatliche Änderung ab dem ersten Monat.
-- Variable Einnahmen fließen nur mit dem gewählten Anteil ein.
+- Kapitalerträge, Erstattungen und interne Überträge fließen nicht als laufendes Einkommen ein.
+- Der aktuelle unvollständige Monat fließt nicht in Median oder Projektion ein.
 - Finanzvermögen wird nach Aufbrauch bei null begrenzt, nicht automatisch als Schuld fortgeschrieben.
 - Desktop und 375-Pixel-Mobilansicht funktionieren ohne horizontales Überlaufen.
 - Bedienfelder sind beschriftet und per Tastatur nutzbar.

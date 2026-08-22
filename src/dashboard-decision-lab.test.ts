@@ -40,7 +40,8 @@ function trendMonth(month: string, incomeMinor: number, expensesMinor: number) {
     unreviewedIncomeMinor: 0,
     unknownPositiveMinor: 0,
     consumptionMinor: expensesMinor,
-    committedOutflowMinor: 0
+    committedOutflowMinor: 0,
+    investmentOutflowMinor: 0
   };
 }
 
@@ -56,7 +57,7 @@ const cashflow = {
   generatedAt: "2026-08-22T12:01:00.000Z",
   state: "current",
   source: "Actual",
-  window: { start: "2025-08", end: "2026-07", months: 12 },
+  window: { start: "2025-08", end: "2026-07", months: 12, currentMonthIncluded: false },
   payroll: { months: 12, regularMonthlyMinor: 450_000, variableAnnualMinor: 1_200_000, estimate: true },
   manualForwardedIncome: { status: "assigned", occurrences: 12, assignedOccurrences: 12, unassignedOccurrences: 0, amountMinor: 2_400_000, unassignedAmountMinor: 0, regularMonthlyMinor: 200_000, variableAnnualMinor: 240_000, estimate: true },
   otherIncome: { regularMonthlyMinor: 60_000, regularAnnualMinor: 720_000, variableAnnualMinor: 1_560_000, reimbursementsAnnualMinor: 0, passThroughAnnualMinor: 0, investmentReturnAnnualMinor: 0, internalTransferAnnualMinor: 0, unreviewedMinor: 0, unknownPositiveMinor: 0, estimate: true },
@@ -70,20 +71,20 @@ const cashflow = {
 
 test("Entscheidungslabor begrenzt Annahmen und verwendet konservative Standardwerte", () => {
   assert.deepEqual(decisionLabInputs({
-    trendBasis: "last-month",
+    trendBasis: "current-year",
     realReturnBps: 99_999,
     monthlyChangeMinor: 5_000_000,
     oneTimeMinor: -500_000_000
   }), {
     horizonYears: 20,
-    trendBasis: "last-month",
+    trendBasis: "current-year",
     realReturnBps: 1_000,
     monthlyChangeMinor: 1_000_000,
     oneTimeMinor: -100_000_000
   });
 });
 
-test("YTD ist Standard und alle drei historischen Ausgangsbasen bleiben nachvollziehbar", () => {
+test("aktuelles Jahr verbindet YTD-Bilanz und typischen Monat als Standard", () => {
   const options = decisionTrendOptions(cashflow);
   assert.deepEqual(options.map((option) => [
     option.key,
@@ -92,11 +93,12 @@ test("YTD ist Standard und alle drei historischen Ausgangsbasen bleiben nachvoll
     option.annualizedNetMinor,
     option.excludedIncomeMinor
   ]), [
-    ["ytd", 7, 157_143, 1_885_716, 0],
-    ["last-month", 1, 200_000, 2_400_000, 0],
+    ["current-year", 7, 150_000, 1_800_000, 0],
     ["ytd-plus-last-year", 19, 121_053, 1_452_636, 0]
   ]);
-  assert.equal(decisionLabInputs().trendBasis, "ytd");
+  assert.equal(decisionLabInputs().trendBasis, "current-year");
+  assert.equal(options[0].monthlyIncomeMinor, 800_000);
+  assert.equal(options[0].monthlyExpensesMinor, 650_000);
 });
 
 test("Basis und Szenario bleiben getrennt und alle Werte sind Schätzungen", () => {
@@ -112,6 +114,15 @@ test("Basis und Szenario bleiben getrennt und alle Werte sind Schätzungen", () 
   assert.equal(result.basis.selectedTrend.incomeMinor, 14_100_000);
   assert.equal(result.basis.selectedTrend.expensesMinor, 11_800_000);
   assert.equal(result.basis.projectedMonthlyCapacityMinor, 121_053);
+  assert.deepEqual(result.basis.lastMonthComparison, {
+    month: "2026-07",
+    incomeMinor: 900_000,
+    expensesMinor: 700_000,
+    netMinor: 200_000,
+    incomeDifferenceMinor: 100_000,
+    expensesDifferenceMinor: 50_000,
+    netDifferenceMinor: 50_000
+  });
   assert.equal(result.series[0].baselineMinor, 20_000_000);
   assert.equal(result.series[0].scenarioMinor, 19_000_000);
   assert.deepEqual(result.milestones[0], {
@@ -121,6 +132,62 @@ test("Basis und Szenario bleiben getrennt und alle Werte sind Schätzungen", () 
     differenceMinor: -640_000
   });
   assert.match(result.basisNotes.join(" "), /\[SCHÄTZUNG\]/);
+});
+
+test("Einnahmen und Vermögensbildung werden transparent getrennt", () => {
+  const enriched = {
+    ...cashflow,
+    months: cashflow.months.map((month, index) => index === cashflow.months.length - 1
+      ? {
+          ...month,
+          payrollRegularMinor: 450_000,
+          payrollVariableMinor: 50_000,
+          secondIncomeRegularMinor: 200_000,
+          otherIncomeRegularMinor: 51_800,
+          passThroughMinor: 10_000,
+          investmentReturnMinor: 3_500,
+          committedOutflowMinor: 40_000,
+          investmentOutflowMinor: 75_000
+        }
+      : month)
+  } satisfies DashboardSavingsBaseline;
+  const result = buildDashboardDecisionLab(assets, enriched, { trendBasis: "current-year" });
+  assert.ok(result.basis.selectedTrend.incomeBreakdown);
+  assert.ok(result.basis.selectedTrend.wealthBuilding);
+  assert.equal(result.basis.selectedTrend.incomeBreakdown.investmentReturnsExcludedMinor, 0);
+  assert.equal(result.basis.selectedTrend.wealthBuilding.employeeStockBenefitStatus, "unavailable");
+  assert.equal(result.basis.selectedTrend.wealthBuilding.employeeStockBenefitMinor, null);
+});
+
+test("aktueller unvollständiger Monat bleibt sichtbar, aber außerhalb der Projektion", () => {
+  const withCurrentMonth = {
+    ...cashflow,
+    window: {
+      start: "2025-08",
+      end: "2026-08",
+      months: 13,
+      currentMonthIncluded: true
+    },
+    months: [...cashflow.months, trendMonth("2026-08", 300_000, 250_000)]
+  } satisfies DashboardSavingsBaseline;
+  const result = buildDashboardDecisionLab(
+    assets,
+    withCurrentMonth,
+    {},
+    new Date("2026-08-22T12:02:00.000Z")
+  );
+  assert.equal(result.basis.selectedTrend.months, 7);
+  assert.equal(result.basis.projectedMonthlyCapacityMinor, 150_000);
+  assert.deepEqual(result.basis.currentMonthProgress, {
+    month: "2026-08",
+    throughDate: "2026-08-22",
+    incomeMinor: 300_000,
+    expensesMinor: 250_000,
+    netMinor: 50_000,
+    incomeDifferenceMinor: -500_000,
+    expensesDifferenceMinor: -400_000,
+    netDifferenceMinor: -100_000
+  });
 });
 
 test("fehlende Vermögens- oder Sparratenbasis erzeugt keine erfundene Projektion", () => {

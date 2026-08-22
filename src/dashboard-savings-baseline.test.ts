@@ -143,6 +143,7 @@ test("interne Überträge und Sparen werden nicht als Konsum oder Einkommen gez�
   ]), config, new Date("2026-08-22T10:00:00.000Z"));
   assert.equal(result.otherIncome.unreviewedMinor, 0);
   assert.equal(result.months.find((month) => month.month === "2026-07")?.consumptionMinor, 80_000);
+  assert.equal(result.months.find((month) => month.month === "2026-07")?.investmentOutflowMinor, 100_000);
 });
 
 test("sonstige Einnahmeregeln trennen laufend, variabel, Erstattung und Durchlauf", () => {
@@ -187,6 +188,7 @@ test("sonstige Einnahmeregeln trennen laufend, variabel, Erstattung und Durchlau
   assert.equal(result.committedOutflow.earmarkedFundingAnnualMinor, 10_000);
   assert.equal(result.committedOutflow.householdContributionAnnualMinor, 30_000);
   assert.equal(result.months.find((month) => month.month === "2026-07")?.consumptionMinor, 60_000);
+  assert.equal(result.months.find((month) => month.month === "2026-07")?.investmentOutflowMinor, 0);
 });
 
 test("Actual-Leser bildet nur pseudonyme Gegenparteischlüssel und erkennt Transfers", async () => {

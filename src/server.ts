@@ -164,9 +164,9 @@ const server = createServer(async (req, res) => {
         res,
         200,
         await service.getDashboardDecisionLab(url.searchParams.get("refresh") === "1", {
-          trendBasis: ["ytd", "last-month", "ytd-plus-last-year"].includes(
+          trendBasis: ["current-year", "ytd-plus-last-year"].includes(
             url.searchParams.get("trendBasis") ?? ""
-          ) ? url.searchParams.get("trendBasis") as "ytd" | "last-month" | "ytd-plus-last-year" : undefined,
+          ) ? url.searchParams.get("trendBasis") as "current-year" | "ytd-plus-last-year" : undefined,
           realReturnBps: numberParam("realReturnBps"),
           monthlyChangeMinor: numberParam("monthlyChangeMinor"),
           oneTimeMinor: numberParam("oneTimeMinor")

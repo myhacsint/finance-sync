@@ -70,7 +70,7 @@ export interface DashboardSavingsBaseline {
   generatedAt: string;
   state: "current" | "partial" | "empty";
   source: "Actual";
-  window: { start: string; end: string; months: number };
+  window: { start: string; end: string; months: number; currentMonthIncluded: boolean };
   payroll: {
     months: number;
     regularMonthlyMinor: number | null;
@@ -131,6 +131,7 @@ export interface DashboardSavingsBaseline {
     unknownPositiveMinor: number;
     consumptionMinor: number;
     committedOutflowMinor: number;
+    investmentOutflowMinor: number;
   }>;
   warnings: string[];
   basis: string[];
@@ -170,6 +171,15 @@ function currentMonth(now: Date, timezone: string): string {
   return `${year}-${month}`;
 }
 
+function currentDate(now: Date, timezone: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(now);
+}
+
 function monthEnd(month: string): string {
   const [year, value] = month.split("-").map(Number);
   const day = new Date(Date.UTC(year, value, 0)).getUTCDate();
@@ -179,14 +189,17 @@ function monthEnd(month: string): string {
 export function savingsBaselineRange(
   now: Date,
   timezone: string,
-  months = 12
+  months = 12,
+  includeCurrentMonth = false
 ): { startDate: string; endDate: string; startMonth: string; endMonth: string; months: number } {
   const safeMonths = Math.max(3, Math.min(36, Math.trunc(months)));
-  const endMonth = shiftMonth(currentMonth(now, timezone), -1);
+  const endMonth = includeCurrentMonth
+    ? currentMonth(now, timezone)
+    : shiftMonth(currentMonth(now, timezone), -1);
   const startMonth = shiftMonth(endMonth, -(safeMonths - 1));
   return {
     startDate: `${startMonth}-01`,
-    endDate: monthEnd(endMonth),
+    endDate: includeCurrentMonth ? currentDate(now, timezone) : monthEnd(endMonth),
     startMonth,
     endMonth,
     months: safeMonths
@@ -206,9 +219,10 @@ export function buildDashboardSavingsBaseline(
   snapshot: SavingsCashflowSnapshot,
   config: AppConfig,
   now = new Date(),
-  analysisMonths = 12
+  analysisMonths = 12,
+  includeCurrentMonth = false
 ): DashboardSavingsBaseline {
-  const range = savingsBaselineRange(now, config.timezone, analysisMonths);
+  const range = savingsBaselineRange(now, config.timezone, analysisMonths, includeCurrentMonth);
   const configuredManual = new Set(
     config.analysis?.savingsBaseline?.manualForwardedIncomeMerchantKeys ?? []
   );
@@ -236,7 +250,8 @@ export function buildDashboardSavingsBaseline(
       unreviewedIncomeMinor: 0,
       unknownPositiveMinor: 0,
       consumptionMinor: 0,
-      committedOutflowMinor: 0
+      committedOutflowMinor: 0,
+      investmentOutflowMinor: 0
     });
   }
 
@@ -320,7 +335,10 @@ export function buildDashboardSavingsBaseline(
       item.unknownPositiveMinor += line.amountMinor;
       continue;
     }
-    if (line.categoryLabel === "Sparen & Investieren") continue;
+    if (line.categoryLabel === "Sparen & Investieren") {
+      if (line.amountMinor < 0) item.investmentOutflowMinor -= line.amountMinor;
+      continue;
+    }
     if (!line.categoryIsIncome) item.consumptionMinor -= line.amountMinor;
   }
 
@@ -384,7 +402,12 @@ export function buildDashboardSavingsBaseline(
       && month.manualForwardedUnassignedMinor === 0
     ) ? "empty" : warnings.length > 0 ? "partial" : "current",
     source: "Actual",
-    window: { start: range.startMonth, end: range.endMonth, months: range.months },
+    window: {
+      start: range.startMonth,
+      end: range.endMonth,
+      months: range.months,
+      currentMonthIncluded: includeCurrentMonth
+    },
     payroll: {
       months: resultMonths.filter((month) => month.payrollRegularMinor > 0).length,
       regularMonthlyMinor: regularPayrollMedian,
@@ -482,9 +505,19 @@ export async function readActualSavingsCashflow(
   config: NonNullable<AppConfig["actual"]>,
   timezone: string,
   now = new Date(),
-  options: { loadApi?: () => Promise<ActualCashflowApi>; password?: string; months?: number } = {}
+  options: {
+    loadApi?: () => Promise<ActualCashflowApi>;
+    password?: string;
+    months?: number;
+    includeCurrentMonth?: boolean;
+  } = {}
 ): Promise<SavingsCashflowSnapshot> {
-  const range = savingsBaselineRange(now, timezone, options.months ?? 12);
+  const range = savingsBaselineRange(
+    now,
+    timezone,
+    options.months ?? 12,
+    options.includeCurrentMonth ?? false
+  );
   const password = options.password ?? readSecret("actual-password");
   if (!password) throw new Error("Actual-Zugang ist nicht verfügbar");
   const dataDir = mkdtempSync(join(tmpdir(), "finance-savings-actual-"));

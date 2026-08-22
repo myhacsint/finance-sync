@@ -373,9 +373,9 @@ export class FinanceService {
           this.config.actual!,
           this.config.timezone,
           generatedAt,
-          { months: 24 }
+          { months: 25, includeCurrentMonth: true }
         ));
-        const value = buildDashboardSavingsBaseline(snapshot, this.config, generatedAt, 24);
+        const value = buildDashboardSavingsBaseline(snapshot, this.config, generatedAt, 25, true);
         this.savingsHistoryCache = { expiresAt: Date.now() + 5 * 60_000, value };
         return value;
       })();

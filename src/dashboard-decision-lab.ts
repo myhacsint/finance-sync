@@ -8,7 +8,26 @@ export interface DecisionLabRequest {
   oneTimeMinor?: number;
 }
 
-export type DecisionTrendBasis = "ytd" | "last-month" | "ytd-plus-last-year";
+export type DecisionTrendBasis = "current-year" | "ytd-plus-last-year";
+
+export interface DecisionMonthlyIncomeBreakdown {
+  workRegularMinor: number;
+  workVariableMinor: number;
+  otherRegularMinor: number;
+  otherVariableMinor: number;
+  earmarkedFundingMinor: number;
+  investmentReturnsExcludedMinor: number;
+  unreviewedExcludedMinor: number;
+}
+
+export interface DecisionMonthlyWealthBuilding {
+  bookedInvestingMinor: number;
+  committedInvestingMinor: number;
+  earmarkedFundingMinor: number;
+  householdContributionMinor: number;
+  employeeStockBenefitMinor: null;
+  employeeStockBenefitStatus: "unavailable";
+}
 
 export interface DecisionTrendOption {
   key: DecisionTrendBasis;
@@ -21,9 +40,14 @@ export interface DecisionTrendOption {
   incomeMinor: number | null;
   expensesMinor: number | null;
   netMinor: number | null;
+  monthlyIncomeMinor: number | null;
+  monthlyExpensesMinor: number | null;
   averageMonthlyNetMinor: number | null;
   annualizedNetMinor: number | null;
   excludedIncomeMinor: number;
+  monthlyMetric: "median" | "average";
+  incomeBreakdown: DecisionMonthlyIncomeBreakdown | null;
+  wealthBuilding: DecisionMonthlyWealthBuilding | null;
 }
 
 export interface DashboardDecisionLab {
@@ -51,6 +75,25 @@ export interface DashboardDecisionLab {
     selectedTrend: DecisionTrendOption;
     trendOptions: DecisionTrendOption[];
     projectedMonthlyCapacityMinor: number | null;
+    lastMonthComparison: {
+      month: string | null;
+      incomeMinor: number | null;
+      expensesMinor: number | null;
+      netMinor: number | null;
+      incomeDifferenceMinor: number | null;
+      expensesDifferenceMinor: number | null;
+      netDifferenceMinor: number | null;
+    };
+    currentMonthProgress: {
+      month: string | null;
+      throughDate: string | null;
+      incomeMinor: number | null;
+      expensesMinor: number | null;
+      netMinor: number | null;
+      incomeDifferenceMinor: number | null;
+      expensesDifferenceMinor: number | null;
+      netDifferenceMinor: number | null;
+    };
   };
   series: Array<{
     year: number;
@@ -79,10 +122,9 @@ function clampInteger(value: number | undefined, fallback: number, min: number, 
 export function decisionLabInputs(request: DecisionLabRequest = {}): DashboardDecisionLab["inputs"] {
   return {
     horizonYears: 20,
-    trendBasis: request.trendBasis === "last-month"
-      || request.trendBasis === "ytd-plus-last-year"
+    trendBasis: request.trendBasis === "ytd-plus-last-year"
       ? request.trendBasis
-      : "ytd",
+      : "current-year",
     realReturnBps: clampInteger(request.realReturnBps, 200, -500, 1_000),
     monthlyChangeMinor: clampInteger(request.monthlyChangeMinor, 0, -1_000_000, 1_000_000),
     oneTimeMinor: clampInteger(request.oneTimeMinor, 0, -100_000_000, 100_000_000)
@@ -92,16 +134,82 @@ export function decisionLabInputs(request: DecisionLabRequest = {}): DashboardDe
 function trendMonthValues(month: DashboardSavingsBaseline["months"][number]): {
   incomeMinor: number;
   expensesMinor: number;
+  incomeBreakdown: DecisionMonthlyIncomeBreakdown;
+  wealthBuilding: DecisionMonthlyWealthBuilding;
 } {
+  const incomeBreakdown = {
+    workRegularMinor: month.payrollRegularMinor + month.secondIncomeRegularMinor,
+    workVariableMinor: month.payrollVariableMinor + month.secondIncomeVariableMinor,
+    otherRegularMinor: month.otherIncomeRegularMinor,
+    otherVariableMinor: month.otherIncomeVariableMinor,
+    earmarkedFundingMinor: month.passThroughMinor,
+    investmentReturnsExcludedMinor: month.investmentReturnMinor,
+    unreviewedExcludedMinor: month.manualForwardedUnassignedMinor
+      + month.unreviewedIncomeMinor
+      + month.unknownPositiveMinor
+  };
   return {
-    incomeMinor: month.payrollRegularMinor
-      + month.payrollVariableMinor
-      + month.secondIncomeRegularMinor
-      + month.secondIncomeVariableMinor
-      + month.otherIncomeRegularMinor
-      + month.otherIncomeVariableMinor
-      + month.passThroughMinor,
-    expensesMinor: month.consumptionMinor + month.committedOutflowMinor
+    incomeMinor: incomeBreakdown.workRegularMinor
+      + incomeBreakdown.workVariableMinor
+      + incomeBreakdown.otherRegularMinor
+      + incomeBreakdown.otherVariableMinor
+      + incomeBreakdown.earmarkedFundingMinor,
+    expensesMinor: month.consumptionMinor + month.committedOutflowMinor,
+    incomeBreakdown,
+    wealthBuilding: {
+      bookedInvestingMinor: month.investmentOutflowMinor,
+      committedInvestingMinor: month.committedOutflowMinor,
+      earmarkedFundingMinor: Math.min(month.passThroughMinor, month.committedOutflowMinor),
+      householdContributionMinor: Math.max(0, month.committedOutflowMinor - month.passThroughMinor),
+      employeeStockBenefitMinor: null,
+      employeeStockBenefitStatus: "unavailable"
+    }
+  };
+}
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? Math.round((sorted[middle - 1] + sorted[middle]) / 2)
+    : sorted[middle];
+}
+
+function monthlyValue(values: number[], metric: "median" | "average"): number {
+  return metric === "median"
+    ? median(values)
+    : Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+}
+
+function monthlyBreakdown(
+  values: ReturnType<typeof trendMonthValues>[],
+  metric: "median" | "average"
+): { income: DecisionMonthlyIncomeBreakdown; wealth: DecisionMonthlyWealthBuilding } {
+  const income = (key: keyof DecisionMonthlyIncomeBreakdown) => monthlyValue(
+    values.map((value) => value.incomeBreakdown[key]), metric
+  );
+  const wealth = (key: Exclude<keyof DecisionMonthlyWealthBuilding,
+    "employeeStockBenefitMinor" | "employeeStockBenefitStatus">) => monthlyValue(
+    values.map((value) => value.wealthBuilding[key] as number), metric
+  );
+  return {
+    income: {
+      workRegularMinor: income("workRegularMinor"),
+      workVariableMinor: income("workVariableMinor"),
+      otherRegularMinor: income("otherRegularMinor"),
+      otherVariableMinor: income("otherVariableMinor"),
+      earmarkedFundingMinor: income("earmarkedFundingMinor"),
+      investmentReturnsExcludedMinor: income("investmentReturnsExcludedMinor"),
+      unreviewedExcludedMinor: income("unreviewedExcludedMinor")
+    },
+    wealth: {
+      bookedInvestingMinor: wealth("bookedInvestingMinor"),
+      committedInvestingMinor: wealth("committedInvestingMinor"),
+      earmarkedFundingMinor: wealth("earmarkedFundingMinor"),
+      householdContributionMinor: wealth("householdContributionMinor"),
+      employeeStockBenefitMinor: null,
+      employeeStockBenefitStatus: "unavailable"
+    }
   };
 }
 
@@ -109,7 +217,8 @@ function trendOption(
   key: DecisionTrendBasis,
   label: string,
   description: string,
-  months: DashboardSavingsBaseline["months"]
+  months: DashboardSavingsBaseline["months"],
+  monthlyMetric: "median" | "average" = "average"
 ): DecisionTrendOption {
   if (months.length === 0) {
     return {
@@ -123,11 +232,17 @@ function trendOption(
       incomeMinor: null,
       expensesMinor: null,
       netMinor: null,
+      monthlyIncomeMinor: null,
+      monthlyExpensesMinor: null,
       averageMonthlyNetMinor: null,
       annualizedNetMinor: null,
-      excludedIncomeMinor: 0
+      excludedIncomeMinor: 0,
+      monthlyMetric,
+      incomeBreakdown: null,
+      wealthBuilding: null
     };
   }
+  const monthValues = months.map(trendMonthValues);
   const totals = months.reduce((sum, month) => {
     const values = trendMonthValues(month);
     return {
@@ -140,7 +255,12 @@ function trendOption(
     };
   }, { incomeMinor: 0, expensesMinor: 0, excludedIncomeMinor: 0 });
   const netMinor = totals.incomeMinor - totals.expensesMinor;
-  const averageMonthlyNetMinor = Math.round(netMinor / months.length);
+  const monthlyIncomeMinor = monthlyValue(monthValues.map((value) => value.incomeMinor), monthlyMetric);
+  const monthlyExpensesMinor = monthlyValue(monthValues.map((value) => value.expensesMinor), monthlyMetric);
+  const averageMonthlyNetMinor = monthlyValue(
+    monthValues.map((value) => value.incomeMinor - value.expensesMinor), monthlyMetric
+  );
+  const breakdown = monthlyBreakdown(monthValues, monthlyMetric);
   return {
     key,
     label,
@@ -152,42 +272,46 @@ function trendOption(
     incomeMinor: totals.incomeMinor,
     expensesMinor: totals.expensesMinor,
     netMinor,
+    monthlyIncomeMinor,
+    monthlyExpensesMinor,
     averageMonthlyNetMinor,
     annualizedNetMinor: averageMonthlyNetMinor * 12,
-    excludedIncomeMinor: totals.excludedIncomeMinor
+    excludedIncomeMinor: totals.excludedIncomeMinor,
+    monthlyMetric,
+    incomeBreakdown: breakdown.income,
+    wealthBuilding: breakdown.wealth
   };
 }
 
 export function decisionTrendOptions(
   cashflow: DashboardSavingsBaseline
 ): DecisionTrendOption[] {
-  const lastMonth = cashflow.months.at(-1);
+  const completeMonths = cashflow.window.currentMonthIncluded
+    ? cashflow.months.slice(0, -1)
+    : cashflow.months;
+  const lastMonth = completeMonths.at(-1);
   const endYear = lastMonth?.month.slice(0, 4);
   const previousYear = endYear ? String(Number(endYear) - 1) : "";
   const ytd = endYear
-    ? cashflow.months.filter((month) => month.month.startsWith(`${endYear}-`))
+    ? completeMonths.filter((month) => month.month.startsWith(`${endYear}-`))
     : [];
   const priorFullYear = previousYear
-    ? cashflow.months.filter((month) => month.month.startsWith(`${previousYear}-`))
+    ? completeMonths.filter((month) => month.month.startsWith(`${previousYear}-`))
     : [];
   return [
     trendOption(
-      "ytd",
-      "Aktuelles Jahr (YTD)",
-      "Durchschnitt aller vollständigen Monate des laufenden Jahres",
-      ytd
-    ),
-    trendOption(
-      "last-month",
-      "Letzter vollständiger Monat",
-      "Fortschreibung des zuletzt vollständig gebuchten Monats",
-      lastMonth ? [lastMonth] : []
+      "current-year",
+      "Aktuelles Jahr",
+      "YTD-Bilanz und typischer Monat als Median der realen Monatsüberschüsse",
+      ytd,
+      "median"
     ),
     trendOption(
       "ytd-plus-last-year",
       "YTD + letztes Jahr",
       "Geglätteter Durchschnitt aus dem vollständigen Vorjahr und dem aktuellen YTD",
-      priorFullYear.length === 12 ? [...priorFullYear, ...ytd] : []
+      priorFullYear.length === 12 ? [...priorFullYear, ...ytd] : [],
+      "average"
     )
   ];
 }
@@ -226,6 +350,20 @@ export function buildDashboardDecisionLab(
   const selectedTrend = trendOptions.find((option) => option.key === inputs.trendBasis)!;
   const startingAssetsMinor = assets.totalMinor;
   const projectedMonthlyCapacityMinor = selectedTrend.averageMonthlyNetMinor;
+  const typicalTrend = trendOptions.find((option) => option.key === "current-year")!;
+  const completeMonths = cashflow.window.currentMonthIncluded
+    ? cashflow.months.slice(0, -1)
+    : cashflow.months;
+  const lastMonth = completeMonths.at(-1);
+  const lastMonthValues = lastMonth ? trendMonthValues(lastMonth) : null;
+  const lastMonthNetMinor = lastMonthValues
+    ? lastMonthValues.incomeMinor - lastMonthValues.expensesMinor
+    : null;
+  const currentMonth = cashflow.window.currentMonthIncluded ? cashflow.months.at(-1) : undefined;
+  const currentMonthValues = currentMonth ? trendMonthValues(currentMonth) : null;
+  const currentMonthNetMinor = currentMonthValues
+    ? currentMonthValues.incomeMinor - currentMonthValues.expensesMinor
+    : null;
   const warnings = [...assets.warnings];
   if (startingAssetsMinor === null) {
     warnings.push("Das aktuelle Finanzvermögen ist unvollständig; die Projektion ist nicht verfügbar.");
@@ -295,7 +433,38 @@ export function buildDashboardDecisionLab(
       startingAssetsMinor,
       selectedTrend,
       trendOptions,
-      projectedMonthlyCapacityMinor
+      projectedMonthlyCapacityMinor,
+      lastMonthComparison: {
+        month: lastMonth?.month ?? null,
+        incomeMinor: lastMonthValues?.incomeMinor ?? null,
+        expensesMinor: lastMonthValues?.expensesMinor ?? null,
+        netMinor: lastMonthNetMinor,
+        incomeDifferenceMinor: lastMonthValues && typicalTrend.monthlyIncomeMinor !== null
+          ? lastMonthValues.incomeMinor - typicalTrend.monthlyIncomeMinor
+          : null,
+        expensesDifferenceMinor: lastMonthValues && typicalTrend.monthlyExpensesMinor !== null
+          ? lastMonthValues.expensesMinor - typicalTrend.monthlyExpensesMinor
+          : null,
+        netDifferenceMinor: lastMonthNetMinor !== null && typicalTrend.averageMonthlyNetMinor !== null
+          ? lastMonthNetMinor - typicalTrend.averageMonthlyNetMinor
+          : null
+      },
+      currentMonthProgress: {
+        month: currentMonth?.month ?? null,
+        throughDate: currentMonth ? cashflow.generatedAt.slice(0, 10) : null,
+        incomeMinor: currentMonthValues?.incomeMinor ?? null,
+        expensesMinor: currentMonthValues?.expensesMinor ?? null,
+        netMinor: currentMonthNetMinor,
+        incomeDifferenceMinor: currentMonthValues && typicalTrend.monthlyIncomeMinor !== null
+          ? currentMonthValues.incomeMinor - typicalTrend.monthlyIncomeMinor
+          : null,
+        expensesDifferenceMinor: currentMonthValues && typicalTrend.monthlyExpensesMinor !== null
+          ? currentMonthValues.expensesMinor - typicalTrend.monthlyExpensesMinor
+          : null,
+        netDifferenceMinor: currentMonthNetMinor !== null && typicalTrend.averageMonthlyNetMinor !== null
+          ? currentMonthNetMinor - typicalTrend.averageMonthlyNetMinor
+          : null
+      }
     },
     series,
     milestones,
@@ -306,6 +475,8 @@ export function buildDashboardDecisionLab(
       "Rendite als Realrendite nach Inflation und monatliche Verzinsung gerechnet [SCHÄTZUNG]",
       "Einnahmen und Ausgaben nach der gewählten historischen Basis fortgeschrieben [SCHÄTZUNG]",
       "Kostenerstattungen mit Ausgaben verrechnet; interne Überträge und Kapitalerträge ausgeschlossen",
+      "Der typische Monat verwendet den Median der realen monatlichen Überschüsse; der letzte Monat dient nur als Vergleich [SCHÄTZUNG]",
+      "Mitarbeiteraktienvorteile sind nur enthalten, wenn sie als eigener Arbeitgeberzufluss gebucht wurden",
       "Bei aufgebrauchtem Finanzvermögen wird nicht automatisch eine Verschuldung unterstellt"
     ]
   };

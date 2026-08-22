@@ -882,6 +882,20 @@ export function renderUi(): string {
     .optimization-stale { grid-column: 1 / -1; color: #ffbd55; font-size: 12px; }
     .decision-toolbar { grid-template-columns: minmax(260px, 1fr); }
     .decision-summary { grid-template-columns: 1.2fr repeat(3, 1fr); }
+    .decision-context { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 12px; }
+    .decision-context-grid { overflow: hidden; border: 1px solid var(--line-soft); border-radius: 10px; }
+    .decision-context-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .decision-context-table th, .decision-context-table td { min-height: 52px; padding: 11px 12px; border-bottom: 1px solid var(--line-soft); text-align: right; font-variant-numeric: tabular-nums; }
+    .decision-context-table tr:last-child td { border-bottom: 0; }
+    .decision-context-table th { background: var(--surface-2); color: var(--muted); font-size: 12px; font-weight: 500; }
+    .decision-context-table th:first-child, .decision-context-table td:first-child { width: 42%; color: var(--muted); text-align: left; }
+    .decision-breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .decision-breakdown-list { display: grid; align-content: start; }
+    .decision-breakdown-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--line-soft); }
+    .decision-breakdown-row:last-child { border-bottom: 0; }
+    .decision-breakdown-row span { color: var(--muted); font-size: 12px; }
+    .decision-breakdown-row strong { font-variant-numeric: tabular-nums; }
+    .decision-breakdown-note { margin-top: 12px; color: var(--muted); font-size: 11px; line-height: 1.5; }
     .decision-layout { display: grid; grid-template-columns: minmax(280px, .62fr) minmax(0, 1.38fr); gap: 12px; margin-top: 12px; }
     .decision-assumptions form { display: grid; gap: 16px; }
     .decision-assumptions label { margin: 0; color: var(--muted); font-size: 12px; }
@@ -936,6 +950,7 @@ export function renderUi(): string {
       .analysis-grid { grid-template-columns: 1fr; }
       .crypto-layout { grid-template-columns: 1fr; }
       .decision-layout { grid-template-columns: 1fr; }
+      .decision-context { grid-template-columns: 1fr; }
       .decision-milestones { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .decision-milestone:nth-child(3) { border-left: 0; border-top: 1px solid var(--line-soft); }
       .decision-milestone:nth-child(4) { border-top: 1px solid var(--line-soft); }
@@ -1117,6 +1132,9 @@ export function renderUi(): string {
       .decision-summary { grid-template-columns: 1fr; }
       .decision-summary > div:first-child { grid-column: auto; }
       .decision-milestones { grid-template-columns: 1fr; }
+      .decision-breakdown { grid-template-columns: 1fr; }
+      .decision-context-table th, .decision-context-table td { padding: 9px 6px; font-size: 11px; }
+      .decision-context-table th:first-child, .decision-context-table td:first-child { width: 38%; }
       .decision-milestone + .decision-milestone { border-left: 0; border-top: 1px solid var(--line-soft); }
       .decision-chart svg { min-height: 205px; }
       .decision-axis { font-size: 10px; }
@@ -1418,7 +1436,7 @@ function analysisSelection(){
     classification:["GRUNDBEDARF","GESTALTBAR","VERMEIDBAR","UNKLAR"].includes(params.get("recurringClassification"))?params.get("recurringClassification"):"alle",
     confidence:["hoch","mittel"].includes(params.get("recurringConfidence"))?params.get("recurringConfidence"):"alle",
     candidate:/^recurring-[a-f0-9]{18}$/.test(params.get("recurringCandidate")||"")?params.get("recurringCandidate"):"",
-    decisionBasis:["last-month","ytd-plus-last-year"].includes(params.get("decisionBasis"))?params.get("decisionBasis"):"ytd",
+    decisionBasis:params.get("decisionBasis")==="ytd-plus-last-year"?"ytd-plus-last-year":"current-year",
     decisionReturn:boundedParam("decisionReturn",2,-5,10),
     decisionMonthly:boundedParam("decisionMonthly",0,-10000,10000),
     decisionOneTime:boundedParam("decisionOneTime",0,-1000000,1000000)
@@ -1456,8 +1474,8 @@ function applyRecurringFilters(){
 function applyDecisionLab(event){
   event?.preventDefault();
   const params=new URLSearchParams(location.search);
-  const basis=document.getElementById("decision-basis")?.value||"ytd";
-  if(basis==="last-month"||basis==="ytd-plus-last-year")params.set("decisionBasis",basis);else params.delete("decisionBasis");
+  const basis=document.getElementById("decision-basis")?.value||"current-year";
+  if(basis==="ytd-plus-last-year")params.set("decisionBasis",basis);else params.delete("decisionBasis");
   params.delete("decisionVariableShare");
   const values={
     decisionReturn:Number(document.getElementById("decision-return")?.value||2),
@@ -1988,7 +2006,8 @@ function renderDecisionLab(data){
   const period=trend.periodStart&&trend.periodEnd
     ? trend.periodStart===trend.periodEnd?analysisMonthLabel(trend.periodEnd):analysisMonthLabel(trend.periodStart)+'–'+analysisMonthLabel(trend.periodEnd)
     : 'nicht verfügbar';
-  const summary='<section class="analysis-summary decision-summary" aria-label="Ausgangslage für die Projektion"><div><span>Finanzvermögen heute</span><strong class="analysis-total">'+(data.basis.startingAssetsMinor===null?'–':moneyWhole(data.basis.startingAssetsMinor))+'</strong><p class="analysis-basis">Ohne Immobilien · '+esc(data.scope.includes.join(", "))+' '+analysisEstimate(true)+'</p></div><div><span>Einnahmen · '+esc(period)+'</span><strong>'+(trend.incomeMinor===null?'–':moneyWhole(trend.incomeMinor))+'</strong><p class="analysis-basis">Ø '+(trend.incomeMinor===null?'–':moneyWhole(Math.round(trend.incomeMinor/trend.months)))+' pro Monat</p></div><div><span>Ausgaben · '+esc(period)+'</span><strong>'+(trend.expensesMinor===null?'–':moneyWhole(trend.expensesMinor))+'</strong><p class="analysis-basis">Ø '+(trend.expensesMinor===null?'–':moneyWhole(Math.round(trend.expensesMinor/trend.months)))+' pro Monat</p></div><div><span>Aktueller Trend</span><strong class="'+(trend.averageMonthlyNetMinor<0?'tone-warning':'tone-ok')+'">'+(trend.averageMonthlyNetMinor===null?'–':signedMoneyWhole(trend.averageMonthlyNetMinor))+' / Monat</strong><p class="analysis-basis">'+(trend.annualizedNetMinor===null?'–':signedMoneyWhole(trend.annualizedNetMinor))+' pro Jahr '+analysisEstimate(true)+'</p></div></section>';
+  const monthlyLabel=trend.monthlyMetric==='median'?'Typischer Monat · Median':'Monatsdurchschnitt';
+  const summary='<section class="analysis-summary decision-summary" aria-label="Ausgangslage für die Projektion"><div><span>Finanzvermögen heute</span><strong class="analysis-total">'+(data.basis.startingAssetsMinor===null?'–':moneyWhole(data.basis.startingAssetsMinor))+'</strong><p class="analysis-basis">Ohne Immobilien · '+esc(data.scope.includes.join(", "))+' '+analysisEstimate(true)+'</p></div><div><span>Bilanz · '+esc(period)+'</span><strong class="'+(trend.netMinor<0?'tone-warning':'tone-ok')+'">'+(trend.netMinor===null?'–':signedMoneyWhole(trend.netMinor))+'</strong><p class="analysis-basis">Einnahmen '+(trend.incomeMinor===null?'–':moneyWhole(trend.incomeMinor))+' · Ausgaben '+(trend.expensesMinor===null?'–':moneyWhole(trend.expensesMinor))+'</p></div><div><span>'+esc(monthlyLabel)+'</span><strong class="'+(trend.averageMonthlyNetMinor<0?'tone-warning':'tone-ok')+'">'+(trend.averageMonthlyNetMinor===null?'–':signedMoneyWhole(trend.averageMonthlyNetMinor))+'</strong><p class="analysis-basis">Einnahmen '+(trend.monthlyIncomeMinor===null?'–':moneyWhole(trend.monthlyIncomeMinor))+' · Ausgaben '+(trend.monthlyExpensesMinor===null?'–':moneyWhole(trend.monthlyExpensesMinor))+'</p></div><div><span>Projektionsbasis</span><strong class="'+(trend.annualizedNetMinor<0?'tone-warning':'tone-ok')+'">'+(trend.annualizedNetMinor===null?'–':signedMoneyWhole(trend.annualizedNetMinor))+' / Jahr</strong><p class="analysis-basis">Aus '+esc(monthlyLabel.toLowerCase())+' '+analysisEstimate(true)+'</p></div></section>';
   if(data.series.length===0){
     const warnings=data.warnings.map(warning=>'<div class="analysis-warning" role="status">'+icons.warning+'<span>'+esc(warning)+'</span></div>').join("");
     document.getElementById("dashboard").innerHTML=toolbar+summary+'<div style="margin-top:12px">'+expenseState("Projektion nicht verfügbar","Für eine Trajektorie werden ein vollständiger Vermögensstand und eine vollständige Sparratenbasis benötigt.","refresh(true)","Neu prüfen","warning")+'</div>'+warnings;
@@ -1999,11 +2018,18 @@ function renderDecisionLab(data){
   const baselineEnd=data.series.at(-1).baselineMinor;const scenarioEnd=data.series.at(-1).scenarioMinor;
   const depletion=(data.depletion.baselineAfterMonths!==null||data.depletion.scenarioAfterMonths!==null)?'<div class="analysis-warning decision-depletion" role="status">'+icons.warning+'<span>Finanzvermögen aufgebraucht: Basis '+esc(decisionDuration(data.depletion.baselineAfterMonths))+' · Szenario '+esc(decisionDuration(data.depletion.scenarioAfterMonths))+'. Eine Verschuldung wird nicht unterstellt.</span></div>':'';
   const projection='<section class="analysis-panel decision-projection" aria-labelledby="decision-projection-title"><div class="analysis-panel-head"><div><h2 id="decision-projection-title">Finanzvermögen über 20 Jahre</h2><p>Aktueller Trend '+moneyWhole(baselineEnd)+' · Szenario '+moneyWhole(scenarioEnd)+' '+analysisEstimate(true)+'</p></div></div>'+decisionChart(data)+depletion+'</section>';
+  const typical=data.basis.trendOptions.find(option=>option.key==='current-year');
+  const last=data.basis.lastMonthComparison;const current=data.basis.currentMonthProgress;
+  const contextRow=(label,income,expenses,net)=>'<tr><td>'+esc(label)+'</td><td>'+(income===null?'–':moneyWhole(income))+'</td><td>'+(expenses===null?'–':moneyWhole(expenses))+'</td><td class="'+(net<0?'tone-warning':'tone-ok')+'">'+(net===null?'–':signedMoneyWhole(net))+'</td></tr>';
+  const comparison='<section class="analysis-panel" aria-labelledby="decision-comparison-title"><div class="analysis-panel-head"><div><h2 id="decision-comparison-title">Monate einordnen</h2><p>Aktueller Stand und letzter vollständiger Monat gegenüber dem typischen Monat.</p></div></div><div class="decision-context-grid"><table class="decision-context-table"><thead><tr><th scope="col">Zeitraum</th><th scope="col">Einnahmen</th><th scope="col">Ausgaben</th><th scope="col">Saldo</th></tr></thead><tbody>'+contextRow('Typischer Monat · Median',typical?.monthlyIncomeMinor??null,typical?.monthlyExpensesMinor??null,typical?.averageMonthlyNetMinor??null)+contextRow('Letzter vollständiger Monat · '+(last.month?analysisMonthLabel(last.month):'–'),last.incomeMinor,last.expensesMinor,last.netMinor)+contextRow('Aktueller Monat bis heute · '+(current.throughDate?formatDate(current.throughDate):'–'),current.incomeMinor,current.expensesMinor,current.netMinor)+'</tbody></table></div><p class="decision-breakdown-note">Letzter Monat gegenüber typisch: Einnahmen '+(last.incomeDifferenceMinor===null?'–':signedMoneyWhole(last.incomeDifferenceMinor))+' · Ausgaben '+(last.expensesDifferenceMinor===null?'–':signedMoneyWhole(last.expensesDifferenceMinor))+' · Saldo '+(last.netDifferenceMinor===null?'–':signedMoneyWhole(last.netDifferenceMinor))+'. Der aktuelle Monat ist unvollständig und fließt nicht in die Projektion ein.</p></section>';
+  const income=trend.incomeBreakdown;const wealth=trend.wealthBuilding;
+  const breakdownRow=(label,value)=>'<div class="decision-breakdown-row"><span>'+esc(label)+'</span><strong>'+(value===null?'–':moneyWhole(value))+'</strong></div>';
+  const breakdown='<section class="analysis-panel" aria-labelledby="decision-breakdown-title"><div class="analysis-panel-head"><div><h2 id="decision-breakdown-title">Was in die Monatsbasis einfließt</h2><p>Durchschnittliche beziehungsweise typische Monatswerte der gewählten Basis.</p></div></div><div class="decision-breakdown"><div><h3>Einnahmen</h3><div class="decision-breakdown-list">'+breakdownRow('Regelmäßige Arbeitseinkommen',income?.workRegularMinor??null)+breakdownRow('Variable Arbeits- und Haushaltseinnahmen',income?.workVariableMinor??null)+breakdownRow('Sonstige regelmäßige Einnahmen',income?.otherRegularMinor??null)+breakdownRow('Sonstige variable Einnahmen',income?.otherVariableMinor??null)+breakdownRow('Zweckgebundene Zuflüsse',income?.earmarkedFundingMinor??null)+breakdownRow('Kapitalerträge · ausgeschlossen',income?.investmentReturnsExcludedMinor??null)+'</div></div><div><h3>Vermögensbildung</h3><div class="decision-breakdown-list">'+breakdownRow('Gebuchte Depot- und Vorsorgezuflüsse',wealth?.bookedInvestingMinor??null)+breakdownRow('Weitere feste Anlagezuflüsse',wealth?.committedInvestingMinor??null)+breakdownRow('Davon zweckgebunden finanziert',wealth?.earmarkedFundingMinor??null)+breakdownRow('Davon eigener Haushaltsanteil',wealth?.householdContributionMinor??null)+breakdownRow('Mitarbeiteraktienvorteil',wealth?.employeeStockBenefitMinor??null)+'</div><p class="decision-breakdown-note">Depotkäufe sind Vermögensbildung und kein Konsum. Der Preisvorteil aus Mitarbeiteraktien ist derzeit nicht separat verfügbar; er wird nur erfasst, wenn er als eigener Arbeitgeberzufluss gebucht ist.</p></div></div></section>';
   const milestones=data.milestones.map(item=>'<article class="decision-milestone"><span>Nach '+item.year+' '+(item.year===1?'Jahr':'Jahren')+'</span><div><small>Trend</small><strong>'+moneyWhole(item.baselineMinor)+'</strong></div><div><small>Szenario</small><strong>'+moneyWhole(item.scenarioMinor)+'</strong></div><p class="'+(item.differenceMinor<0?'tone-warning':'tone-ok')+'">Differenz '+signedMoneyWhole(item.differenceMinor)+' '+analysisEstimate(true)+'</p></article>').join("");
   const basisNotes=data.basisNotes.map(note=>'<li>'+esc(note)+'</li>').join("");
   const notes='<section class="analysis-panel decision-details" aria-labelledby="decision-details-title"><div class="analysis-panel-head"><div><h2 id="decision-details-title">Meilensteine und Datenbasis</h2><p>Exakte Werte ergänzen die Trenddarstellung.</p></div></div><div class="decision-milestones">'+milestones+'</div><div class="decision-source"><p>Vermögensstand '+esc(formatDate(data.freshness.assetsGeneratedAt,true))+' · Zahlungsbasis '+esc(formatDate(data.freshness.cashflowGeneratedAt,true))+' · Quelle '+esc(data.source)+'</p><ul>'+basisNotes+'</ul></div></section>';
   const warnings=data.warnings.map(warning=>'<div class="analysis-warning" role="status">'+icons.warning+'<span>'+esc(warning)+'</span></div>').join("");
-  document.getElementById("dashboard").innerHTML=toolbar+summary+'<div class="decision-layout">'+assumptions+projection+'</div>'+notes+warnings;
+  document.getElementById("dashboard").innerHTML=toolbar+summary+'<div class="decision-context">'+comparison+breakdown+'</div><div class="decision-layout">'+assumptions+projection+'</div>'+notes+warnings;
   document.getElementById("dashboard").setAttribute("aria-busy","false");
 }
 function renderDecisionLabError(error){
