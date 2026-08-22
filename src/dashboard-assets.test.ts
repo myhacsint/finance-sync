@@ -58,11 +58,11 @@ test("Vermögen wird ohne Kontonummern aus letzten Beständen und Ghostfolio auf
     }
   }, new Date("2026-08-11T09:00:00Z"));
   assert.equal(result.state, "current");
-  assert.equal(result.totalMinor, 13_900_000);
+  assert.equal(result.totalMinor, 14_000_000);
   assert.deepEqual(result.areas.map((area) => [area.key, area.amountMinor]), [
     ["cash", 1_800_000],
     ["depots", 3_500_000],
-    ["pensions", 7_200_000],
+    ["pensions", 7_300_000],
     ["crypto", 1_400_000]
   ]);
   assert.deepEqual(result.positions.map((position) => position.label), [
@@ -74,6 +74,13 @@ test("Vermögen wird ohne Kontonummern aus letzten Beständen und Ghostfolio auf
   ]);
   assert.equal(result.positions.some((position) => /cash-shared|depot-private|wallet/.test(position.key)), false);
   assert.equal(result.summary.confirmed, 1);
+  const pension = result.positions.find((position) => position.area === "pensions");
+  assert.equal(pension?.amountMinor, 7_300_000);
+  assert.equal(pension?.basis, "Ghostfolio-Marktwert");
+  assert.equal(pension?.capturedAt, "2026-08-11T08:30:00Z");
+  assert.equal(pension?.confirmedAmountMinor, 7_200_000);
+  assert.equal(pension?.confirmedAt, "2026-07-17T22:00:00Z");
+  assert.equal(pension?.status, "current");
 });
 
 test("fehlende Ghostfolio-Werte lassen Liquidität sichtbar und Gesamtwert offen", () => {
@@ -146,12 +153,12 @@ test("physisches Gold wird separat und ohne Ghostfolio-Doppelzählung ausgewiese
       }
     }
   }, new Date("2026-08-22T09:00:00Z"));
-  assert.equal(result.totalMinor, 15_145_000);
+  assert.equal(result.totalMinor, 15_245_000);
   assert.deepEqual(result.areas.at(-1), {
     key: "precious-metals",
     label: "Edelmetalle",
     amountMinor: 1_245_000,
-    percent: 8.22,
+    percent: 8.17,
     positions: 1,
     status: "confirmed"
   });

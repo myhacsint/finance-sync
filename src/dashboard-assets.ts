@@ -40,8 +40,10 @@ export interface DashboardAssets {
     areaLabel: string;
     amountMinor: number | null;
     capturedAt?: string;
-    basis: "FinanceSync" | "Ghostfolio" | "Bestätigter Wert" | "Ankaufwert [SCHÄTZUNG]";
+    basis: "FinanceSync" | "Ghostfolio" | "Ghostfolio-Marktwert" | "Bestätigter Wert" | "Ankaufwert [SCHÄTZUNG]";
     status: AssetPositionState;
+    confirmedAmountMinor?: number;
+    confirmedAt?: string;
     detail?: string;
     acquisitionCostMinor?: number;
     acquisitionCostEstimated?: boolean;
@@ -216,29 +218,40 @@ export function buildDashboardAssets(
     for (const row of expectedRows) {
       const cashValue = row?.currency === "EUR" ? Number(row.amount_minor) : undefined;
       const investmentValue = row ? marketData?.valuesByAccount[row.account_id] : undefined;
-      const amountMinor = area === "cash" || area === "pensions"
+      const pensionMarketValue = area === "pensions" && Number.isFinite(investmentValue);
+      const amountMinor = area === "cash"
         ? cashValue
-        : investmentValue;
-      const status = positionState(
-        source,
-        sourceRows.get(source.id),
-        row?.captured_at,
-        Number.isFinite(amountMinor),
-        now
-      );
+        : area === "pensions"
+          ? pensionMarketValue ? investmentValue : cashValue
+          : investmentValue;
+      const capturedAt = pensionMarketValue ? marketData?.capturedAt : row?.captured_at;
+      const marketAge = capturedAt ? now.getTime() - new Date(capturedAt).getTime() : Number.NaN;
+      const status = pensionMarketValue
+        ? Number.isFinite(marketAge) && marketAge <= maximumAgeMs("manual") ? "current" : "stale"
+        : positionState(
+            source,
+            sourceRows.get(source.id),
+            capturedAt,
+            Number.isFinite(amountMinor),
+            now
+          );
       positions.push({
         key: publicKey(source.id, row?.account_id ?? "missing"),
         label: positionLabel(source, row?.owner),
         area,
         areaLabel: areaDefinitions.find((item) => item.key === area)!.label,
         amountMinor: Number.isFinite(amountMinor) ? Number(amountMinor) : null,
-        capturedAt: row?.captured_at,
+        capturedAt,
         basis: area === "cash"
           ? "FinanceSync"
           : area === "pensions"
-            ? "Bestätigter Wert"
+            ? pensionMarketValue ? "Ghostfolio-Marktwert" : "Bestätigter Wert"
             : "Ghostfolio",
-        status
+        status,
+        confirmedAmountMinor: area === "pensions" && Number.isFinite(cashValue)
+          ? Number(cashValue)
+          : undefined,
+        confirmedAt: area === "pensions" ? row?.captured_at : undefined
       });
     }
   }
@@ -301,7 +314,9 @@ export function buildDashboardAssets(
     return sourcePositions.length > 0
       && sourcePositions.every((position) => position.status === "current");
   }).length;
-  const confirmed = sortedPositions.filter((position) => position.status === "confirmed").length;
+  const confirmed = sortedPositions.filter((position) =>
+    position.status === "confirmed" || Boolean(position.confirmedAt)
+  ).length;
   const warnings: string[] = [];
   if (!marketData) warnings.push("Anlagenwerte konnten nicht geladen werden");
   if (!complete) warnings.push("Der Gesamtwert ist wegen fehlender Teilwerte nicht verfügbar");
