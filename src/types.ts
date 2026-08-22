@@ -184,6 +184,7 @@ export interface AppConfig {
   analysis?: {
     savingsBaseline?: {
       manualForwardedIncomeMerchantKeys?: string[];
+      manualForwardedIncomeAssignments?: Record<string, string>;
     };
     expenseStructure?: {
       oldestYear?: number;

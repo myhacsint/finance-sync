@@ -45,7 +45,15 @@ export function loadConfig(): AppConfig {
         ? {
             manualForwardedIncomeMerchantKeys:
               parsed.analysis.savingsBaseline.manualForwardedIncomeMerchantKeys
-                ?.filter((key) => /^merchant-[a-f0-9]{16}$/.test(key))
+                ?.filter((key) => /^merchant-[a-f0-9]{16}$/.test(key)),
+            manualForwardedIncomeAssignments: Object.fromEntries(
+              Object.entries(
+                parsed.analysis.savingsBaseline.manualForwardedIncomeAssignments ?? {}
+              ).filter(([key, month]) =>
+                /^booking-[a-f0-9]{20}$/.test(key)
+                  && /^\d{4}-(0[1-9]|1[0-2])$/.test(String(month))
+              )
+            )
           }
         : undefined,
       expenseStructure: parsed.analysis.expenseStructure

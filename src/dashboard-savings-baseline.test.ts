@@ -22,6 +22,7 @@ const config: AppConfig = {
 
 function line(overrides: Partial<SavingsCashflowLine>): SavingsCashflowLine {
   return {
+    bookingKey: "booking-aaaaaaaaaaaaaaaaaaaa",
     date: "2026-07-01",
     amountMinor: 0,
     categoryIsIncome: false,
@@ -90,10 +91,43 @@ test("manuell weitergeleitetes Zweitgehalt bleibt bis zur Monatszuordnung ausges
   assert.deepEqual(result.manualForwardedIncome, {
     status: "needs-assignment",
     occurrences: 2,
-    amountMinor: 420_000
+    assignedOccurrences: 0,
+    unassignedOccurrences: 2,
+    amountMinor: 420_000,
+    unassignedAmountMinor: 420_000,
+    regularMonthlyMinor: null,
+    variableAnnualMinor: 0,
+    estimate: true
   });
   assert.equal(result.otherIncome.amountMinor, 0);
   assert.equal(result.savingsCapacityMonthlyMinor, null);
+});
+
+test("bestätigte Wirtschaftsmonate ordnen das zweite Gehalt ohne Buchungsverschiebung zu", () => {
+  const assignedConfig: AppConfig = {
+    ...config,
+    analysis: {
+      savingsBaseline: {
+        manualForwardedIncomeMerchantKeys: [manualKey],
+        manualForwardedIncomeAssignments: {
+          "booking-11111111111111111111": "2026-01",
+          "booking-22222222222222222222": "2026-02",
+          "booking-33333333333333333333": "2026-03"
+        }
+      }
+    }
+  };
+  const result = buildDashboardSavingsBaseline(snapshot([
+    line({ bookingKey: "booking-11111111111111111111", date: "2025-12-30", amountMinor: 120_000, categoryIsIncome: true, merchantKey: manualKey }),
+    line({ bookingKey: "booking-22222222222222222222", date: "2026-02-03", amountMinor: 120_000, categoryIsIncome: true, merchantKey: manualKey }),
+    line({ bookingKey: "booking-33333333333333333333", date: "2026-03-31", amountMinor: 440_000, categoryIsIncome: true, merchantKey: manualKey })
+  ]), assignedConfig, new Date("2026-08-22T10:00:00.000Z"));
+  assert.equal(result.manualForwardedIncome.status, "assigned");
+  assert.equal(result.manualForwardedIncome.unassignedOccurrences, 0);
+  assert.equal(result.manualForwardedIncome.regularMonthlyMinor, 120_000);
+  assert.equal(result.manualForwardedIncome.variableAnnualMinor, 320_000);
+  assert.equal(result.months.find((month) => month.month === "2026-01")?.secondIncomeRegularMinor, 120_000);
+  assert.equal(result.months.find((month) => month.month === "2026-03")?.secondIncomeVariableMinor, 320_000);
 });
 
 test("interne Überträge und Sparen werden nicht als Konsum oder Einkommen gezählt", () => {

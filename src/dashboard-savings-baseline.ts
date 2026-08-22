@@ -48,6 +48,7 @@ interface ActualCashflowApi {
 }
 
 export interface SavingsCashflowLine {
+  bookingKey: string;
   date: string;
   amountMinor: number;
   categoryLabel?: string;
@@ -77,9 +78,15 @@ export interface DashboardSavingsBaseline {
     estimate: true;
   };
   manualForwardedIncome: {
-    status: "none" | "needs-assignment";
+    status: "none" | "needs-assignment" | "assigned";
     occurrences: number;
+    assignedOccurrences: number;
+    unassignedOccurrences: number;
     amountMinor: number;
+    unassignedAmountMinor: number;
+    regularMonthlyMinor: number | null;
+    variableAnnualMinor: number;
+    estimate: true;
   };
   otherIncome: {
     amountMinor: number;
@@ -94,7 +101,9 @@ export interface DashboardSavingsBaseline {
     month: string;
     payrollRegularMinor: number;
     payrollVariableMinor: number;
-    manualForwardedIncomeMinor: number;
+    secondIncomeRegularMinor: number;
+    secondIncomeVariableMinor: number;
+    manualForwardedUnassignedMinor: number;
     otherIncomeMinor: number;
     unknownPositiveMinor: number;
     consumptionMinor: number;
@@ -107,6 +116,12 @@ export function savingsMerchantKey(stable: string): string {
   return `merchant-${createHash("sha256")
     .update(`finance-hub:merchant:${stable}`)
     .digest("hex").slice(0, 16)}`;
+}
+
+export function savingsBookingKey(accountId: string, parentId: string, transactionId: string): string {
+  return `booking-${createHash("sha256")
+    .update(`finance-hub:savings-booking:${accountId}:${parentId}:${transactionId}`)
+    .digest("hex").slice(0, 20)}`;
 }
 
 export function payrollEconomicMonth(purpose: string): string | undefined {
@@ -172,13 +187,16 @@ export function buildDashboardSavingsBaseline(
   const configuredManual = new Set(
     config.analysis?.savingsBaseline?.manualForwardedIncomeMerchantKeys ?? []
   );
+  const assignments = config.analysis?.savingsBaseline?.manualForwardedIncomeAssignments ?? {};
   const months = new Map<string, DashboardSavingsBaseline["months"][number]>();
   for (let month = range.startMonth; month <= range.endMonth; month = shiftMonth(month, 1)) {
     months.set(month, {
       month,
       payrollRegularMinor: 0,
       payrollVariableMinor: 0,
-      manualForwardedIncomeMinor: 0,
+      secondIncomeRegularMinor: 0,
+      secondIncomeVariableMinor: 0,
+      manualForwardedUnassignedMinor: 0,
       otherIncomeMinor: 0,
       unknownPositiveMinor: 0,
       consumptionMinor: 0
@@ -194,6 +212,21 @@ export function buildDashboardSavingsBaseline(
   const variableThreshold = regularPayrollMedian === null
     ? Number.POSITIVE_INFINITY
     : regularPayrollMedian * 1.5;
+  const manualLines = snapshot.lines.filter((line) =>
+    line.amountMinor > 0
+      && !line.transfer
+      && !line.startingBalance
+      && configuredManual.has(line.merchantKey)
+      && months.has(line.date.slice(0, 7))
+  );
+  const assignedManualLines = manualLines.flatMap((line) => {
+    const month = assignments[line.bookingKey];
+    return month && months.has(month) ? [{ ...line, month }] : [];
+  });
+  const regularSecondIncomeMedian = median(assignedManualLines.map((line) => line.amountMinor));
+  const secondIncomeVariableThreshold = regularSecondIncomeMedian === null
+    ? Number.POSITIVE_INFINITY
+    : regularSecondIncomeMedian * 1.5;
 
   for (const line of snapshot.lines) {
     if (line.transfer || line.startingBalance) continue;
@@ -212,7 +245,16 @@ export function buildDashboardSavingsBaseline(
     const item = months.get(bookingMonth);
     if (!item) continue;
     if (line.amountMinor > 0 && configuredManual.has(line.merchantKey)) {
-      item.manualForwardedIncomeMinor += line.amountMinor;
+      const assignedMonth = assignments[line.bookingKey];
+      const assignedItem = assignedMonth ? months.get(assignedMonth) : undefined;
+      if (!assignedItem || regularSecondIncomeMedian === null) {
+        item.manualForwardedUnassignedMinor += line.amountMinor;
+      } else if (line.amountMinor > secondIncomeVariableThreshold) {
+        assignedItem.secondIncomeRegularMinor += regularSecondIncomeMedian;
+        assignedItem.secondIncomeVariableMinor += line.amountMinor - regularSecondIncomeMedian;
+      } else {
+        assignedItem.secondIncomeRegularMinor += line.amountMinor;
+      }
       continue;
     }
     if (line.categoryIsIncome && line.amountMinor > 0) {
@@ -228,15 +270,11 @@ export function buildDashboardSavingsBaseline(
   }
 
   const resultMonths = [...months.values()];
-  const manualOccurrences = snapshot.lines.filter((line) =>
-    line.amountMinor > 0
-      && !line.transfer
-      && !line.startingBalance
-      && configuredManual.has(line.merchantKey)
-      && months.has(line.date.slice(0, 7))
-  ).length;
-  const manualAmountMinor = resultMonths.reduce(
-    (sum, month) => sum + month.manualForwardedIncomeMinor,
+  const manualOccurrences = manualLines.length;
+  const assignedOccurrences = assignedManualLines.length;
+  const manualAmountMinor = manualLines.reduce((sum, line) => sum + line.amountMinor, 0);
+  const unassignedAmountMinor = resultMonths.reduce(
+    (sum, month) => sum + month.manualForwardedUnassignedMinor,
     0
   );
   const unknownPositiveMinor = resultMonths.reduce(
@@ -244,7 +282,7 @@ export function buildDashboardSavingsBaseline(
     0
   );
   const warnings: string[] = [];
-  if (manualOccurrences > 0) {
+  if (assignedOccurrences < manualOccurrences) {
     warnings.push(
       "Manuell weitergeleitetes zweites Haushaltseinkommen wartet auf wirtschaftliche Monatszuordnung."
     );
@@ -258,7 +296,8 @@ export function buildDashboardSavingsBaseline(
       month.consumptionMinor === 0
       && month.payrollRegularMinor === 0
       && month.otherIncomeMinor === 0
-      && month.manualForwardedIncomeMinor === 0
+      && month.secondIncomeRegularMinor === 0
+      && month.manualForwardedUnassignedMinor === 0
     ) ? "empty" : warnings.length > 0 ? "partial" : "current",
     source: "Actual",
     window: { start: range.startMonth, end: range.endMonth, months: range.months },
@@ -272,9 +311,20 @@ export function buildDashboardSavingsBaseline(
       estimate: true
     },
     manualForwardedIncome: {
-      status: manualOccurrences > 0 ? "needs-assignment" : "none",
+      status: manualOccurrences === 0
+        ? "none"
+        : assignedOccurrences === manualOccurrences ? "assigned" : "needs-assignment",
       occurrences: manualOccurrences,
-      amountMinor: manualAmountMinor
+      assignedOccurrences,
+      unassignedOccurrences: manualOccurrences - assignedOccurrences,
+      amountMinor: manualAmountMinor,
+      unassignedAmountMinor,
+      regularMonthlyMinor: regularSecondIncomeMedian,
+      variableAnnualMinor: resultMonths.reduce(
+        (sum, month) => sum + month.secondIncomeVariableMinor,
+        0
+      ),
+      estimate: true
     },
     otherIncome: {
       amountMinor: resultMonths.reduce((sum, month) => sum + month.otherIncomeMinor, 0),
@@ -290,7 +340,7 @@ export function buildDashboardSavingsBaseline(
     basis: [
       "Payroll-Zahlungen nach dem im Verwendungszweck codierten Leistungsmonat",
       "Arbeitgeber-Einmalzahlungen getrennt vom regelmäßigen Gehalt [SCHÄTZUNG]",
-      "Manuell weitergeleitetes zweites Gehalt bis zur Monatszuordnung ausgeschlossen",
+      "Manuell weitergeleitetes zweites Gehalt nach bestätigtem Wirtschaftsmonat",
       "Interne Überträge sowie Sparen & Investieren nicht als Konsum gezählt",
       "Sparratenbasis bleibt bis zur vollständigen Einkommenszuordnung nicht verfügbar"
     ]
@@ -330,11 +380,12 @@ export async function readActualSavingsCashflow(
     );
     const payeeMap = new Map(payees.map((payee) => [payee.id, payee]));
     const accountTransactions = await Promise.all(
-      accounts.filter((account) => !account.offbudget).map((account) =>
-        api.getTransactions(account.id, range.startDate, range.endDate)
-      )
+      accounts.filter((account) => !account.offbudget).map(async (account) => ({
+        account,
+        transactions: await api.getTransactions(account.id, range.startDate, range.endDate)
+      }))
     );
-    const lines = accountTransactions.flatMap((transactions) =>
+    const lines = accountTransactions.flatMap(({ account, transactions }) =>
       transactions.flatMap((transaction) => {
         if (transaction.is_child) return [];
         const parts = transaction.is_parent && transaction.subtransactions?.length
@@ -347,6 +398,7 @@ export async function readActualSavingsCashflow(
           const stable = payee?.id ?? parentPayee?.id
             ?? part.imported_payee ?? transaction.imported_payee ?? "unknown";
           return {
+            bookingKey: savingsBookingKey(account.id, transaction.id, part.id),
             date: part.date || transaction.date,
             amountMinor: Math.round(part.amount),
             categoryLabel: category?.name,
