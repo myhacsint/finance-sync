@@ -2091,9 +2091,11 @@ function renderFireTracking(fire){
   const actionRows=fire.actions.map(action=>{
     const checked=fire.selectedActionKeys.includes(action.key);
     const disabled=!action.selectable;
-    const saving=action.expectedAnnualSavingsMinor===null?'Noch nicht belastbar':money(action.expectedAnnualSavingsMinor)+' / Jahr';
+    const saving=action.expectedAnnualSavingsMinor===null
+      ?money(action.estimatedAnnualCostMinor)+' Kosten / Jahr'
+      :money(action.expectedAnnualSavingsMinor)+' Entlastung / Jahr';
     const coverage=gap&&action.expectedAnnualSavingsMinor!==null?Math.min(100,Math.round(action.expectedAnnualSavingsMinor/gap*100)):null;
-    const impact=action.yearsGained&&action.yearsGained>0?action.yearsGained+' '+(action.yearsGained===1?'Jahr':'Jahre')+' früher':coverage!==null?coverage+' % der aktuellen Ziel-Lücke':'Erst nach Prüfung berechenbar';
+    const impact=action.yearsGained&&action.yearsGained>0?action.yearsGained+' '+(action.yearsGained===1?'Jahr':'Jahre')+' früher':coverage!==null?coverage+' % der aktuellen Ziel-Lücke':'Mögliche Entlastung erst nach Prüfung';
     return '<label class="fire-action fire-action-'+esc(action.leverQuality)+'"><input type="checkbox" name="fire-action" value="'+esc(action.key)+'" '+(checked?'checked ':'')+(disabled?'disabled ':'')+'><span class="fire-action-main"><strong>'+esc(action.label)+'</strong><small>'+esc(action.leverLabel)+' · '+esc(action.classificationLabel)+' · '+esc(action.statusLabel)+'</small></span><span class="fire-action-saving"><strong>'+saving+'</strong><small>'+esc(impact)+' '+analysisEstimate(true)+'</small></span></label>';
   }).join('');
   const noActions='<div class="fire-empty">Noch keine bestätigten Optimierungsmaßnahmen verfügbar.</div>';

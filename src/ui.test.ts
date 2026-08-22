@@ -175,6 +175,8 @@ test("Analysenansicht besitzt ein zugängliches Entscheidungslabor", () => {
   assert.match(html, /Überbrückungskapital heute/);
   assert.match(html, /Gebundene Vorsorge/);
   assert.match(html, /Reale Ausgabenhebel/);
+  assert.match(html, /estimatedAnnualCostMinor/);
+  assert.match(html, /Mögliche Entlastung erst nach Prüfung/);
   assert.match(html, /Grundbedarf bleibt ausgeschlossen/);
   assert.match(html, /fireTargetAge/);
   assert.match(html, /fireActionKeys/);
