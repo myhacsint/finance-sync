@@ -1,7 +1,11 @@
 import type { FinanceDatabase } from "./database.js";
 import type { AppConfig, SourceConfig, SourceKind } from "./types.js";
+import {
+  configuredPhysicalAssets,
+  latestPhysicalAssetValuation
+} from "./physical-assets.js";
 
-export type AssetComparisonKey = "cash" | "depots" | "pensions" | "solana";
+export type AssetComparisonKey = "cash" | "depots" | "pensions" | "solana" | "gold";
 export type AssetComparisonValuation = "measured" | "confirmed" | "estimated" | "unavailable";
 
 export interface CoinGeckoSolPrice {
@@ -256,8 +260,8 @@ function previousSolanaQuantity(
 }
 
 function currentInvestmentAmount(
-  allocation: Array<{ key: "pensions" | "depots" | "solana"; amountMinor: number }>,
-  key: "pensions" | "depots" | "solana"
+  allocation: Array<{ key: "pensions" | "depots" | "solana" | "gold"; amountMinor: number }>,
+  key: "pensions" | "depots" | "solana" | "gold"
 ): number | null {
   const row = allocation.find((item) => item.key === key);
   return row && Number.isFinite(row.amountMinor) ? row.amountMinor : null;
@@ -270,7 +274,7 @@ export function buildOverviewAssetComparison(
     totalMinor: number | null;
     cashMinor: number | null;
     investmentMinor: number | null;
-    allocation: Array<{ key: "pensions" | "depots" | "solana"; amountMinor: number }>;
+    allocation: Array<{ key: "pensions" | "depots" | "solana" | "gold"; amountMinor: number }>;
   },
   solPrice: PromiseSettledResult<CoinGeckoSolPrice>,
   now = new Date()
@@ -333,6 +337,36 @@ export function buildOverviewAssetComparison(
       stakingRewardsQuantity: solana.stakingRewardsQuantity,
       priceMinor: price?.priceMinor,
       priceDate: price?.date
+    });
+  }
+
+  const physicalAssets = configuredPhysicalAssets(config);
+  if (physicalAssets.length > 0) {
+    const previousValuations = physicalAssets.map((asset) => ({
+      asset,
+      valuation: latestPhysicalAssetValuation(asset, boundary.effectiveDate)
+    }));
+    const previousComplete = previousValuations.every((item) => Boolean(item.valuation));
+    const previousMinor = previousComplete
+      ? previousValuations.reduce((sum, item) => sum + Number(item.valuation?.amountMinor), 0)
+      : null;
+    const currentMinor = currentInvestmentAmount(current.allocation, "gold");
+    const sources = [...new Set(previousValuations
+      .map((item) => item.valuation?.source)
+      .filter((value): value is string => Boolean(value)))];
+    parts.push({
+      key: "gold",
+      label: "Physisches Gold",
+      currentMinor,
+      previousMinor,
+      changeMinor: previousMinor !== null && currentMinor !== null
+        ? currentMinor - previousMinor
+        : null,
+      source: sources.length ? sources.join(" · ") : "Manuelle Goldbewertung",
+      capturedDates: previousValuations
+        .map((item) => item.valuation?.date)
+        .filter((value): value is string => Boolean(value)),
+      valuation: previousMinor === null ? "unavailable" : "estimated"
     });
   }
 

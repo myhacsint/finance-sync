@@ -48,7 +48,8 @@ export function loadConfig(): AppConfig {
         ? { ...parsed.analysis.cryptoPosition }
         : undefined
     } : undefined,
-    sources: parsed.sources ?? []
+    sources: parsed.sources ?? [],
+    physicalAssets: parsed.physicalAssets ?? []
   };
 }
 

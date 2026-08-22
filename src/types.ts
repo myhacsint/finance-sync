@@ -138,11 +138,32 @@ export interface SourceConfig {
   settings?: Record<string, unknown>;
 }
 
+export interface PhysicalAssetValuationConfig {
+  date: string;
+  amountMinor: number;
+  basis: string;
+  source: string;
+  estimated: boolean;
+}
+
+export interface PhysicalAssetConfig {
+  id: string;
+  label: string;
+  kind: "gold";
+  weightGrams: number;
+  fineness: number;
+  acquiredYear?: number;
+  acquisitionCostMinor?: number;
+  acquisitionCostEstimated?: boolean;
+  valuations: PhysicalAssetValuationConfig[];
+}
+
 export interface AppConfig {
   port: number;
   publicBaseUrl?: string;
   timezone: string;
   sources: SourceConfig[];
+  physicalAssets?: PhysicalAssetConfig[];
   actual?: {
     enabled: boolean;
     serverUrl: string;

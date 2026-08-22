@@ -9,6 +9,7 @@ import {
   type CoinGeckoSolPrice,
   type OverviewAssetComparison
 } from "./dashboard-asset-comparison.js";
+import { physicalAssetsTotalMinor } from "./physical-assets.js";
 
 export interface OverviewMonth {
   key: string;
@@ -45,7 +46,7 @@ export interface InvestmentOverviewSnapshot {
   amountMinor: number;
   capturedAt?: string;
   allocation: Array<{
-    key: "pensions" | "depots" | "solana";
+    key: "pensions" | "depots" | "solana" | "gold";
     label: string;
     amountMinor: number;
   }>;
@@ -70,7 +71,7 @@ export interface DashboardOverview {
   investments: {
     amountMinor: number | null;
     capturedAt?: string;
-    source: "Ghostfolio";
+    source: "Ghostfolio" | "Ghostfolio + bestätigte Sachwerte";
     allocation: InvestmentOverviewSnapshot["allocation"];
   };
   comparison: OverviewAssetComparison;
@@ -401,6 +402,7 @@ export function buildDashboardOverview(
   const rows = db.listSources() as unknown as SourceRow[];
   const cash = cashSnapshot(db, config);
   const investment = investments.status === "fulfilled" ? investments.value : undefined;
+  const physicalAssetsMinor = physicalAssetsTotalMinor(config);
   const actualData = actual.status === "fulfilled" ? actual.value : undefined;
   const manualActions = config.sources
     .filter((source) => source.enabled && source.kind === "manual")
@@ -428,14 +430,25 @@ export function buildDashboardOverview(
   if (!actualData) warnings.push("Actual-Daten sind vorübergehend nicht verfügbar");
   if (!investment) warnings.push("Ghostfolio-Daten sind vorübergehend nicht verfügbar");
   if (cash.amountMinor === null) warnings.push("Aktuelle Bankstände sind nicht verfügbar");
-  const totalMinor = cash.amountMinor !== null && investment
-    ? cash.amountMinor + investment.amountMinor
+  const investmentAmountMinor = investment
+    ? investment.amountMinor + physicalAssetsMinor
+    : null;
+  const investmentAllocation = investment
+    ? [
+        ...investment.allocation,
+        ...(physicalAssetsMinor > 0
+          ? [{ key: "gold" as const, label: "Physisches Gold", amountMinor: physicalAssetsMinor }]
+          : [])
+      ]
+    : [];
+  const totalMinor = cash.amountMinor !== null && investmentAmountMinor !== null
+    ? cash.amountMinor + investmentAmountMinor
     : null;
   const comparison = buildOverviewAssetComparison(db, config, {
     totalMinor,
     cashMinor: cash.amountMinor,
-    investmentMinor: investment?.amountMinor ?? null,
-    allocation: investment?.allocation ?? []
+    investmentMinor: investmentAmountMinor,
+    allocation: investmentAllocation
   }, solPrice, now);
   return {
     generatedAt: now.toISOString(),
@@ -443,10 +456,10 @@ export function buildDashboardOverview(
     totalMinor,
     cash: { ...cash, source: "FinanceSync" },
     investments: {
-      amountMinor: investment?.amountMinor ?? null,
+      amountMinor: investmentAmountMinor,
       capturedAt: investment?.capturedAt,
-      source: "Ghostfolio",
-      allocation: investment?.allocation ?? []
+      source: physicalAssetsMinor > 0 ? "Ghostfolio + bestätigte Sachwerte" : "Ghostfolio",
+      allocation: investmentAllocation
     },
     comparison,
     cashflow: {

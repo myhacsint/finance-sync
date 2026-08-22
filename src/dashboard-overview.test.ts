@@ -265,3 +265,40 @@ test("Ghostfolio-Werte werden anhand der FinanceSync-Quellen gruppiert", async (
     db.close();
   }
 });
+
+test("Übersicht ergänzt physisches Gold getrennt zum Ghostfolio-Wert", () => {
+  const db = database();
+  try {
+    const goldConfig: AppConfig = {
+      ...config,
+      physicalAssets: [{
+        id: "gold-100g",
+        label: "Goldbarren 100 g",
+        kind: "gold",
+        weightGrams: 100,
+        fineness: 999.9,
+        valuations: [
+          { date: "2026-07-31", amountMinor: 1_127_800, basis: "XAU/EUR", source: "Historischer Goldkurs", estimated: true },
+          { date: "2026-08-22", amountMinor: 1_245_000, basis: "Ankauf", source: "GOLD.DE", estimated: true }
+        ]
+      }]
+    };
+    const result = buildDashboardOverview(
+      db,
+      goldConfig,
+      { status: "fulfilled", value: actual },
+      { status: "fulfilled", value: investments },
+      new Date("2026-08-22T09:00:00Z")
+    );
+    assert.equal(result.investments.amountMinor, 17_421_600);
+    assert.equal(result.totalMinor, 19_247_500);
+    assert.deepEqual(result.investments.allocation.at(-1), {
+      key: "gold",
+      label: "Physisches Gold",
+      amountMinor: 1_245_000
+    });
+    assert.equal(result.investments.source, "Ghostfolio + bestätigte Sachwerte");
+  } finally {
+    db.close();
+  }
+});

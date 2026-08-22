@@ -2,8 +2,12 @@ import { createHash } from "node:crypto";
 import { readSecret } from "./config.js";
 import type { FinanceDatabase } from "./database.js";
 import type { AppConfig, SourceConfig, SourceKind } from "./types.js";
+import {
+  configuredPhysicalAssets,
+  latestPhysicalAssetValuation
+} from "./physical-assets.js";
 
-export type AssetAreaKey = "cash" | "depots" | "pensions" | "crypto";
+export type AssetAreaKey = "cash" | "depots" | "pensions" | "crypto" | "precious-metals";
 export type AssetPositionState = "current" | "confirmed" | "stale" | "error" | "unavailable";
 
 export interface GhostfolioAssetSnapshot {
@@ -36,8 +40,11 @@ export interface DashboardAssets {
     areaLabel: string;
     amountMinor: number | null;
     capturedAt?: string;
-    basis: "FinanceSync" | "Ghostfolio" | "Bestätigter Wert";
+    basis: "FinanceSync" | "Ghostfolio" | "Bestätigter Wert" | "Ankaufwert [SCHÄTZUNG]";
     status: AssetPositionState;
+    detail?: string;
+    acquisitionCostMinor?: number;
+    acquisitionCostEstimated?: boolean;
   }>;
   warnings: string[];
 }
@@ -63,7 +70,8 @@ const areaDefinitions: Array<{ key: AssetAreaKey; label: string }> = [
   { key: "cash", label: "Liquidität" },
   { key: "depots", label: "Depots" },
   { key: "pensions", label: "Vorsorge" },
-  { key: "crypto", label: "Krypto" }
+  { key: "crypto", label: "Krypto" },
+  { key: "precious-metals", label: "Edelmetalle" }
 ];
 
 function areaFor(kind: SourceKind): AssetAreaKey | undefined {
@@ -233,6 +241,26 @@ export function buildDashboardAssets(
       });
     }
   }
+  for (const asset of configuredPhysicalAssets(config)) {
+    const valuation = latestPhysicalAssetValuation(asset);
+    if (!valuation) continue;
+    positions.push({
+      key: publicKey("physical-asset", asset.id),
+      label: asset.label,
+      area: "precious-metals",
+      areaLabel: "Edelmetalle",
+      amountMinor: valuation.amountMinor,
+      capturedAt: `${valuation.date}T12:00:00.000Z`,
+      basis: "Ankaufwert [SCHÄTZUNG]",
+      status: "confirmed",
+      detail: `${asset.weightGrams} g · Feinheit ${new Intl.NumberFormat("de-DE", {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1
+      }).format(asset.fineness)}`,
+      acquisitionCostMinor: asset.acquisitionCostMinor,
+      acquisitionCostEstimated: asset.acquisitionCostEstimated
+    });
+  }
   const sortedPositions = positions.sort((left, right) => {
     const areaDelta = areaDefinitions.findIndex((item) => item.key === left.area)
       - areaDefinitions.findIndex((item) => item.key === right.area);
@@ -261,7 +289,7 @@ export function buildDashboardAssets(
       positions: areaPositions.length,
       status: weakestState(areaPositions.map((position) => position.status))
     };
-  });
+  }).filter((area) => area.positions > 0);
   const automaticSources = enabledSources.filter((source) => source.kind !== "manual");
   const automaticCurrent = automaticSources.filter((source) => {
     const sourcePositions = sortedPositions.filter((position) => {

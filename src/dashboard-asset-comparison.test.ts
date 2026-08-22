@@ -129,3 +129,48 @@ test("CoinGecko-Tageskurs wird für den exakten Stichtag in EUR gelesen", async 
   assert.equal(url.searchParams.get("localization"), "false");
   assert.deepEqual(result, { date: "2026-07-31", priceMinor: 15_346, source: "CoinGecko" });
 });
+
+test("Goldvergleich verwendet nur dokumentierte Bewertungen und stimmt die Gesamtsumme ab", () => {
+  const db = database();
+  try {
+    const goldConfig: AppConfig = {
+      ...config,
+      physicalAssets: [{
+        id: "gold-100g",
+        label: "Goldbarren 100 g",
+        kind: "gold",
+        weightGrams: 100,
+        fineness: 999.9,
+        valuations: [
+          { date: "2026-07-31", amountMinor: 1_127_800, basis: "XAU/EUR", source: "Historischer Goldkurs", estimated: true },
+          { date: "2026-08-22", amountMinor: 1_245_000, basis: "Ankauf", source: "GOLD.DE", estimated: true }
+        ]
+      }]
+    };
+    const goldCurrent = {
+      ...current,
+      totalMinor: current.totalMinor + 1_245_000,
+      investmentMinor: current.investmentMinor + 1_245_000,
+      allocation: [...current.allocation, { key: "gold" as const, amountMinor: 1_245_000 }]
+    };
+    const result = buildOverviewAssetComparison(db, goldConfig, goldCurrent, {
+      status: "fulfilled",
+      value: { date: "2026-07-31", priceMinor: 10_000, source: "CoinGecko" }
+    }, new Date("2026-08-22T09:00:00Z"));
+    assert.equal(result.state, "complete");
+    assert.equal(result.previousTotalMinor, 13_147_800);
+    assert.equal(result.changeTotalMinor, 6_099_700);
+    assert.deepEqual(result.parts.at(-1), {
+      key: "gold",
+      label: "Physisches Gold",
+      currentMinor: 1_245_000,
+      previousMinor: 1_127_800,
+      changeMinor: 117_200,
+      source: "Historischer Goldkurs",
+      capturedDates: ["2026-07-31"],
+      valuation: "estimated"
+    });
+  } finally {
+    db.close();
+  }
+});

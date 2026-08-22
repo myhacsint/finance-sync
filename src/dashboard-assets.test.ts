@@ -113,3 +113,50 @@ test("Ghostfolio-Konten werden auf FinanceSync-Konten abgebildet", async () => {
   ]);
   assert.equal(snapshot.valuesByAccount["depot-private"], 3_500_013);
 });
+
+test("physisches Gold wird separat und ohne Ghostfolio-Doppelzählung ausgewiesen", () => {
+  const goldConfig: AppConfig = {
+    ...config,
+    physicalAssets: [{
+      id: "gold-100g",
+      label: "Goldbarren 100 g",
+      kind: "gold",
+      weightGrams: 100,
+      fineness: 999.9,
+      acquiredYear: 2015,
+      acquisitionCostMinor: 350_000,
+      acquisitionCostEstimated: true,
+      valuations: [{
+        date: "2026-08-22",
+        amountMinor: 1_245_000,
+        basis: "Händler-Ankaufspreis",
+        source: "GOLD.DE Ankaufspreisvergleich",
+        estimated: true
+      }]
+    }]
+  };
+  const result = buildDashboardAssets(database(), goldConfig, {
+    status: "fulfilled",
+    value: {
+      capturedAt: "2026-08-22T08:30:00Z",
+      valuesByAccount: {
+        "depot-private": 3_500_000,
+        wallet: 1_400_000,
+        riester: 7_300_000
+      }
+    }
+  }, new Date("2026-08-22T09:00:00Z"));
+  assert.equal(result.totalMinor, 15_145_000);
+  assert.deepEqual(result.areas.at(-1), {
+    key: "precious-metals",
+    label: "Edelmetalle",
+    amountMinor: 1_245_000,
+    percent: 8.22,
+    positions: 1,
+    status: "confirmed"
+  });
+  const gold = result.positions.find((position) => position.area === "precious-metals");
+  assert.equal(gold?.basis, "Ankaufwert [SCHÄTZUNG]");
+  assert.equal(gold?.acquisitionCostMinor, 350_000);
+  assert.match(gold?.detail ?? "", /100 g.*999,9/);
+});

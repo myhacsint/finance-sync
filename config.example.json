@@ -114,6 +114,34 @@
       }
     }
   ],
+  "physicalAssets": [
+    {
+      "id": "physical-gold-bar-100g",
+      "label": "Goldbarren 100 g",
+      "kind": "gold",
+      "weightGrams": 100,
+      "fineness": 999.9,
+      "acquiredYear": 2015,
+      "acquisitionCostMinor": 350000,
+      "acquisitionCostEstimated": true,
+      "valuations": [
+        {
+          "date": "2026-07-31",
+          "amountMinor": 1127800,
+          "basis": "Historischer XAU/EUR-Schlusskurs",
+          "source": "Historischer Goldkurs",
+          "estimated": true
+        },
+        {
+          "date": "2026-08-22",
+          "amountMinor": 1245000,
+          "basis": "Händler-Ankaufspreis",
+          "source": "GOLD.DE Ankaufspreisvergleich",
+          "estimated": true
+        }
+      ]
+    }
+  ],
   "actual": {
     "enabled": false,
     "serverUrl": "http://ActualServer:5006",
