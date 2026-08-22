@@ -9,7 +9,9 @@ Das Entscheidungslabor vergleicht das vorhandene Finanzvermögen ohne Immobilie 
 ## Bedienung
 
 - Realrendite nach Inflation, konservativ mit 2 % vorbelegt
-- Anteil variabler Jahreseinnahmen, konservativ mit 0 % vorbelegt
+- Ausgangsbasis mit `Aktuelles Jahr (YTD)` als Standard
+- alternative Basis `Letzter vollständiger Monat`
+- geglättete Basis `YTD + letztes Jahr`
 - monatliche Veränderung für zusätzliche Einsparungen oder Ausgaben
 - einmaliger Zu- oder Abfluss für Vorhaben wie eine Renovierung
 - teilbarer Zustand über abstrakte URL-Parameter
@@ -17,6 +19,7 @@ Das Entscheidungslabor vergleicht das vorhandene Finanzvermögen ohne Immobilie 
 ## Ergebnis
 
 - durchgezogene Basislinie und gestrichelte Szenariolinie über 20 Jahre
+- Einnahmen, Ausgaben, durchschnittlicher Monatsüberschuss und annualisierter Überschuss der gewählten Basis
 - exakte Vergleichswerte nach 1, 5, 10 und 20 Jahren
 - sichtbare Differenz zur Basis
 - Warnung, falls das Finanzvermögen in einem Szenario aufgebraucht wird

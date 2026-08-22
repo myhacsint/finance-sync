@@ -2,10 +2,27 @@ import type { DashboardAssets } from "./dashboard-assets.js";
 import type { DashboardSavingsBaseline } from "./dashboard-savings-baseline.js";
 
 export interface DecisionLabRequest {
+  trendBasis?: DecisionTrendBasis;
   realReturnBps?: number;
-  variableIncomeShareBps?: number;
   monthlyChangeMinor?: number;
   oneTimeMinor?: number;
+}
+
+export type DecisionTrendBasis = "ytd" | "last-month" | "ytd-plus-last-year";
+
+export interface DecisionTrendOption {
+  key: DecisionTrendBasis;
+  label: string;
+  description: string;
+  available: boolean;
+  periodStart: string | null;
+  periodEnd: string | null;
+  months: number;
+  incomeMinor: number | null;
+  expensesMinor: number | null;
+  netMinor: number | null;
+  averageMonthlyNetMinor: number | null;
+  annualizedNetMinor: number | null;
 }
 
 export interface DashboardDecisionLab {
@@ -23,16 +40,15 @@ export interface DashboardDecisionLab {
   };
   inputs: {
     horizonYears: 20;
+    trendBasis: DecisionTrendBasis;
     realReturnBps: number;
-    variableIncomeShareBps: number;
     monthlyChangeMinor: number;
     oneTimeMinor: number;
   };
   basis: {
     startingAssetsMinor: number | null;
-    regularMonthlyCapacityMinor: number | null;
-    variableAnnualIncomeMinor: number;
-    assumedVariableMonthlyMinor: number;
+    selectedTrend: DecisionTrendOption;
+    trendOptions: DecisionTrendOption[];
     projectedMonthlyCapacityMinor: number | null;
   };
   series: Array<{
@@ -62,11 +78,111 @@ function clampInteger(value: number | undefined, fallback: number, min: number, 
 export function decisionLabInputs(request: DecisionLabRequest = {}): DashboardDecisionLab["inputs"] {
   return {
     horizonYears: 20,
+    trendBasis: request.trendBasis === "last-month"
+      || request.trendBasis === "ytd-plus-last-year"
+      ? request.trendBasis
+      : "ytd",
     realReturnBps: clampInteger(request.realReturnBps, 200, -500, 1_000),
-    variableIncomeShareBps: clampInteger(request.variableIncomeShareBps, 0, 0, 10_000),
     monthlyChangeMinor: clampInteger(request.monthlyChangeMinor, 0, -1_000_000, 1_000_000),
     oneTimeMinor: clampInteger(request.oneTimeMinor, 0, -100_000_000, 100_000_000)
   };
+}
+
+function trendMonthValues(month: DashboardSavingsBaseline["months"][number]): {
+  incomeMinor: number;
+  expensesMinor: number;
+} {
+  return {
+    incomeMinor: month.payrollRegularMinor
+      + month.payrollVariableMinor
+      + month.secondIncomeRegularMinor
+      + month.secondIncomeVariableMinor
+      + month.otherIncomeRegularMinor
+      + month.otherIncomeVariableMinor
+      + month.passThroughMinor,
+    expensesMinor: month.consumptionMinor + month.committedOutflowMinor
+  };
+}
+
+function trendOption(
+  key: DecisionTrendBasis,
+  label: string,
+  description: string,
+  months: DashboardSavingsBaseline["months"]
+): DecisionTrendOption {
+  if (months.length === 0) {
+    return {
+      key,
+      label,
+      description,
+      available: false,
+      periodStart: null,
+      periodEnd: null,
+      months: 0,
+      incomeMinor: null,
+      expensesMinor: null,
+      netMinor: null,
+      averageMonthlyNetMinor: null,
+      annualizedNetMinor: null
+    };
+  }
+  const totals = months.reduce((sum, month) => {
+    const values = trendMonthValues(month);
+    return {
+      incomeMinor: sum.incomeMinor + values.incomeMinor,
+      expensesMinor: sum.expensesMinor + values.expensesMinor
+    };
+  }, { incomeMinor: 0, expensesMinor: 0 });
+  const netMinor = totals.incomeMinor - totals.expensesMinor;
+  const averageMonthlyNetMinor = Math.round(netMinor / months.length);
+  return {
+    key,
+    label,
+    description,
+    available: true,
+    periodStart: months[0].month,
+    periodEnd: months.at(-1)!.month,
+    months: months.length,
+    incomeMinor: totals.incomeMinor,
+    expensesMinor: totals.expensesMinor,
+    netMinor,
+    averageMonthlyNetMinor,
+    annualizedNetMinor: averageMonthlyNetMinor * 12
+  };
+}
+
+export function decisionTrendOptions(
+  cashflow: DashboardSavingsBaseline
+): DecisionTrendOption[] {
+  const lastMonth = cashflow.months.at(-1);
+  const endYear = lastMonth?.month.slice(0, 4);
+  const previousYear = endYear ? String(Number(endYear) - 1) : "";
+  const ytd = endYear
+    ? cashflow.months.filter((month) => month.month.startsWith(`${endYear}-`))
+    : [];
+  const priorFullYear = previousYear
+    ? cashflow.months.filter((month) => month.month.startsWith(`${previousYear}-`))
+    : [];
+  return [
+    trendOption(
+      "ytd",
+      "Aktuelles Jahr (YTD)",
+      "Durchschnitt aller vollständigen Monate des laufenden Jahres",
+      ytd
+    ),
+    trendOption(
+      "last-month",
+      "Letzter vollständiger Monat",
+      "Fortschreibung des zuletzt vollständig gebuchten Monats",
+      lastMonth ? [lastMonth] : []
+    ),
+    trendOption(
+      "ytd-plus-last-year",
+      "YTD + letztes Jahr",
+      "Geglätteter Durchschnitt aus dem vollständigen Vorjahr und dem aktuellen YTD",
+      priorFullYear.length === 12 ? [...priorFullYear, ...ytd] : []
+    )
+  ];
 }
 
 function project(
@@ -99,23 +215,16 @@ export function buildDashboardDecisionLab(
   now = new Date()
 ): DashboardDecisionLab {
   const inputs = decisionLabInputs(request);
-  const variableAnnualIncomeMinor = cashflow.payroll.variableAnnualMinor
-    + cashflow.manualForwardedIncome.variableAnnualMinor
-    + cashflow.otherIncome.variableAnnualMinor;
-  const assumedVariableMonthlyMinor = Math.round(
-    variableAnnualIncomeMinor * inputs.variableIncomeShareBps / 10_000 / 12
-  );
+  const trendOptions = decisionTrendOptions(cashflow);
+  const selectedTrend = trendOptions.find((option) => option.key === inputs.trendBasis)!;
   const startingAssetsMinor = assets.totalMinor;
-  const regularMonthlyCapacityMinor = cashflow.savingsCapacityMonthlyMinor;
-  const projectedMonthlyCapacityMinor = regularMonthlyCapacityMinor === null
-    ? null
-    : regularMonthlyCapacityMinor + assumedVariableMonthlyMinor;
+  const projectedMonthlyCapacityMinor = selectedTrend.averageMonthlyNetMinor;
   const warnings = [...assets.warnings, ...cashflow.warnings];
   if (startingAssetsMinor === null) {
     warnings.push("Das aktuelle Finanzvermögen ist unvollständig; die Projektion ist nicht verfügbar.");
   }
-  if (regularMonthlyCapacityMinor === null) {
-    warnings.push("Die regelmäßige Sparratenbasis ist unvollständig; die Projektion ist nicht verfügbar.");
+  if (!selectedTrend.available || projectedMonthlyCapacityMinor === null) {
+    warnings.push("Die gewählte Einnahmen- und Ausgabenbasis ist unvollständig; die Projektion ist nicht verfügbar.");
   }
   let series: DashboardDecisionLab["series"] = [];
   let milestones: DashboardDecisionLab["milestones"] = [];
@@ -154,7 +263,7 @@ export function buildDashboardDecisionLab(
     state: startingAssetsMinor !== null
       && projectedMonthlyCapacityMinor !== null
       && assets.state === "current"
-      && cashflow.state === "current"
+      && cashflow.warnings.length === 0
       ? "current"
       : "partial",
     source: "FinanceSync + Actual",
@@ -172,9 +281,8 @@ export function buildDashboardDecisionLab(
     inputs,
     basis: {
       startingAssetsMinor,
-      regularMonthlyCapacityMinor,
-      variableAnnualIncomeMinor,
-      assumedVariableMonthlyMinor,
+      selectedTrend,
+      trendOptions,
       projectedMonthlyCapacityMinor
     },
     series,
@@ -184,7 +292,8 @@ export function buildDashboardDecisionLab(
     basisNotes: [
       "Finanzvermögen ohne Immobilien; Liquidität, Depots, Vorsorge, Krypto und Edelmetalle einbezogen",
       "Rendite als Realrendite nach Inflation und monatliche Verzinsung gerechnet [SCHÄTZUNG]",
-      "Variable Jahreseinnahmen nur im gewählten Anteil berücksichtigt [SCHÄTZUNG]",
+      "Einnahmen und Ausgaben nach der gewählten historischen Basis fortgeschrieben [SCHÄTZUNG]",
+      "Kostenerstattungen mit Ausgaben verrechnet; interne Überträge und Kapitalerträge ausgeschlossen",
       "Bei aufgebrauchtem Finanzvermögen wird nicht automatisch eine Verschuldung unterstellt"
     ]
   };

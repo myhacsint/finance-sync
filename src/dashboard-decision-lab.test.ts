@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { DashboardAssets } from "./dashboard-assets.js";
 import type { DashboardSavingsBaseline } from "./dashboard-savings-baseline.js";
-import { buildDashboardDecisionLab, decisionLabInputs } from "./dashboard-decision-lab.js";
+import {
+  buildDashboardDecisionLab,
+  decisionLabInputs,
+  decisionTrendOptions
+} from "./dashboard-decision-lab.js";
 
 const assets = {
   generatedAt: "2026-08-22T12:00:00.000Z",
@@ -19,6 +23,35 @@ const assets = {
   warnings: []
 } satisfies DashboardAssets;
 
+function trendMonth(month: string, incomeMinor: number, expensesMinor: number) {
+  return {
+    month,
+    payrollRegularMinor: incomeMinor,
+    payrollVariableMinor: 0,
+    secondIncomeRegularMinor: 0,
+    secondIncomeVariableMinor: 0,
+    manualForwardedUnassignedMinor: 0,
+    otherIncomeRegularMinor: 0,
+    otherIncomeVariableMinor: 0,
+    reimbursementMinor: 0,
+    passThroughMinor: 0,
+    investmentReturnMinor: 0,
+    internalTransferMinor: 0,
+    unreviewedIncomeMinor: 0,
+    unknownPositiveMinor: 0,
+    consumptionMinor: expensesMinor,
+    committedOutflowMinor: 0
+  };
+}
+
+const trendMonths = [
+  ...Array.from({ length: 12 }, (_, index) =>
+    trendMonth(`2025-${String(index + 1).padStart(2, "0")}`, 700_000, 600_000)),
+  ...Array.from({ length: 6 }, (_, index) =>
+    trendMonth(`2026-${String(index + 1).padStart(2, "0")}`, 800_000, 650_000)),
+  trendMonth("2026-07", 900_000, 700_000)
+];
+
 const cashflow = {
   generatedAt: "2026-08-22T12:01:00.000Z",
   state: "current",
@@ -30,44 +63,60 @@ const cashflow = {
   consumption: { typicalMonthlyMinor: 700_000, estimate: true },
   committedOutflow: { grossMonthlyMinor: 40_000, earmarkedFundingMonthlyMinor: 10_000, householdContributionMonthlyMinor: 30_000, grossAnnualMinor: 480_000, earmarkedFundingAnnualMinor: 120_000, householdContributionAnnualMinor: 360_000, estimate: true },
   savingsCapacityMonthlyMinor: -20_000,
-  months: [],
+  months: trendMonths,
   warnings: [],
   basis: []
 } satisfies DashboardSavingsBaseline;
 
 test("Entscheidungslabor begrenzt Annahmen und verwendet konservative Standardwerte", () => {
   assert.deepEqual(decisionLabInputs({
+    trendBasis: "last-month",
     realReturnBps: 99_999,
-    variableIncomeShareBps: -50,
     monthlyChangeMinor: 5_000_000,
     oneTimeMinor: -500_000_000
   }), {
     horizonYears: 20,
+    trendBasis: "last-month",
     realReturnBps: 1_000,
-    variableIncomeShareBps: 0,
     monthlyChangeMinor: 1_000_000,
     oneTimeMinor: -100_000_000
   });
 });
 
+test("YTD ist Standard und alle drei historischen Ausgangsbasen bleiben nachvollziehbar", () => {
+  const options = decisionTrendOptions(cashflow);
+  assert.deepEqual(options.map((option) => [
+    option.key,
+    option.months,
+    option.averageMonthlyNetMinor,
+    option.annualizedNetMinor
+  ]), [
+    ["ytd", 7, 157_143, 1_885_716],
+    ["last-month", 1, 200_000, 2_400_000],
+    ["ytd-plus-last-year", 19, 121_053, 1_452_636]
+  ]);
+  assert.equal(decisionLabInputs().trendBasis, "ytd");
+});
+
 test("Basis und Szenario bleiben getrennt und alle Werte sind Schätzungen", () => {
   const result = buildDashboardDecisionLab(assets, cashflow, {
+    trendBasis: "ytd-plus-last-year",
     realReturnBps: 0,
-    variableIncomeShareBps: 5_000,
     monthlyChangeMinor: 30_000,
     oneTimeMinor: -1_000_000
   }, new Date("2026-08-22T12:02:00.000Z"));
   assert.equal(result.state, "current");
   assert.equal(result.estimate, true);
-  assert.equal(result.basis.variableAnnualIncomeMinor, 3_000_000);
-  assert.equal(result.basis.assumedVariableMonthlyMinor, 125_000);
-  assert.equal(result.basis.projectedMonthlyCapacityMinor, 105_000);
+  assert.equal(result.basis.selectedTrend.key, "ytd-plus-last-year");
+  assert.equal(result.basis.selectedTrend.incomeMinor, 14_100_000);
+  assert.equal(result.basis.selectedTrend.expensesMinor, 11_800_000);
+  assert.equal(result.basis.projectedMonthlyCapacityMinor, 121_053);
   assert.equal(result.series[0].baselineMinor, 20_000_000);
   assert.equal(result.series[0].scenarioMinor, 19_000_000);
   assert.deepEqual(result.milestones[0], {
     year: 1,
-    baselineMinor: 21_260_000,
-    scenarioMinor: 20_620_000,
+    baselineMinor: 21_452_636,
+    scenarioMinor: 20_812_636,
     differenceMinor: -640_000
   });
   assert.match(result.basisNotes.join(" "), /\[SCHÄTZUNG\]/);
@@ -76,7 +125,7 @@ test("Basis und Szenario bleiben getrennt und alle Werte sind Schätzungen", () 
 test("fehlende Vermögens- oder Sparratenbasis erzeugt keine erfundene Projektion", () => {
   const result = buildDashboardDecisionLab(
     { ...assets, state: "partial", totalMinor: null, warnings: ["Depotwert fehlt"] },
-    { ...cashflow, state: "partial", savingsCapacityMonthlyMinor: null },
+    { ...cashflow, state: "partial", months: [] },
     {},
     new Date("2026-08-22T12:02:00.000Z")
   );
@@ -89,7 +138,7 @@ test("fehlende Vermögens- oder Sparratenbasis erzeugt keine erfundene Projektio
 test("aufgebrauchtes Finanzvermögen wird bei null begrenzt statt als Schuld fortgeschrieben", () => {
   const result = buildDashboardDecisionLab(
     { ...assets, totalMinor: 100_000 },
-    { ...cashflow, savingsCapacityMonthlyMinor: -100_000 },
+    { ...cashflow, months: [trendMonth("2026-07", 0, 100_000)] },
     { realReturnBps: 0 },
     new Date("2026-08-22T12:02:00.000Z")
   );

@@ -118,6 +118,8 @@ export class FinanceService {
   private analysesLoading = new Map<string, Promise<DashboardAnalyses>>();
   private savingsBaselineCache?: { expiresAt: number; value: DashboardSavingsBaseline };
   private savingsBaselineLoading?: Promise<DashboardSavingsBaseline>;
+  private savingsHistoryCache?: { expiresAt: number; value: DashboardSavingsBaseline };
+  private savingsHistoryLoading?: Promise<DashboardSavingsBaseline>;
   private recurringCache?: { expiresAt: number; value: ActualSpendingRangeSnapshot };
   private recurringLoading?: Promise<ActualSpendingRangeSnapshot>;
   private assetsCache?: { expiresAt: number; value: DashboardAssets };
@@ -358,9 +360,35 @@ export class FinanceService {
     force = false,
     request: DecisionLabRequest = {}
   ): Promise<DashboardDecisionLab> {
+    if (!this.config.actual?.enabled) throw new Error("Actual ist deaktiviert");
+    const loadHistory = async (): Promise<DashboardSavingsBaseline> => {
+      if (!force && this.savingsHistoryCache
+        && this.savingsHistoryCache.expiresAt > Date.now()) {
+        return this.savingsHistoryCache.value;
+      }
+      if (this.savingsHistoryLoading) return this.savingsHistoryLoading;
+      const loading = (async () => {
+        const generatedAt = new Date();
+        const snapshot = await this.withActual(() => readActualSavingsCashflow(
+          this.config.actual!,
+          this.config.timezone,
+          generatedAt,
+          { months: 24 }
+        ));
+        const value = buildDashboardSavingsBaseline(snapshot, this.config, generatedAt, 24);
+        this.savingsHistoryCache = { expiresAt: Date.now() + 5 * 60_000, value };
+        return value;
+      })();
+      this.savingsHistoryLoading = loading;
+      try {
+        return await loading;
+      } finally {
+        this.savingsHistoryLoading = undefined;
+      }
+    };
     const [assets, cashflow] = await Promise.all([
       this.getDashboardAssets(force),
-      this.getDashboardSavingsBaseline(force)
+      loadHistory()
     ]);
     return buildDashboardDecisionLab(assets, cashflow, request);
   }

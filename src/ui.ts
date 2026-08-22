@@ -881,11 +881,11 @@ export function renderUi(): string {
     .optimization-card select, .optimization-card input { width: 100%; margin-top: 6px; }
     .optimization-stale { grid-column: 1 / -1; color: #ffbd55; font-size: 12px; }
     .decision-toolbar { grid-template-columns: minmax(260px, 1fr); }
-    .decision-summary { grid-template-columns: 1.35fr 1fr 1fr; }
+    .decision-summary { grid-template-columns: 1.2fr repeat(3, 1fr); }
     .decision-layout { display: grid; grid-template-columns: minmax(280px, .62fr) minmax(0, 1.38fr); gap: 12px; margin-top: 12px; }
     .decision-assumptions form { display: grid; gap: 16px; }
     .decision-assumptions label { margin: 0; color: var(--muted); font-size: 12px; }
-    .decision-assumptions input { width: 100%; min-height: 44px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+    .decision-assumptions input, .decision-assumptions select { width: 100%; min-height: 44px; margin-top: 6px; font-variant-numeric: tabular-nums; }
     .decision-assumptions small { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.45; }
     .decision-assumptions .button { width: 100%; margin-top: 2px; }
     .decision-chart { margin: 0; }
@@ -1418,8 +1418,8 @@ function analysisSelection(){
     classification:["GRUNDBEDARF","GESTALTBAR","VERMEIDBAR","UNKLAR"].includes(params.get("recurringClassification"))?params.get("recurringClassification"):"alle",
     confidence:["hoch","mittel"].includes(params.get("recurringConfidence"))?params.get("recurringConfidence"):"alle",
     candidate:/^recurring-[a-f0-9]{18}$/.test(params.get("recurringCandidate")||"")?params.get("recurringCandidate"):"",
+    decisionBasis:["last-month","ytd-plus-last-year"].includes(params.get("decisionBasis"))?params.get("decisionBasis"):"ytd",
     decisionReturn:boundedParam("decisionReturn",2,-5,10),
-    decisionVariableShare:boundedParam("decisionVariableShare",0,0,100),
     decisionMonthly:boundedParam("decisionMonthly",0,-10000,10000),
     decisionOneTime:boundedParam("decisionOneTime",0,-1000000,1000000)
   };
@@ -1456,13 +1456,15 @@ function applyRecurringFilters(){
 function applyDecisionLab(event){
   event?.preventDefault();
   const params=new URLSearchParams(location.search);
+  const basis=document.getElementById("decision-basis")?.value||"ytd";
+  if(basis==="last-month"||basis==="ytd-plus-last-year")params.set("decisionBasis",basis);else params.delete("decisionBasis");
+  params.delete("decisionVariableShare");
   const values={
     decisionReturn:Number(document.getElementById("decision-return")?.value||2),
-    decisionVariableShare:Number(document.getElementById("decision-variable-share")?.value||0),
     decisionMonthly:Number(document.getElementById("decision-monthly")?.value||0),
     decisionOneTime:Number(document.getElementById("decision-one-time")?.value||0)
   };
-  const rules={decisionReturn:[2,-5,10],decisionVariableShare:[0,0,100],decisionMonthly:[0,-10000,10000],decisionOneTime:[0,-1000000,1000000]};
+  const rules={decisionReturn:[2,-5,10],decisionMonthly:[0,-10000,10000],decisionOneTime:[0,-1000000,1000000]};
   for(const [name,value] of Object.entries(values)){
     const [fallback,min,max]=rules[name];
     const safe=Number.isFinite(value)?Math.max(min,Math.min(max,value)):fallback;
@@ -1976,23 +1978,28 @@ function decisionChart(data){
   const baselinePath=decisionPath(data.series,"baselineMinor",maxValue);
   const scenarioPath=decisionPath(data.series,"scenarioMinor",maxValue);
   const top=moneyWhole(maxValue);const middle=moneyWhole(Math.round(maxValue/2));
-  const label="20-Jahres-Projektion [SCHÄTZUNG]. Basis nach 20 Jahren "+moneyWhole(data.series.at(-1).baselineMinor)+", Szenario "+moneyWhole(data.series.at(-1).scenarioMinor)+".";
-  return '<figure class="decision-chart"><div class="decision-legend" aria-hidden="true"><span><i class="baseline"></i>Basis</span><span><i class="scenario"></i>Szenario</span></div><svg viewBox="0 0 800 286" role="img" aria-label="'+esc(label)+'"><g class="decision-grid"><path d="M58 24H762M58 133H762M58 242H762"/><path d="M58 24V242M234 24V242M410 24V242M586 24V242M762 24V242"/></g><g class="decision-axis"><text x="50" y="28" text-anchor="end">'+esc(top)+'</text><text x="50" y="137" text-anchor="end">'+esc(middle)+'</text><text x="50" y="246" text-anchor="end">0 €</text><text x="58" y="270" text-anchor="middle">Heute</text><text x="234" y="270" text-anchor="middle">5 J.</text><text x="410" y="270" text-anchor="middle">10 J.</text><text x="586" y="270" text-anchor="middle">15 J.</text><text x="762" y="270" text-anchor="middle">20 J.</text></g><path class="decision-line baseline" d="'+baselinePath+'"/><path class="decision-line scenario" d="'+scenarioPath+'"/></svg><figcaption>'+esc(label)+'</figcaption></figure>';
+  const label="20-Jahres-Projektion [SCHÄTZUNG]. Aktueller Trend nach 20 Jahren "+moneyWhole(data.series.at(-1).baselineMinor)+", Szenario "+moneyWhole(data.series.at(-1).scenarioMinor)+".";
+  return '<figure class="decision-chart"><div class="decision-legend" aria-hidden="true"><span><i class="baseline"></i>Aktueller Trend</span><span><i class="scenario"></i>Szenario</span></div><svg viewBox="0 0 800 286" role="img" aria-label="'+esc(label)+'"><g class="decision-grid"><path d="M58 24H762M58 133H762M58 242H762"/><path d="M58 24V242M234 24V242M410 24V242M586 24V242M762 24V242"/></g><g class="decision-axis"><text x="50" y="28" text-anchor="end">'+esc(top)+'</text><text x="50" y="137" text-anchor="end">'+esc(middle)+'</text><text x="50" y="246" text-anchor="end">0 €</text><text x="58" y="270" text-anchor="middle">Heute</text><text x="234" y="270" text-anchor="middle">5 J.</text><text x="410" y="270" text-anchor="middle">10 J.</text><text x="586" y="270" text-anchor="middle">15 J.</text><text x="762" y="270" text-anchor="middle">20 J.</text></g><path class="decision-line baseline" d="'+baselinePath+'"/><path class="decision-line scenario" d="'+scenarioPath+'"/></svg><figcaption>'+esc(label)+'</figcaption></figure>';
 }
 function renderDecisionLab(data){
   currentDecisionLabData=data;
   const toolbar='<section class="analysis-toolbar decision-toolbar" aria-label="Entscheidungslabor"><label>Ansicht<select name="analysis-view" autocomplete="off" onchange="setAnalysisView(this.value)"><option value="expense-structure">Ausgabenstruktur</option><option value="recurring-expenses">Regelmäßige Ausgaben prüfen</option><option value="expense-optimizations">Optimierungsliste</option><option value="decision-lab" selected>Entscheidungslabor</option><option value="crypto-origin-tax">Krypto · Herkunft &amp; Steuerstatus</option></select></label></section>';
-  const summary='<section class="analysis-summary decision-summary" aria-label="Ausgangslage für die Projektion"><div><span>Finanzvermögen heute</span><strong class="analysis-total">'+(data.basis.startingAssetsMinor===null?'–':moneyWhole(data.basis.startingAssetsMinor))+'</strong><p class="analysis-basis">Ohne Immobilien · '+esc(data.scope.includes.join(", "))+' '+analysisEstimate(true)+'</p></div><div><span>Reguläre Monatsbasis</span><strong class="'+(data.basis.regularMonthlyCapacityMinor<0?'tone-warning':'tone-ok')+'">'+(data.basis.regularMonthlyCapacityMinor===null?'–':signedMoneyWhole(data.basis.regularMonthlyCapacityMinor))+'</strong><p class="analysis-basis">Median aus zwölf vollständigen Monaten '+analysisEstimate(true)+'</p></div><div><span>Variable Einnahmen pro Jahr</span><strong>'+moneyWhole(data.basis.variableAnnualIncomeMinor)+'</strong><p class="analysis-basis">Davon '+new Intl.NumberFormat("de-DE",{maximumFractionDigits:1}).format(data.inputs.variableIncomeShareBps/100)+' % berücksichtigt '+analysisEstimate(true)+'</p></div></section>';
+  const trend=data.basis.selectedTrend;
+  const period=trend.periodStart&&trend.periodEnd
+    ? trend.periodStart===trend.periodEnd?analysisMonthLabel(trend.periodEnd):analysisMonthLabel(trend.periodStart)+'–'+analysisMonthLabel(trend.periodEnd)
+    : 'nicht verfügbar';
+  const summary='<section class="analysis-summary decision-summary" aria-label="Ausgangslage für die Projektion"><div><span>Finanzvermögen heute</span><strong class="analysis-total">'+(data.basis.startingAssetsMinor===null?'–':moneyWhole(data.basis.startingAssetsMinor))+'</strong><p class="analysis-basis">Ohne Immobilien · '+esc(data.scope.includes.join(", "))+' '+analysisEstimate(true)+'</p></div><div><span>Einnahmen · '+esc(period)+'</span><strong>'+(trend.incomeMinor===null?'–':moneyWhole(trend.incomeMinor))+'</strong><p class="analysis-basis">Ø '+(trend.incomeMinor===null?'–':moneyWhole(Math.round(trend.incomeMinor/trend.months)))+' pro Monat</p></div><div><span>Ausgaben · '+esc(period)+'</span><strong>'+(trend.expensesMinor===null?'–':moneyWhole(trend.expensesMinor))+'</strong><p class="analysis-basis">Ø '+(trend.expensesMinor===null?'–':moneyWhole(Math.round(trend.expensesMinor/trend.months)))+' pro Monat</p></div><div><span>Aktueller Trend</span><strong class="'+(trend.averageMonthlyNetMinor<0?'tone-warning':'tone-ok')+'">'+(trend.averageMonthlyNetMinor===null?'–':signedMoneyWhole(trend.averageMonthlyNetMinor))+' / Monat</strong><p class="analysis-basis">'+(trend.annualizedNetMinor===null?'–':signedMoneyWhole(trend.annualizedNetMinor))+' pro Jahr '+analysisEstimate(true)+'</p></div></section>';
   if(data.series.length===0){
     const warnings=data.warnings.map(warning=>'<div class="analysis-warning" role="status">'+icons.warning+'<span>'+esc(warning)+'</span></div>').join("");
     document.getElementById("dashboard").innerHTML=toolbar+summary+'<div style="margin-top:12px">'+expenseState("Projektion nicht verfügbar","Für eine Trajektorie werden ein vollständiger Vermögensstand und eine vollständige Sparratenbasis benötigt.","refresh(true)","Neu prüfen","warning")+'</div>'+warnings;
     document.getElementById("dashboard").setAttribute("aria-busy","false");return;
   }
-  const assumptions='<section class="analysis-panel decision-assumptions" aria-labelledby="decision-assumptions-title"><div class="analysis-panel-head"><div><h2 id="decision-assumptions-title">Annahmen</h2><p>Alle Projektionen sind veränderbare Schätzungen.</p></div></div><form onsubmit="applyDecisionLab(event)"><label for="decision-return">Realrendite pro Jahr (%)<input id="decision-return" name="decision-return" type="number" inputmode="decimal" autocomplete="off" min="-5" max="10" step="0.1" value="'+esc(data.inputs.realReturnBps/100)+'"><small>Nach Inflation; konservativer Startwert 2 %.</small></label><label for="decision-variable-share">Variable Jahreseinnahmen berücksichtigen (%)<input id="decision-variable-share" name="decision-variable-share" type="number" inputmode="decimal" autocomplete="off" min="0" max="100" step="5" value="'+esc(data.inputs.variableIncomeShareBps/100)+'"><small>0 % lässt Bonus und einmalige Einnahmen vollständig außen vor.</small></label><label for="decision-monthly">Monatliche Veränderung (€)<input id="decision-monthly" name="decision-monthly" type="number" inputmode="decimal" autocomplete="off" min="-10000" max="10000" step="10" value="'+esc(data.inputs.monthlyChangeMinor/100)+'"><small>Positiv spart mehr; negativ erhöht laufende Ausgaben.</small></label><label for="decision-one-time">Einmaliger Zu- oder Abfluss (€)<input id="decision-one-time" name="decision-one-time" type="number" inputmode="decimal" autocomplete="off" min="-1000000" max="1000000" step="100" value="'+esc(data.inputs.oneTimeMinor/100)+'"><small>Negativ für eine Ausgabe, positiv für zusätzliches Vermögen.</small></label><button class="button" type="submit">Szenario berechnen</button></form></section>';
+  const trendOptions=data.basis.trendOptions.map(option=>'<option value="'+esc(option.key)+'" '+(option.key===data.inputs.trendBasis?'selected ':'')+(!option.available?'disabled ':'')+'>'+esc(option.label)+'</option>').join("");
+  const assumptions='<section class="analysis-panel decision-assumptions" aria-labelledby="decision-assumptions-title"><div class="analysis-panel-head"><div><h2 id="decision-assumptions-title">Basis und Annahmen</h2><p>Historische Entwicklung auswählen und als Szenario verändern.</p></div></div><form onsubmit="applyDecisionLab(event)"><label for="decision-basis">Ausgangsbasis<select id="decision-basis" name="decision-basis" autocomplete="off" onchange="applyDecisionLab(event)">'+trendOptions+'</select><small>'+esc(trend.description)+' · '+(trend.months===1?'1 vollständiger Monat':trend.months+' vollständige Monate')+'.</small></label><label for="decision-return">Realrendite pro Jahr (%)<input id="decision-return" name="decision-return" type="number" inputmode="decimal" autocomplete="off" min="-5" max="10" step="0.1" value="'+esc(data.inputs.realReturnBps/100)+'"><small>Nach Inflation; konservativer Startwert 2 %.</small></label><label for="decision-monthly">Monatliche Veränderung (€)<input id="decision-monthly" name="decision-monthly" type="number" inputmode="decimal" autocomplete="off" min="-10000" max="10000" step="10" value="'+esc(data.inputs.monthlyChangeMinor/100)+'"><small>Positiv spart mehr; negativ erhöht laufende Ausgaben.</small></label><label for="decision-one-time">Einmaliger Zu- oder Abfluss (€)<input id="decision-one-time" name="decision-one-time" type="number" inputmode="decimal" autocomplete="off" min="-1000000" max="1000000" step="100" value="'+esc(data.inputs.oneTimeMinor/100)+'"><small>Negativ für eine Ausgabe, positiv für zusätzliches Vermögen.</small></label><button class="button" type="submit">Szenario berechnen</button></form></section>';
   const baselineEnd=data.series.at(-1).baselineMinor;const scenarioEnd=data.series.at(-1).scenarioMinor;
   const depletion=(data.depletion.baselineAfterMonths!==null||data.depletion.scenarioAfterMonths!==null)?'<div class="analysis-warning decision-depletion" role="status">'+icons.warning+'<span>Finanzvermögen aufgebraucht: Basis '+esc(decisionDuration(data.depletion.baselineAfterMonths))+' · Szenario '+esc(decisionDuration(data.depletion.scenarioAfterMonths))+'. Eine Verschuldung wird nicht unterstellt.</span></div>':'';
-  const projection='<section class="analysis-panel decision-projection" aria-labelledby="decision-projection-title"><div class="analysis-panel-head"><div><h2 id="decision-projection-title">Finanzvermögen über 20 Jahre</h2><p>Basis '+moneyWhole(baselineEnd)+' · Szenario '+moneyWhole(scenarioEnd)+' '+analysisEstimate(true)+'</p></div></div>'+decisionChart(data)+depletion+'</section>';
-  const milestones=data.milestones.map(item=>'<article class="decision-milestone"><span>Nach '+item.year+' '+(item.year===1?'Jahr':'Jahren')+'</span><div><small>Basis</small><strong>'+moneyWhole(item.baselineMinor)+'</strong></div><div><small>Szenario</small><strong>'+moneyWhole(item.scenarioMinor)+'</strong></div><p class="'+(item.differenceMinor<0?'tone-warning':'tone-ok')+'">Differenz '+signedMoneyWhole(item.differenceMinor)+' '+analysisEstimate(true)+'</p></article>').join("");
+  const projection='<section class="analysis-panel decision-projection" aria-labelledby="decision-projection-title"><div class="analysis-panel-head"><div><h2 id="decision-projection-title">Finanzvermögen über 20 Jahre</h2><p>Aktueller Trend '+moneyWhole(baselineEnd)+' · Szenario '+moneyWhole(scenarioEnd)+' '+analysisEstimate(true)+'</p></div></div>'+decisionChart(data)+depletion+'</section>';
+  const milestones=data.milestones.map(item=>'<article class="decision-milestone"><span>Nach '+item.year+' '+(item.year===1?'Jahr':'Jahren')+'</span><div><small>Trend</small><strong>'+moneyWhole(item.baselineMinor)+'</strong></div><div><small>Szenario</small><strong>'+moneyWhole(item.scenarioMinor)+'</strong></div><p class="'+(item.differenceMinor<0?'tone-warning':'tone-ok')+'">Differenz '+signedMoneyWhole(item.differenceMinor)+' '+analysisEstimate(true)+'</p></article>').join("");
   const basisNotes=data.basisNotes.map(note=>'<li>'+esc(note)+'</li>').join("");
   const notes='<section class="analysis-panel decision-details" aria-labelledby="decision-details-title"><div class="analysis-panel-head"><div><h2 id="decision-details-title">Meilensteine und Datenbasis</h2><p>Exakte Werte ergänzen die Trenddarstellung.</p></div></div><div class="decision-milestones">'+milestones+'</div><div class="decision-source"><p>Vermögensstand '+esc(formatDate(data.freshness.assetsGeneratedAt,true))+' · Zahlungsbasis '+esc(formatDate(data.freshness.cashflowGeneratedAt,true))+' · Quelle '+esc(data.source)+'</p><ul>'+basisNotes+'</ul></div></section>';
   const warnings=data.warnings.map(warning=>'<div class="analysis-warning" role="status">'+icons.warning+'<span>'+esc(warning)+'</span></div>').join("");
@@ -2103,8 +2110,8 @@ async function refresh(force=false){
       const selection=analysisSelection();
       const params=new URLSearchParams();
       if(selection.view==="decision-lab"){
+        params.set("trendBasis",selection.decisionBasis);
         params.set("realReturnBps",String(Math.round(selection.decisionReturn*100)));
-        params.set("variableIncomeShareBps",String(Math.round(selection.decisionVariableShare*100)));
         params.set("monthlyChangeMinor",String(Math.round(selection.decisionMonthly*100)));
         params.set("oneTimeMinor",String(Math.round(selection.decisionOneTime*100)));
         if(force)params.set("refresh","1");

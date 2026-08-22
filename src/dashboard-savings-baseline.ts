@@ -205,9 +205,10 @@ function median(values: number[]): number | null {
 export function buildDashboardSavingsBaseline(
   snapshot: SavingsCashflowSnapshot,
   config: AppConfig,
-  now = new Date()
+  now = new Date(),
+  analysisMonths = 12
 ): DashboardSavingsBaseline {
-  const range = savingsBaselineRange(now, config.timezone);
+  const range = savingsBaselineRange(now, config.timezone, analysisMonths);
   const configuredManual = new Set(
     config.analysis?.savingsBaseline?.manualForwardedIncomeMerchantKeys ?? []
   );
@@ -481,9 +482,9 @@ export async function readActualSavingsCashflow(
   config: NonNullable<AppConfig["actual"]>,
   timezone: string,
   now = new Date(),
-  options: { loadApi?: () => Promise<ActualCashflowApi>; password?: string } = {}
+  options: { loadApi?: () => Promise<ActualCashflowApi>; password?: string; months?: number } = {}
 ): Promise<SavingsCashflowSnapshot> {
-  const range = savingsBaselineRange(now, timezone);
+  const range = savingsBaselineRange(now, timezone, options.months ?? 12);
   const password = options.password ?? readSecret("actual-password");
   if (!password) throw new Error("Actual-Zugang ist nicht verfügbar");
   const dataDir = mkdtempSync(join(tmpdir(), "finance-savings-actual-"));
