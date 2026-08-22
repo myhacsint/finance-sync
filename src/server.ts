@@ -169,7 +169,11 @@ const server = createServer(async (req, res) => {
           ) ? url.searchParams.get("trendBasis") as "current-year" | "ytd-plus-last-year" : undefined,
           realReturnBps: numberParam("realReturnBps"),
           monthlyChangeMinor: numberParam("monthlyChangeMinor"),
-          oneTimeMinor: numberParam("oneTimeMinor")
+          oneTimeMinor: numberParam("oneTimeMinor"),
+          fireTargetAge: numberParam("fireTargetAge"),
+          fireActionKeys: (url.searchParams.get("fireActionKeys") ?? "")
+            .split(",")
+            .filter(Boolean)
         })
       );
     }

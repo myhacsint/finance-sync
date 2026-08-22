@@ -882,6 +882,46 @@ export function renderUi(): string {
     .optimization-stale { grid-column: 1 / -1; color: #ffbd55; font-size: 12px; }
     .decision-toolbar { grid-template-columns: minmax(260px, 1fr); }
     .decision-summary { grid-template-columns: 1.2fr repeat(3, 1fr); }
+    .fire-cockpit { margin-top: 12px; }
+    .fire-model { color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .fire-course, .fire-capital { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); overflow: hidden; margin-top: 14px; border: 1px solid var(--line-soft); border-radius: 10px; }
+    .fire-course > div, .fire-capital > div { min-width: 0; padding: 15px 16px; }
+    .fire-course > div + div, .fire-capital > div + div { border-left: 1px solid var(--line-soft); }
+    .fire-course span, .fire-capital span { display: block; color: var(--muted); font-size: 11px; }
+    .fire-course strong, .fire-capital strong { display: block; margin-top: 6px; font-size: 21px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .fire-course small, .fire-capital small { display: block; margin-top: 5px; color: var(--muted); line-height: 1.4; }
+    .fire-capital { margin-top: 0; border-top: 0; border-radius: 0 0 10px 10px; background: var(--surface-2); }
+    .fire-course { border-radius: 10px 10px 0 0; }
+    .fire-workspace { display: grid; grid-template-columns: minmax(230px, .43fr) minmax(0, 1.57fr); gap: 18px; margin-top: 20px; }
+    .fire-controls { display: grid; align-content: start; gap: 14px; padding-right: 18px; border-right: 1px solid var(--line-soft); }
+    .fire-controls label { color: var(--muted); font-size: 12px; }
+    .fire-controls select { width: 100%; min-height: 44px; margin-top: 6px; }
+    .fire-controls .button { width: 100%; }
+    .fire-band { overflow: hidden; border: 1px solid var(--line-soft); border-radius: 9px; }
+    .fire-band table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .fire-band th, .fire-band td { padding: 9px 8px; border-bottom: 1px solid var(--line-soft); text-align: right; font-variant-numeric: tabular-nums; }
+    .fire-band tr:last-child td { border-bottom: 0; }
+    .fire-band th { color: var(--muted); font-weight: 500; }
+    .fire-band th:first-child, .fire-band td:first-child { text-align: left; }
+    .fire-levers-head { display: flex; align-items: start; justify-content: space-between; gap: 18px; }
+    .fire-levers-head p { margin-top: 4px; color: var(--muted); font-size: 12px; }
+    .fire-levers-head > strong { font-size: 18px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .fire-action-list { display: grid; margin-top: 11px; border-top: 1px solid var(--line-soft); }
+    .fire-action { display: grid; grid-template-columns: 22px minmax(0, 1fr) minmax(160px, auto); gap: 11px; align-items: center; min-height: 66px; padding: 10px 4px; border-bottom: 1px solid var(--line-soft); cursor: pointer; }
+    .fire-action input { width: 18px; height: 18px; accent-color: #6ea8ff; }
+    .fire-action:has(input:disabled) { cursor: default; opacity: .68; }
+    .fire-action-main, .fire-action-saving { display: grid; gap: 3px; }
+    .fire-action-main small, .fire-action-saving small { color: var(--muted); line-height: 1.35; }
+    .fire-action-saving { text-align: right; }
+    .fire-action-saving strong { font-variant-numeric: tabular-nums; }
+    .fire-action-umgesetzt { box-shadow: inset 3px 0 #5cc99a; }
+    .fire-action-klar { box-shadow: inset 3px 0 #6ea8ff; }
+    .fire-action-pruefen { box-shadow: inset 3px 0 #d8a24d; }
+    .fire-empty { padding: 18px 0; color: var(--muted); }
+    .fire-basis { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: 12px; }
+    .fire-basis summary { min-height: 44px; cursor: pointer; color: var(--text); }
+    .fire-basis ul { margin: 0; padding: 0 0 0 18px; }
+    .fire-basis li + li { margin-top: 5px; }
     .decision-context { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 12px; }
     .decision-context-grid { overflow: hidden; border: 1px solid var(--line-soft); border-radius: 10px; }
     .decision-context-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -1054,6 +1094,12 @@ export function renderUi(): string {
       .decision-summary > div:first-child { grid-column: 1 / -1; }
       .decision-chart svg { min-height: 230px; }
       .decision-source { grid-template-columns: 1fr; gap: 12px; }
+      .fire-course, .fire-capital { grid-template-columns: 1fr 1fr; }
+      .fire-course > div:nth-child(3), .fire-course > div:nth-child(4), .fire-capital > div:nth-child(3), .fire-capital > div:nth-child(4) { border-top: 1px solid var(--line-soft); }
+      .fire-course > div:nth-child(3), .fire-capital > div:nth-child(3) { border-left: 0; }
+      .fire-workspace { grid-template-columns: 1fr; }
+      .fire-controls { grid-template-columns: minmax(180px, .45fr) minmax(0, 1fr); padding-right: 0; padding-bottom: 18px; border-right: 0; border-bottom: 1px solid var(--line-soft); }
+      .fire-controls .button { grid-column: 1 / -1; }
       .overview-panel { padding: 18px 16px; }
       .overview-panel .panel-header { gap: 8px; }
       .overview-panel .panel-header h2 { font-size: 18px; }
@@ -1154,6 +1200,14 @@ export function renderUi(): string {
       .decision-milestone + .decision-milestone { border-left: 0; border-top: 1px solid var(--line-soft); }
       .decision-chart svg { min-height: 205px; }
       .decision-axis { font-size: 10px; }
+      .fire-model { white-space: normal; }
+      .fire-course, .fire-capital { grid-template-columns: 1fr; }
+      .fire-course > div + div, .fire-capital > div + div, .fire-course > div:nth-child(3), .fire-course > div:nth-child(4), .fire-capital > div:nth-child(3), .fire-capital > div:nth-child(4) { border-top: 1px solid var(--line-soft); border-left: 0; }
+      .fire-controls { grid-template-columns: 1fr; }
+      .fire-controls .button { grid-column: auto; }
+      .fire-levers-head { display: grid; }
+      .fire-action { grid-template-columns: 22px minmax(0, 1fr); align-items: start; padding: 13px 4px; }
+      .fire-action-saving { grid-column: 2; text-align: left; }
       .recurring-detail-grid { grid-template-columns: 1fr; }
       .recurring-payment { grid-template-columns: 1fr auto; }
       .recurring-payment span:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
@@ -1455,7 +1509,9 @@ function analysisSelection(){
     decisionBasis:params.get("decisionBasis")==="ytd-plus-last-year"?"ytd-plus-last-year":"current-year",
     decisionReturn:boundedParam("decisionReturn",2,-5,10),
     decisionMonthly:boundedParam("decisionMonthly",0,-10000,10000),
-    decisionOneTime:boundedParam("decisionOneTime",0,-1000000,1000000)
+    decisionOneTime:boundedParam("decisionOneTime",0,-1000000,1000000),
+    fireTargetAge:boundedParam("fireTargetAge",60,50,67),
+    fireActionKeys:(params.get("fireActionKeys")||"").split(",").filter(key=>/^recurring-[a-f0-9]{18}$/.test(key))
   };
 }
 function setAnalysisView(value){
@@ -1504,6 +1560,15 @@ function applyDecisionLab(event){
     const safe=Number.isFinite(value)?Math.max(min,Math.min(max,value)):fallback;
     if(safe===fallback)params.delete(name);else params.set(name,String(safe));
   }
+  const query=params.toString();history.pushState(null,"",(query?"?"+query:location.pathname)+location.hash);refresh();
+}
+function applyFireScenario(event){
+  event?.preventDefault();
+  const params=new URLSearchParams(location.search);
+  const target=Math.max(50,Math.min(67,Number(document.getElementById("fire-target-age")?.value||60)));
+  if(target===60)params.delete("fireTargetAge");else params.set("fireTargetAge",String(target));
+  const keys=[...document.querySelectorAll('input[name="fire-action"]:checked')].map(input=>input.value).filter(key=>/^recurring-[a-f0-9]{18}$/.test(key));
+  if(keys.length)params.set("fireActionKeys",keys.join(","));else params.set("fireActionKeys","none");
   const query=params.toString();history.pushState(null,"",(query?"?"+query:location.pathname)+location.hash);refresh();
 }
 function toggleRecurringCandidate(key){
@@ -2015,6 +2080,27 @@ function decisionChart(data){
   const label="20-Jahres-Projektion [SCHÄTZUNG]. Aktueller Trend nach 20 Jahren "+moneyWhole(data.series.at(-1).baselineMinor)+", Szenario "+moneyWhole(data.series.at(-1).scenarioMinor)+".";
   return '<figure class="decision-chart"><div class="decision-legend" aria-hidden="true"><span><i class="baseline"></i>Aktueller Trend</span><span><i class="scenario"></i>Szenario</span></div><svg viewBox="0 0 800 286" role="img" aria-label="'+esc(label)+'"><g class="decision-grid"><path d="M58 24H762M58 133H762M58 242H762"/><path d="M58 24V242M234 24V242M410 24V242M586 24V242M762 24V242"/></g><g class="decision-axis"><text x="50" y="28" text-anchor="end">'+esc(top)+'</text><text x="50" y="137" text-anchor="end">'+esc(middle)+'</text><text x="50" y="246" text-anchor="end">0 €</text><text x="58" y="270" text-anchor="middle">Heute</text><text x="234" y="270" text-anchor="middle">5 J.</text><text x="410" y="270" text-anchor="middle">10 J.</text><text x="586" y="270" text-anchor="middle">15 J.</text><text x="762" y="270" text-anchor="middle">20 J.</text></g><path class="decision-line baseline" d="'+baselinePath+'"/><path class="decision-line scenario" d="'+scenarioPath+'"/></svg><figcaption>'+esc(label)+'</figcaption></figure>';
 }
+function fireExit(age){return age===null?'Nicht vor 67':'Mit '+age}
+function renderFireTracking(fire){
+  const gap=fire.central.annualGapToTargetMinor;
+  const current=fire.central.currentExitAge;
+  const scenario=fire.central.scenarioExitAge;
+  const years=fire.central.yearsGained;
+  const targetOptions=Array.from({length:18},(_,index)=>{const age=50+index;return '<option value="'+age+'" '+(age===fire.targetAge?'selected ':'')+'>'+age+' Jahre</option>'}).join('');
+  const bandRows=fire.returnBand.map(row=>'<tr><td>'+(row.realReturnBps/100).toLocaleString('de-DE')+' % real</td><td>'+esc(fireExit(row.currentExitAge))+'</td><td>'+esc(fireExit(row.scenarioExitAge))+'</td></tr>').join('');
+  const actionRows=fire.actions.map(action=>{
+    const checked=fire.selectedActionKeys.includes(action.key);
+    const disabled=!action.selectable;
+    const saving=action.expectedAnnualSavingsMinor===null?'Noch nicht belastbar':money(action.expectedAnnualSavingsMinor)+' / Jahr';
+    const coverage=gap&&action.expectedAnnualSavingsMinor!==null?Math.min(100,Math.round(action.expectedAnnualSavingsMinor/gap*100)):null;
+    const impact=action.yearsGained&&action.yearsGained>0?action.yearsGained+' '+(action.yearsGained===1?'Jahr':'Jahre')+' früher':coverage!==null?coverage+' % der aktuellen Ziel-Lücke':'Erst nach Prüfung berechenbar';
+    return '<label class="fire-action fire-action-'+esc(action.leverQuality)+'"><input type="checkbox" name="fire-action" value="'+esc(action.key)+'" '+(checked?'checked ':'')+(disabled?'disabled ':'')+'><span class="fire-action-main"><strong>'+esc(action.label)+'</strong><small>'+esc(action.leverLabel)+' · '+esc(action.classificationLabel)+' · '+esc(action.statusLabel)+'</small></span><span class="fire-action-saving"><strong>'+saving+'</strong><small>'+esc(impact)+' '+analysisEstimate(true)+'</small></span></label>';
+  }).join('');
+  const noActions='<div class="fire-empty">Noch keine bestätigten Optimierungsmaßnahmen verfügbar.</div>';
+  const basis=fire.basis.map(item=>'<li>'+esc(item)+'</li>').join('');
+  const warnings=fire.warnings.map(warning=>'<div class="analysis-warning" role="status">'+icons.warning+'<span>'+esc(warning)+'</span></div>').join('');
+  return '<section class="analysis-panel fire-cockpit" aria-labelledby="fire-title"><div class="analysis-panel-head"><div><h2 id="fire-title">FIRE-Kurs und konkrete Stellschrauben</h2><p>Welche Ausgabenänderung das früheste tragfähige Ausstiegsalter tatsächlich verändert.</p></div><span class="fire-model">'+esc(fire.modelVersion)+' · '+analysisEstimate(true)+'</span></div><div class="fire-course"><div><span>Aktueller Kurs</span><strong class="'+(current!==null&&current<=fire.targetAge?'tone-ok':'tone-warning')+'">'+esc(fireExit(current))+'</strong><small>Bei 3 % Realrendite, ohne Erbschaft</small></div><div><span>Zielalter</span><strong>'+fire.targetAge+'</strong><small>Aktuell gewähltes Arbeitsziel</small></div><div><span>Lücke zum Ziel</span><strong class="'+(gap===0?'tone-ok':'tone-warning')+'">'+(gap===null?'–':moneyWhole(gap)+' / Jahr')+'</strong><small>'+(fire.central.monthlyGapToTargetMinor===null?'Nicht verfügbar':moneyWhole(fire.central.monthlyGapToTargetMinor)+' pro Monat')+' '+analysisEstimate(true)+'</small></div><div><span>Mit ausgewählten Hebeln</span><strong class="'+(scenario!==null&&scenario<=fire.targetAge?'tone-ok':'tone-warning')+'">'+esc(fireExit(scenario))+'</strong><small>'+moneyWhole(fire.selectedAnnualSavingsMinor)+' Entlastung · '+(years===null?'Wirkung offen':years+' Jahre gewonnen')+'</small></div></div><div class="fire-capital"><div><span>Überbrückungskapital heute</span><strong>'+(fire.bridgeCapitalMinor===null?'–':moneyWhole(fire.bridgeCapitalMinor))+'</strong><small>Liquidität, Depots, Krypto und Gold</small></div><div><span>Gebundene Vorsorge</span><strong>'+(fire.lockedPensionMinor===null?'–':moneyWhole(fire.lockedPensionMinor))+'</strong><small>Separat zu den vorgesehenen Leistungszeitpunkten</small></div><div><span>Aktuelle Ausgaben-Hochrechnung</span><strong>'+(fire.liveProjectedAnnualExpensesMinor===null?'–':moneyWhole(fire.liveProjectedAnnualExpensesMinor))+'</strong><small>Normalisiert '+(fire.normalizedAnnualExpensesMinor===null?'–':moneyWhole(fire.normalizedAnnualExpensesMinor))+' '+analysisEstimate(true)+'</small></div><div><span>Tragbar beim Zielalter</span><strong>'+(fire.central.maximumExpensesAtTargetMinor===null?'–':moneyWhole(fire.central.maximumExpensesAtTargetMinor))+'</strong><small>Bei 3 % real '+analysisEstimate(true)+'</small></div></div><div class="fire-workspace"><form class="fire-controls" onsubmit="applyFireScenario(event)"><label for="fire-target-age">Gewünschtes Zielalter<select id="fire-target-age" autocomplete="off">'+targetOptions+'</select></label><div class="fire-band"><table><thead><tr><th scope="col">Renditeband</th><th scope="col">Aktuell</th><th scope="col">Mit Hebeln</th></tr></thead><tbody>'+bandRows+'</tbody></table></div><button class="button" type="submit">FIRE-Szenario aktualisieren</button></form><div class="fire-levers"><div class="fire-levers-head"><div><h3>Reale Ausgabenhebel</h3><p>Nur gespeicherte Entlastungen können ausgewählt werden. Grundbedarf bleibt ausgeschlossen.</p></div><strong>'+moneyWhole(fire.selectedAnnualSavingsMinor)+' / Jahr</strong></div><div class="fire-action-list">'+(actionRows||noActions)+'</div></div></div><details class="fire-basis"><summary>Modellannahmen und Grenzen</summary><ul>'+basis+'</ul></details>'+warnings+'</section>';
+}
 function renderDecisionLab(data){
   currentDecisionLabData=data;
   const toolbar='<section class="analysis-toolbar decision-toolbar" aria-label="Entscheidungslabor"><label>Ansicht<select name="analysis-view" autocomplete="off" onchange="setAnalysisView(this.value)"><option value="expense-structure">Ausgabenstruktur</option><option value="recurring-expenses">Regelmäßige Ausgaben prüfen</option><option value="expense-optimizations">Optimierungsliste</option><option value="decision-lab" selected>Entscheidungslabor</option><option value="crypto-origin-tax">Krypto · Herkunft &amp; Steuerstatus</option></select></label></section>';
@@ -2025,6 +2111,7 @@ function renderDecisionLab(data){
   const monthlyLabel=trend.monthlyMetric==='median'?'Typischer Monat · Median-Saldo':'Monatsdurchschnitt';
   const summary='<section class="analysis-summary decision-summary" aria-label="Ausgangslage für die Projektion"><div><span>Finanzvermögen heute</span><strong class="analysis-total">'+(data.basis.startingAssetsMinor===null?'–':moneyWhole(data.basis.startingAssetsMinor))+'</strong><p class="analysis-basis">Ohne Immobilien · '+esc(data.scope.includes.join(", "))+' '+analysisEstimate(true)+'</p></div><div><span>Bilanz · '+esc(period)+'</span><strong class="'+(trend.netMinor<0?'tone-warning':'tone-ok')+'">'+(trend.netMinor===null?'–':signedMoneyWhole(trend.netMinor))+'</strong><p class="analysis-basis">Einnahmen '+(trend.incomeMinor===null?'–':moneyWhole(trend.incomeMinor))+' · Ausgaben '+(trend.expensesMinor===null?'–':moneyWhole(trend.expensesMinor))+'</p></div><div><span>'+esc(monthlyLabel)+'</span><strong class="'+(trend.averageMonthlyNetMinor<0?'tone-warning':'tone-ok')+'">'+(trend.averageMonthlyNetMinor===null?'–':signedMoneyWhole(trend.averageMonthlyNetMinor))+'</strong><p class="analysis-basis">Einnahmen '+(trend.monthlyIncomeMinor===null?'–':moneyWhole(trend.monthlyIncomeMinor))+' · Ausgaben '+(trend.monthlyExpensesMinor===null?'–':moneyWhole(trend.monthlyExpensesMinor))+'</p></div><div><span>Projektionsbasis</span><strong class="'+(trend.annualizedNetMinor<0?'tone-warning':'tone-ok')+'">'+(trend.annualizedNetMinor===null?'–':signedMoneyWhole(trend.annualizedNetMinor))+' / Jahr</strong><p class="analysis-basis">Aus '+esc(monthlyLabel.toLowerCase())+' '+analysisEstimate(true)+'</p></div></section>';
   const annual=data.basis.annualOutlook;
+  const fire=renderFireTracking(data.fire);
   const annualRow=(label,values,highlight,estimate)=>'<tr class="'+(highlight?'projected':'')+'"><td>'+esc(label)+(estimate?' '+analysisEstimate(true):'')+'</td><td data-label="Einnahmen">'+(values.incomeMinor===null?'–':moneyWhole(values.incomeMinor))+'</td><td data-label="Ausgaben">'+(values.expensesMinor===null?'–':moneyWhole(values.expensesMinor))+'</td><td data-label="Saldo" class="'+(values.netMinor<0?'tone-warning':'tone-ok')+'">'+(values.netMinor===null?'–':signedMoneyWhole(values.netMinor))+'</td></tr>';
   const annualMonths=annual.year===null?'':Array.from({length:12},(_,index)=>'<span class="'+(index<annual.completedMonths?'complete':'')+'" aria-hidden="true">'+(index+1)+'</span>').join('');
   const annualVariance=annual.varianceToExpected.netMinor;
@@ -2032,7 +2119,7 @@ function renderDecisionLab(data){
   const annualPanel=annual.available?'<section class="analysis-panel decision-annual" aria-labelledby="decision-annual-title"><div class="analysis-panel-head"><div><h2 id="decision-annual-title">Jahresausblick '+esc(annual.year)+'</h2><p>'+esc(annual.completedMonths)+' abgeschlossene Monate bis '+analysisMonthLabel(annual.throughMonth)+' · laufender Monat nicht eingerechnet.</p></div></div><div class="decision-annual-progress" aria-label="'+esc(annual.completedMonths)+' von 12 Monaten abgeschlossen">'+annualMonths+'</div><div class="decision-context-grid" style="margin-top:14px"><table class="decision-context-table decision-annual-table"><thead><tr><th scope="col">Jahressicht</th><th scope="col">Einnahmen</th><th scope="col">Ausgaben</th><th scope="col">Saldo</th></tr></thead><tbody>'+annualRow('Ist bis '+analysisMonthLabel(annual.throughMonth),annual.actualToDate,false,false)+annualRow('Median-Pfad bis '+analysisMonthLabel(annual.throughMonth),annual.expectedToDate,false,true)+annualRow('Hochrechnung Jahresende',annual.projectedYearEnd,true,true)+annualRow('Median × 12 · Referenz',annual.medianFullYear,false,true)+'</tbody></table></div><div class="decision-annual-variance"><span>Ist-Saldo gegenüber erwartetem Pfad</span><strong class="'+(annualVariance<0?'tone-warning':'tone-ok')+'">'+esc(annualVarianceText)+'</strong></div><p class="decision-breakdown-note">Die Jahresend-Hochrechnung verbindet den echten Stand der abgeschlossenen Monate mit dem typischen Median-Monat für die verbleibenden '+esc(annual.remainingMonths)+' Monate. Der laufende Monat bleibt bis zum Abschluss separat.</p></section>':'';
   if(data.series.length===0){
     const warnings=data.warnings.map(warning=>'<div class="analysis-warning" role="status">'+icons.warning+'<span>'+esc(warning)+'</span></div>').join("");
-    document.getElementById("dashboard").innerHTML=toolbar+summary+annualPanel+'<div style="margin-top:12px">'+expenseState("Projektion nicht verfügbar","Für eine Trajektorie werden ein vollständiger Vermögensstand und eine vollständige Sparratenbasis benötigt.","refresh(true)","Neu prüfen","warning")+'</div>'+warnings;
+    document.getElementById("dashboard").innerHTML=toolbar+summary+fire+annualPanel+'<div style="margin-top:12px">'+expenseState("Projektion nicht verfügbar","Für eine Trajektorie werden ein vollständiger Vermögensstand und eine vollständige Sparratenbasis benötigt.","refresh(true)","Neu prüfen","warning")+'</div>'+warnings;
     document.getElementById("dashboard").setAttribute("aria-busy","false");return;
   }
   const trendOptions=data.basis.trendOptions.map(option=>'<option value="'+esc(option.key)+'" '+(option.key===data.inputs.trendBasis?'selected ':'')+(!option.available?'disabled ':'')+'>'+esc(option.label)+'</option>').join("");
@@ -2053,7 +2140,7 @@ function renderDecisionLab(data){
   const basisNotes=data.basisNotes.map(note=>'<li>'+esc(note)+'</li>').join("");
   const notes='<section class="analysis-panel decision-details" aria-labelledby="decision-details-title"><div class="analysis-panel-head"><div><h2 id="decision-details-title">Meilensteine und Datenbasis</h2><p>Exakte Werte ergänzen die Trenddarstellung.</p></div></div><div class="decision-milestones">'+milestones+'</div><div class="decision-source"><p>Vermögensstand '+esc(formatDate(data.freshness.assetsGeneratedAt,true))+' · Zahlungsbasis '+esc(formatDate(data.freshness.cashflowGeneratedAt,true))+' · Quelle '+esc(data.source)+'</p><ul>'+basisNotes+'</ul></div></section>';
   const warnings=data.warnings.map(warning=>'<div class="analysis-warning" role="status">'+icons.warning+'<span>'+esc(warning)+'</span></div>').join("");
-  document.getElementById("dashboard").innerHTML=toolbar+summary+annualPanel+'<div class="decision-context">'+comparison+breakdown+'</div><div class="decision-layout">'+assumptions+projection+'</div>'+notes+warnings;
+  document.getElementById("dashboard").innerHTML=toolbar+summary+fire+annualPanel+'<div class="decision-context">'+comparison+breakdown+'</div><div class="decision-layout">'+assumptions+projection+'</div>'+notes+warnings;
   document.getElementById("dashboard").setAttribute("aria-busy","false");
 }
 function renderDecisionLabError(error){
@@ -2164,6 +2251,9 @@ async function refresh(force=false){
         params.set("realReturnBps",String(Math.round(selection.decisionReturn*100)));
         params.set("monthlyChangeMinor",String(Math.round(selection.decisionMonthly*100)));
         params.set("oneTimeMinor",String(Math.round(selection.decisionOneTime*100)));
+        params.set("fireTargetAge",String(selection.fireTargetAge));
+        if(selection.fireActionKeys.length)params.set("fireActionKeys",selection.fireActionKeys.join(","));
+        else if(new URLSearchParams(location.search).has("fireActionKeys"))params.set("fireActionKeys","none");
         if(force)params.set("refresh","1");
         const data=await call("/api/dashboard/analyses/decision-lab?"+params.toString());renderDecisionLab(data);
       }else if(selection.view==="crypto-origin-tax"){

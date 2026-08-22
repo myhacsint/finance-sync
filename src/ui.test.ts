@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { renderUi } from "./ui.js";
 
+test("eingebettetes UI-JavaScript ist syntaktisch gültig", () => {
+  const html = renderUi();
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
+  assert.ok(scripts.length > 0);
+  for (const script of scripts) assert.doesNotThrow(() => new Function(script));
+});
+
 test("Datenstatus enthält responsive Navigation und zugängliche Hauptbereiche", () => {
   const html = renderUi();
   assert.match(html, /<main class="content" id="main-content">/);
@@ -164,6 +171,13 @@ test("Analysenansicht besitzt ein zugängliches Entscheidungslabor", () => {
   assert.match(html, /Monatliche Veränderung/);
   assert.match(html, /Einmaliger Zu- oder Abfluss/);
   assert.match(html, /Finanzvermögen über 20 Jahre/);
+  assert.match(html, /FIRE-Kurs und konkrete Stellschrauben/);
+  assert.match(html, /Überbrückungskapital heute/);
+  assert.match(html, /Gebundene Vorsorge/);
+  assert.match(html, /Reale Ausgabenhebel/);
+  assert.match(html, /Grundbedarf bleibt ausgeschlossen/);
+  assert.match(html, /fireTargetAge/);
+  assert.match(html, /fireActionKeys/);
   assert.match(html, /decision-milestones/);
   assert.match(html, /stroke-dasharray/);
   assert.match(html, /\[SCHÄTZUNG\]/);

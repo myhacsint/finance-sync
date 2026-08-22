@@ -386,11 +386,18 @@ export class FinanceService {
         this.savingsHistoryLoading = undefined;
       }
     };
-    const [assets, cashflow] = await Promise.all([
+    const [assets, cashflow, recurring] = await Promise.all([
       this.getDashboardAssets(force),
-      loadHistory()
+      loadHistory(),
+      this.getRecurringSnapshot(force, true)
     ]);
-    return buildDashboardDecisionLab(assets, cashflow, request);
+    const optimizations = buildDashboardRecurringExpenseOptimizations(
+      recurring.snapshot,
+      this.db.listRecurringExpenseDecisions(),
+      this.db.listRecurringExpenseOptimizations(),
+      { stale: recurring.stale }
+    );
+    return buildDashboardDecisionLab(assets, cashflow, optimizations, request);
   }
 
   getDashboardCryptoAnalysis(): DashboardCryptoAnalysis {

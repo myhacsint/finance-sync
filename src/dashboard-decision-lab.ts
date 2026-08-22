@@ -1,11 +1,15 @@
 import type { DashboardAssets } from "./dashboard-assets.js";
 import type { DashboardSavingsBaseline } from "./dashboard-savings-baseline.js";
+import { buildDashboardFireTracking, type DashboardFireTracking } from "./dashboard-fire.js";
+import type { DashboardRecurringExpenseOptimizations } from "./dashboard-recurring-expenses.js";
 
 export interface DecisionLabRequest {
   trendBasis?: DecisionTrendBasis;
   realReturnBps?: number;
   monthlyChangeMinor?: number;
   oneTimeMinor?: number;
+  fireTargetAge?: number;
+  fireActionKeys?: string[];
 }
 
 export type DecisionTrendBasis = "current-year" | "ytd-plus-last-year";
@@ -90,6 +94,8 @@ export interface DashboardDecisionLab {
     realReturnBps: number;
     monthlyChangeMinor: number;
     oneTimeMinor: number;
+    fireTargetAge: number;
+    fireActionKeys: string[];
   };
   basis: {
     startingAssetsMinor: number | null;
@@ -136,6 +142,7 @@ export interface DashboardDecisionLab {
     baselineAfterMonths: number | null;
     scenarioAfterMonths: number | null;
   };
+  fire: DashboardFireTracking;
   warnings: string[];
   basisNotes: string[];
 }
@@ -153,7 +160,11 @@ export function decisionLabInputs(request: DecisionLabRequest = {}): DashboardDe
       : "current-year",
     realReturnBps: clampInteger(request.realReturnBps, 200, -500, 1_000),
     monthlyChangeMinor: clampInteger(request.monthlyChangeMinor, 0, -1_000_000, 1_000_000),
-    oneTimeMinor: clampInteger(request.oneTimeMinor, 0, -100_000_000, 100_000_000)
+    oneTimeMinor: clampInteger(request.oneTimeMinor, 0, -100_000_000, 100_000_000),
+    fireTargetAge: clampInteger(request.fireTargetAge, 60, 50, 67),
+    fireActionKeys: Array.isArray(request.fireActionKeys)
+      ? request.fireActionKeys.filter((key) => key === "none" || /^recurring-[a-f0-9]{18}$/.test(key)).slice(0, 50)
+      : []
   };
 }
 
@@ -464,6 +475,7 @@ function annualOutlook(
 export function buildDashboardDecisionLab(
   assets: DashboardAssets,
   cashflow: DashboardSavingsBaseline,
+  optimizations: DashboardRecurringExpenseOptimizations,
   request: DecisionLabRequest = {},
   now = new Date()
 ): DashboardDecisionLab {
@@ -488,6 +500,11 @@ export function buildDashboardDecisionLab(
     : null;
   const pendingCardEntries = cashflow.pendingCreditCardBalances?.entries ?? [];
   const pendingCardExpensesMinor = currentMonth?.pendingCardExpenseMinor ?? 0;
+  const annual = annualOutlook(typicalTrend, cashflow.window.currentMonthIncluded);
+  const fire = buildDashboardFireTracking(assets, {
+    liveProjectedAnnualExpensesMinor: annual.projectedYearEnd.expensesMinor,
+    normalizedAnnualExpensesMinor: annual.medianFullYear.expensesMinor
+  }, optimizations, inputs.fireTargetAge, inputs.fireActionKeys);
   const warnings = [...assets.warnings];
   if (startingAssetsMinor === null) {
     warnings.push("Das aktuelle Finanzvermögen ist unvollständig; die Projektion ist nicht verfügbar.");
@@ -558,7 +575,7 @@ export function buildDashboardDecisionLab(
       selectedTrend,
       trendOptions,
       projectedMonthlyCapacityMinor,
-      annualOutlook: annualOutlook(typicalTrend, cashflow.window.currentMonthIncluded),
+      annualOutlook: annual,
       lastMonthComparison: {
         month: lastMonth?.month ?? null,
         incomeMinor: lastMonthValues?.incomeMinor ?? null,
@@ -600,6 +617,7 @@ export function buildDashboardDecisionLab(
     series,
     milestones,
     depletion: { baselineAfterMonths, scenarioAfterMonths },
+    fire,
     warnings: [...new Set(warnings)],
     basisNotes: [
       "Finanzvermögen ohne Immobilien; Liquidität, Depots, Vorsorge, Krypto und Edelmetalle einbezogen",
