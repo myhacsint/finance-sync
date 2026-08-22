@@ -45,6 +45,7 @@ export interface DashboardAssets {
     detail?: string;
     acquisitionCostMinor?: number;
     acquisitionCostEstimated?: boolean;
+    valuationSource?: string;
   }>;
   warnings: string[];
 }
@@ -258,7 +259,8 @@ export function buildDashboardAssets(
         maximumFractionDigits: 1
       }).format(asset.fineness)}`,
       acquisitionCostMinor: asset.acquisitionCostMinor,
-      acquisitionCostEstimated: asset.acquisitionCostEstimated
+      acquisitionCostEstimated: asset.acquisitionCostEstimated,
+      valuationSource: valuation.source
     });
   }
   const sortedPositions = positions.sort((left, right) => {

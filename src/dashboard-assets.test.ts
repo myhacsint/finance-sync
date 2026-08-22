@@ -158,5 +158,6 @@ test("physisches Gold wird separat und ohne Ghostfolio-Doppelzählung ausgewiese
   const gold = result.positions.find((position) => position.area === "precious-metals");
   assert.equal(gold?.basis, "Ankaufwert [SCHÄTZUNG]");
   assert.equal(gold?.acquisitionCostMinor, 350_000);
+  assert.equal(gold?.valuationSource, "GOLD.DE Ankaufspreisvergleich");
   assert.match(gold?.detail ?? "", /100 g.*999,9/);
 });
