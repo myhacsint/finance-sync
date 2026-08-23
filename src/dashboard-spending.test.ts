@@ -5,7 +5,8 @@ import {
   buildDashboardSpending,
   readActualSpendingMonth,
   reviewWindowSelection,
-  spendingMonthSelection
+  spendingMonthSelection,
+  spendingPeriodSelection
 } from "./dashboard-spending.js";
 
 const actual: NonNullable<AppConfig["actual"]> = {
@@ -181,4 +182,93 @@ test("Kategorie, Konto, Suche und Pagination greifen gemeinsam", () => {
   assert.equal(selected.selection.category, "category-food");
   assert.equal(selected.pagination.page, 1);
   assert.equal(selected.transactions.length, 11);
+});
+
+test("Ausgabenzeitraum kennt Monat, Quartal, YTD und Jahr", () => {
+  const now = new Date("2026-08-23T18:00:00.000Z");
+  const month = spendingPeriodSelection(now, "Europe/Berlin", { period: "month", month: "2026-03" });
+  assert.equal(month.kind, "month");
+  assert.equal(month.startMonth, "2026-03");
+  assert.equal(month.endMonth, "2026-03");
+  assert.equal(month.startDate, "2026-03-01");
+  assert.equal(month.endDate, "2026-03-31");
+  assert.equal(month.complete, true);
+
+  const currentMonth = spendingPeriodSelection(now, "Europe/Berlin", { period: "month", month: "2026-08" });
+  assert.equal(currentMonth.endMonth, "2026-08");
+  assert.equal(currentMonth.complete, false);
+
+  const future = spendingPeriodSelection(now, "Europe/Berlin", { period: "month", month: "2026-09" });
+  assert.equal(future.endMonth, "2026-08");
+
+  const quarter = spendingPeriodSelection(now, "Europe/Berlin", { period: "quarter", quarter: "2026-Q2" });
+  assert.equal(quarter.startMonth, "2026-04");
+  assert.equal(quarter.endMonth, "2026-06");
+  assert.equal(quarter.complete, true);
+
+  const openQuarter = spendingPeriodSelection(now, "Europe/Berlin", { period: "quarter", quarter: "2026-Q3" });
+  assert.equal(openQuarter.startMonth, "2026-07");
+  assert.equal(openQuarter.endMonth, "2026-08");
+  assert.equal(openQuarter.complete, false);
+
+  const ytd = spendingPeriodSelection(now, "Europe/Berlin", { period: "ytd" });
+  assert.equal(ytd.startMonth, "2026-01");
+  assert.equal(ytd.endMonth, "2026-08");
+  assert.equal(ytd.startDate, "2026-01-01");
+  assert.equal(ytd.complete, false);
+
+  const year = spendingPeriodSelection(now, "Europe/Berlin", { period: "year", year: "2025" });
+  assert.equal(year.startMonth, "2025-01");
+  assert.equal(year.endMonth, "2025-12");
+  assert.equal(year.endDate, "2025-12-31");
+  assert.equal(year.complete, true);
+});
+
+test("Buchungsliste sortiert nach Datum oder Betrag", () => {
+  const snapshot = {
+    month: "2026-07",
+    monthLabel: "Juli 2026",
+    latestMonth: "2026-07",
+    oldestMonth: "2016-07",
+    generatedAt: "2026-08-23T18:00:00.000Z",
+    accounts: [{ key: "account-one", label: "Giro" }],
+    catalog: [],
+    lines: [
+      {
+        id: "late",
+        date: "2026-07-20",
+        merchantKey: "merchant-a",
+        merchant: "Zoo",
+        notes: "",
+        accountKey: "account-one",
+        accountLabel: "Giro",
+        categoryKey: "category-food",
+        categoryLabel: "Lebensmittel",
+        categorized: true,
+        amountMinor: 300
+      },
+      {
+        id: "early",
+        date: "2026-07-01",
+        merchantKey: "merchant-b",
+        merchant: "Alpha",
+        notes: "",
+        accountKey: "account-one",
+        accountLabel: "Giro",
+        categoryKey: "category-food",
+        categoryLabel: "Lebensmittel",
+        categorized: true,
+        amountMinor: 900
+      }
+    ]
+  };
+  const newest = buildDashboardSpending(snapshot);
+  assert.deepEqual(newest.transactions.map((row) => row.date), ["2026-07-20", "2026-07-01"]);
+  const oldest = buildDashboardSpending(snapshot, { sort: "date-asc" });
+  assert.deepEqual(oldest.transactions.map((row) => row.date), ["2026-07-01", "2026-07-20"]);
+  const amountDesc = buildDashboardSpending(snapshot, { sort: "amount-desc" });
+  assert.deepEqual(amountDesc.transactions.map((row) => row.amountMinor), [900, 300]);
+  const amountAsc = buildDashboardSpending(snapshot, { sort: "amount-asc" });
+  assert.deepEqual(amountAsc.transactions.map((row) => row.amountMinor), [300, 900]);
+  assert.equal(amountDesc.selection.sort, "amount-desc");
 });

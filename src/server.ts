@@ -146,6 +146,10 @@ const server = createServer(async (req, res) => {
       const month = requestedMonth && /^\d{4}-(0[1-9]|1[0-2])$/.test(requestedMonth)
         ? requestedMonth
         : undefined;
+      const period = url.searchParams.get("period") ?? undefined;
+      const quarter = url.searchParams.get("quarter") ?? undefined;
+      const year = url.searchParams.get("year") ?? undefined;
+      const sort = url.searchParams.get("sort") ?? undefined;
       const requestedPage = Number(url.searchParams.get("page") ?? 1);
       const page = Number.isInteger(requestedPage)
         ? Math.max(1, Math.min(100_000, requestedPage))
@@ -157,6 +161,10 @@ const server = createServer(async (req, res) => {
         200,
         await service.getDashboardSpending(url.searchParams.get("refresh") === "1", {
           month,
+          period,
+          quarter,
+          year,
+          sort: sort as import("./dashboard-spending.js").SpendingSort,
           category: (url.searchParams.get("category") ?? "").slice(0, 80),
           account: (url.searchParams.get("account") ?? "").slice(0, 80),
           search: (url.searchParams.get("search") ?? "").slice(0, 80),

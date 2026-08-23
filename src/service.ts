@@ -51,9 +51,11 @@ import {
   readActualSpendingRange,
   readActualSpendingMonth,
   reviewWindowSelection,
+  spendingPeriodSelection,
   type ActualSpendingRangeSnapshot,
   type ActualSpendingMonthSnapshot,
   type DashboardSpending,
+  type SpendingPeriodRequest,
   type SpendingQuery
 } from "./dashboard-spending.js";
 import {
@@ -242,10 +244,11 @@ export class FinanceService {
 
   async getDashboardSpending(
     force = false,
-    request: SpendingQuery & { month?: string } = {}
+    request: SpendingQuery & SpendingPeriodRequest = {}
   ): Promise<DashboardSpending> {
     if (!this.config.actual?.enabled) throw new Error("Actual ist deaktiviert");
-    const cacheKey = request.month ?? "latest";
+    const period = spendingPeriodSelection(new Date(), this.config.timezone, request);
+    const cacheKey = period.key;
     const now = Date.now();
     let snapshot = this.spendingCache.get(cacheKey);
     if (force || !snapshot || snapshot.expiresAt <= now) {
@@ -254,7 +257,9 @@ export class FinanceService {
         loading = this.withActual(() => readActualSpendingMonth(
           this.config.actual!,
           this.config.timezone,
-          request.month
+          request.month,
+          new Date(),
+          { period: request }
         ));
         this.spendingLoading.set(cacheKey, loading);
       }

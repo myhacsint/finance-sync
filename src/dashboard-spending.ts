@@ -99,6 +99,7 @@ export interface ActualSpendingMonthSnapshot {
   monthLabel: string;
   latestMonth: string;
   oldestMonth: string;
+  period?: SpendingPeriodSelection;
   generatedAt: string;
   lines: SpendingLine[];
   accounts: Array<{ key: string; label: string }>;
@@ -111,6 +112,31 @@ export interface SpendingQuery {
   search?: string;
   page?: number;
   pageSize?: number;
+  sort?: SpendingSort;
+}
+
+export type SpendingSort = "date-desc" | "date-asc" | "amount-desc" | "amount-asc" | "merchant-asc" | "merchant-desc";
+export type SpendingPeriodKind = "month" | "quarter" | "ytd" | "year";
+
+export interface SpendingPeriodRequest {
+  period?: string;
+  month?: string;
+  quarter?: string;
+  year?: string;
+}
+
+export interface SpendingPeriodSelection {
+  kind: SpendingPeriodKind;
+  key: string;
+  label: string;
+  startMonth: string;
+  endMonth: string;
+  startDate: string;
+  endDate: string;
+  complete: boolean;
+  currentMonth: string;
+  latestCompleteMonth: string;
+  oldestMonth: string;
 }
 
 export interface DashboardSpending {
@@ -121,6 +147,7 @@ export interface DashboardSpending {
   monthLabel: string;
   latestMonth: string;
   oldestMonth: string;
+  period?: SpendingPeriodSelection;
   summary: {
     totalMinor: number;
     bookings: number;
@@ -130,6 +157,7 @@ export interface DashboardSpending {
     category: string;
     account: string;
     search: string;
+    sort: SpendingSort;
   };
   filtered: {
     totalMinor: number;
@@ -200,6 +228,103 @@ export function spendingMonthSelection(
     && monthDistance(requested, latestMonth) <= 0
     && monthDistance(requested, oldestMonth) >= 0;
   return { month: valid ? requested : latestMonth, latestMonth, oldestMonth };
+}
+
+function dayParts(now: Date, timezone: string): { year: number; month: number; day: number } {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(now);
+  return {
+    year: Number(parts.find((part) => part.type === "year")?.value),
+    month: Number(parts.find((part) => part.type === "month")?.value),
+    day: Number(parts.find((part) => part.type === "day")?.value)
+  };
+}
+
+function monthKey(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+function clampMonth(key: string, oldest: string, newest: string): string {
+  if (key < oldest) return oldest;
+  if (key > newest) return newest;
+  return key;
+}
+
+function periodLabel(kind: SpendingPeriodKind, startMonth: string, timezone: string): string {
+  const format = (key: string, options: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat("de-DE", { timeZone: timezone, ...options })
+      .format(new Date(`${key}-15T12:00:00Z`));
+  if (kind === "month") return format(startMonth, { month: "long", year: "numeric" });
+  if (kind === "year") return startMonth.slice(0, 4);
+  if (kind === "ytd") return `Jahr bis heute ${startMonth.slice(0, 4)}`;
+  const quarter = Math.ceil(Number(startMonth.slice(5)) / 3);
+  return `Q${quarter} ${startMonth.slice(0, 4)}`;
+}
+
+export function spendingPeriodSelection(
+  now: Date,
+  timezone: string,
+  request: SpendingPeriodRequest = {}
+): SpendingPeriodSelection {
+  const today = dayParts(now, timezone);
+  const currentMonth = monthKey(today.year, today.month);
+  const latestCompleteMonth = shiftSpendingMonth(currentMonth, -1);
+  const oldestMonth = shiftSpendingMonth(latestCompleteMonth, -120);
+  const todayDate = `${currentMonth}-${String(today.day).padStart(2, "0")}`;
+  const kind: SpendingPeriodKind = request.period === "quarter" || request.period === "ytd" || request.period === "year"
+    ? request.period
+    : "month";
+
+  let startMonth = latestCompleteMonth;
+  let endMonth = latestCompleteMonth;
+  let key = latestCompleteMonth;
+
+  if (kind === "month") {
+    const requested = request.month && /^\d{4}-(0[1-9]|1[0-2])$/.test(request.month)
+      ? request.month
+      : latestCompleteMonth;
+    startMonth = clampMonth(requested, oldestMonth, currentMonth);
+    endMonth = startMonth;
+    key = startMonth;
+  } else if (kind === "quarter") {
+    const match = /^(\d{4})-Q([1-4])$/.exec(request.quarter ?? "");
+    const year = match ? Number(match[1]) : today.year;
+    const quarter = match ? Number(match[2]) : Math.ceil(today.month / 3);
+    startMonth = clampMonth(monthKey(year, (quarter - 1) * 3 + 1), oldestMonth, currentMonth);
+    endMonth = clampMonth(monthKey(year, quarter * 3), oldestMonth, currentMonth);
+    if (endMonth < startMonth) startMonth = endMonth;
+    key = `${startMonth.slice(0, 4)}-Q${Math.ceil(Number(startMonth.slice(5)) / 3)}`;
+  } else if (kind === "ytd") {
+    const year = /^\d{4}$/.test(request.year ?? "") ? Number(request.year) : today.year;
+    startMonth = clampMonth(monthKey(year, 1), oldestMonth, currentMonth);
+    endMonth = year === today.year ? currentMonth : clampMonth(monthKey(year, 12), oldestMonth, currentMonth);
+    key = `ytd-${year}`;
+  } else {
+    const year = /^\d{4}$/.test(request.year ?? "") ? Number(request.year) : today.year;
+    startMonth = clampMonth(monthKey(year, 1), oldestMonth, currentMonth);
+    endMonth = year === today.year ? currentMonth : clampMonth(monthKey(year, 12), oldestMonth, currentMonth);
+    key = String(year);
+  }
+
+  const complete = endMonth < currentMonth;
+  const endDate = endMonth === currentMonth ? todayDate : monthEnd(endMonth);
+  return {
+    kind,
+    key,
+    label: periodLabel(kind, startMonth, timezone),
+    startMonth,
+    endMonth,
+    startDate: `${startMonth}-01`,
+    endDate,
+    complete,
+    currentMonth,
+    latestCompleteMonth,
+    oldestMonth
+  };
 }
 
 function monthEnd(key: string): string {
@@ -372,23 +497,25 @@ export async function readActualSpendingMonth(
   timezone: string,
   requestedMonth?: string,
   now = new Date(),
-  options: { loadApi?: ActualSpendingApiLoader; password?: string } = {}
+  options: { loadApi?: ActualSpendingApiLoader; password?: string; period?: SpendingPeriodRequest } = {}
 ): Promise<ActualSpendingMonthSnapshot> {
-  const selected = spendingMonthSelection(now, timezone, requestedMonth);
+  const period = spendingPeriodSelection(now, timezone, {
+    ...options.period,
+    month: options.period?.month ?? requestedMonth
+  });
   const snapshot = await readActualSpendingRange(
     config,
-    `${selected.month}-01`,
-    monthEnd(selected.month),
+    period.startDate,
+    period.endDate,
     now,
     options
   );
   return {
-    ...selected,
-    monthLabel: new Intl.DateTimeFormat("de-DE", {
-      timeZone: timezone,
-      month: "long",
-      year: "numeric"
-    }).format(new Date(`${selected.month}-15T12:00:00Z`)),
+    month: period.endMonth,
+    monthLabel: period.label,
+    latestMonth: period.latestCompleteMonth,
+    oldestMonth: period.oldestMonth,
+    period,
     generatedAt: snapshot.generatedAt,
     lines: snapshot.lines,
     accounts: snapshot.accounts,
@@ -478,6 +605,22 @@ function safePageSize(value: number | undefined): number {
   return [20, 50, 100].includes(size) ? size : 20;
 }
 
+function parseSpendingSort(value: string | undefined): SpendingSort {
+  return value === "date-asc" || value === "amount-desc" || value === "amount-asc"
+    || value === "merchant-asc" || value === "merchant-desc"
+    ? value
+    : "date-desc";
+}
+
+function compareSpendingLines(left: SpendingLine, right: SpendingLine, sort: SpendingSort): number {
+  if (sort === "amount-desc") return right.amountMinor - left.amountMinor || right.date.localeCompare(left.date);
+  if (sort === "amount-asc") return left.amountMinor - right.amountMinor || left.date.localeCompare(right.date);
+  if (sort === "merchant-asc") return left.merchant.localeCompare(right.merchant, "de") || right.date.localeCompare(left.date);
+  if (sort === "merchant-desc") return right.merchant.localeCompare(left.merchant, "de") || right.date.localeCompare(left.date);
+  if (sort === "date-asc") return left.date.localeCompare(right.date) || left.id.localeCompare(right.id);
+  return right.date.localeCompare(left.date) || right.id.localeCompare(left.id);
+}
+
 export function buildDashboardSpending(
   snapshot: ActualSpendingMonthSnapshot,
   query: SpendingQuery = {}
@@ -507,8 +650,10 @@ export function buildDashboardSpending(
     ? String(query.category)
     : "all";
   const filteredLines = availableCategory === "all"
-    ? basis
+    ? [...basis]
     : basis.filter((line) => line.categoryKey === availableCategory);
+  const sort = parseSpendingSort(query.sort);
+  filteredLines.sort((left, right) => compareSpendingLines(left, right, sort));
   const pageSize = safePageSize(query.pageSize);
   const pages = Math.max(1, Math.ceil(filteredLines.length / pageSize));
   const requestedPage = Math.max(1, Math.trunc(query.page ?? 1));
@@ -542,6 +687,7 @@ export function buildDashboardSpending(
     monthLabel: snapshot.monthLabel,
     latestMonth: snapshot.latestMonth,
     oldestMonth: snapshot.oldestMonth,
+    period: snapshot.period,
     summary: {
       totalMinor,
       bookings: snapshot.lines.length,
@@ -552,7 +698,8 @@ export function buildDashboardSpending(
     selection: {
       category: availableCategory,
       account: selectedAccount,
-      search
+      search,
+      sort
     },
     filtered: {
       totalMinor: filteredTotal,

@@ -62,6 +62,9 @@ test("Ausgabenansicht besitzt Navigation, Filter, Pagination und mobile Buchunge
   const html = renderUi();
   assert.match(html, /\/api\/dashboard\/spending/);
   assert.match(html, /expenseMonth/);
+  assert.match(html, /expensePeriod/);
+  assert.match(html, /toggleExpenseSort/);
+  assert.match(html, /setExpensePeriod/);
   assert.match(html, /expenseCategory/);
   assert.match(html, /expenseAccount/);
   assert.match(html, /expenseSearch/);
