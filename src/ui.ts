@@ -2146,7 +2146,7 @@ function fireCapitalGoal(goal){
     return '<div class="fire-capital-goal"><span>Kapitalziel</span><b>Nicht verfügbar</b></div>';
   }
   const positive=goal.differenceMinor>=0;
-  return '<div class="fire-capital-goal"><span>Erwartet frei mit '+goal.age+'</span><b>'+moneyWhole(goal.projectedCapitalMinor)+'</b><span>Benötigtes FIRE-Kapital</span><b>'+moneyWhole(goal.requiredCapitalMinor)+'</b><span>'+(positive?'Puffer':'Kapitallücke')+'</span><b class="'+(positive?'tone-ok':'tone-warning')+'">'+moneyWhole(Math.abs(goal.differenceMinor))+'</b><span>Modellwert</span><b>'+analysisEstimate(true)+'</b></div>';
+  return '<div class="fire-capital-goal"><span>Erwartet frei mit '+goal.age+'</span><b>'+moneyWhole(goal.projectedCapitalMinor)+'</b><span>Benötigtes FIRE-Kapital</span><b>'+moneyWhole(goal.requiredCapitalMinor)+'</b><span>'+(positive?'Puffer':'Kapitallücke')+'</span><b class="'+(positive?'tone-ok':'tone-warning')+'">'+moneyWhole(Math.abs(goal.differenceMinor))+'</b><span>Heutige Kaufkraft · Basisjahr 2026</span><b>'+analysisEstimate(true)+'</b></div>';
 }
 function rememberFireGroup(element,key){
   const params=new URLSearchParams(location.search);

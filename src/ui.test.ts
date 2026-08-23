@@ -178,6 +178,7 @@ test("Analysenansicht besitzt ein zugängliches Entscheidungslabor", () => {
   assert.match(html, /Benötigtes FIRE-Kapital/);
   assert.match(html, /Kapitallücke/);
   assert.match(html, /Puffer/);
+  assert.match(html, /Heutige Kaufkraft · Basisjahr 2026/);
   assert.match(html, /Reale Ausgabenhebel/);
   assert.match(html, /estimatedAnnualCostMinor/);
   assert.match(html, /Mögliche Entlastung erst nach Prüfung/);

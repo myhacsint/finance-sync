@@ -74,7 +74,8 @@ geschützt.
 Der FIRE-Kurs weist für das aktuell früheste tragfähige Ausstiegsalter und
 das gewählte Zielalter jeweils das erwartete frei verfügbare Finanzvermögen,
 das benötigte FIRE-Kapital und den daraus resultierenden Puffer oder die
-Kapitallücke aus. Beide Werte stammen aus demselben Phasenmodell und tragen
+Kapitallücke aus. Alle Beträge werden als reale Euro in heutiger Kaufkraft mit
+Basisjahr 2026 ausgewiesen, stammen aus demselben Phasenmodell und tragen
 `[SCHÄTZUNG]`. Gebundene Vorsorge wird nicht zum frei verfügbaren Zielkapital
 addiert, sondern weiterhin nur zu ihren vorgesehenen Leistungszeitpunkten
 berücksichtigt.

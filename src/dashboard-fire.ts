@@ -648,7 +648,7 @@ export function buildDashboardFireTracking(
       "FIRE-Phasenmodell v3.1; Basisjahr 2026, Modellende 2071",
       "3 % Realrendite als Mitte; 2 % und 4 % als Sensitivität [SCHÄTZUNG]",
       "Haushaltsmittel 157.000 € real pro Jahr aus der geprüften Modellannahme [SCHÄTZUNG]",
-      "Kapitalziele vergleichen das bis zum Ausstiegsalter erwartete freie Finanzvermögen mit dem ab diesem Zeitpunkt benötigten FIRE-Kapital; gebundene Vorsorge bleibt separat [SCHÄTZUNG]",
+      "Kapitalziele vergleichen das bis zum Ausstiegsalter erwartete freie Finanzvermögen mit dem ab diesem Zeitpunkt benötigten FIRE-Kapital; alle Beträge sind reale Euro in heutiger Kaufkraft mit Basisjahr 2026, gebundene Vorsorge bleibt separat [SCHÄTZUNG]",
       "Kinderkosten sinken ab 2030 und 2048 und werden vollständig der Sparrate zugeführt [SCHÄTZUNG]",
       "Erbschaft und unbelegte Riester-Kapitalhöhe werden nicht angesetzt",
       "Variable Kategorien verwenden den Mittelwert aus laufender Jahreshochrechnung und Vorjahr [SCHÄTZUNG]",
