@@ -103,7 +103,10 @@ Buchungen des laufenden Analysezeitraums oder des Vorjahrs. Innerhalb einer
 Kategorie werden sie zunächst pro Händler oder Dienst gebündelt und nach ihrer
 Gesamtsumme sortiert. Erst die zweite Aufklappstufe zeigt die Einzelbuchungen
 dieses Händlers in absteigender Datumsfolge. Bekannte Namensvarianten desselben
-Dienstes werden nur über explizite, geprüfte Aliase zusammengeführt. In dieser
+Dienstes werden nur über explizite, anhand der Buchungsdaten geprüfte Aliase
+zusammengeführt. Die Gruppierung bleibt innerhalb einer Kategorie: Amazon in
+`Freizeit & Hobbys` und Amazon in `Homelab & IT` sind daher zwei getrennte
+Gruppen. In dieser
 authentifizierten persönlichen Detailansicht werden
 echte Gegenparteien angezeigt; technische Actual-IDs, IBANs, Kontonummern und
 Geheimnisse bleiben pseudonymisiert oder maskiert. Die Buchungssummen stimmen

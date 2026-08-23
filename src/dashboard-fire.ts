@@ -411,11 +411,39 @@ function normalizedLabel(value: string): string {
 
 function merchantIdentity(value: string): { key: string; label: string } {
   const normalized = normalizedLabel(value);
-  if (normalized.includes("anthropic")) {
+  if (normalized.includes("amazon")) {
+    return { key: "amazon", label: "Amazon" };
+  }
+  if (normalized.includes("anthropic") || /\bclaude ai subscription\b/.test(normalized)) {
     return { key: "anthropic-claude", label: "Anthropic Claude Subscription" };
   }
   if (normalized.includes("openai") || normalized.includes("chatgpt")) {
     return { key: "openai-chatgpt", label: "OpenAI / ChatGPT" };
+  }
+  if (normalized.includes("paypal")) {
+    return { key: "paypal", label: "PayPal" };
+  }
+  if (normalized.includes("hetzner online")) {
+    return { key: "hetzner-online", label: "Hetzner Online" };
+  }
+  if (normalized.includes("tipp24")) {
+    return { key: "tipp24", label: "Tipp24" };
+  }
+  if (normalized.includes("eschacher") && normalized.includes("liftbetriebe")) {
+    return { key: "eschacher-liftbetriebe", label: "Eschacher Liftbetriebe" };
+  }
+  if (normalized.includes("fraport") && normalized.includes("parken")) {
+    return { key: "fraport-parken", label: "Fraport Parken" };
+  }
+  if (normalized.includes("jufa") && normalized.includes("hotel")) {
+    return { key: "jufa-hotels", label: "JUFA Hotels" };
+  }
+  if (normalized.includes("rhoen") && normalized.includes("park")
+    && normalized.includes("hotel")) {
+    return { key: "rhoen-park-hotel", label: "Rhön Park Hotel" };
+  }
+  if (/^bauhaus(?:\b|\s)/.test(normalized)) {
+    return { key: "bauhaus", label: "BAUHAUS" };
   }
   return { key: normalized || "unbekannt", label: value.trim() || "Unbekannter Händler" };
 }

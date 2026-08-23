@@ -201,15 +201,23 @@ test("Buchungen werden je Händler gebündelt und innerhalb neueste zuerst sorti
   const groups = groupFireTransactions([
     { key: "booking-a", date: "2026-04-01", merchant: "Anthropic", amountMinor: 2_380, estimate: false },
     { key: "booking-b", date: "2026-06-01", merchant: "Anthropic Claude Subscription", amountMinor: 2_380, estimate: false },
-    { key: "booking-c", date: "2026-05-01", merchant: "Openai Ireland Limited", amountMinor: 2_300, estimate: false },
-    { key: "booking-d", date: "2026-07-01", merchant: "Ginge Technology", amountMinor: 10_000, estimate: false }
+    { key: "booking-c", date: "2026-07-01", merchant: "Claude.Ai Subscription", amountMinor: 2_380, estimate: false },
+    { key: "booking-d", date: "2026-05-01", merchant: "Openai Ireland Limited", amountMinor: 2_300, estimate: false },
+    { key: "booking-e", date: "2026-07-01", merchant: "Ginge Technology", amountMinor: 10_000, estimate: false },
+    { key: "booking-f", date: "2026-02-01", merchant: "Amazon Payments Europe S.C.A.", amountMinor: 1_500, estimate: false },
+    { key: "booking-g", date: "2026-03-01", merchant: "Amazon Media Eu S.A R.L.", amountMinor: 2_000, estimate: false },
+    { key: "booking-h", date: "2026-01-01", merchant: "Paypal Europe S.A.R.L. Et Cie S.C.A", amountMinor: 500, estimate: false },
+    { key: "booking-i", date: "2026-02-01", merchant: "Paypal Etsy Ireland", amountMinor: 700, estimate: false }
   ]);
   assert.deepEqual(groups.map((group) => [group.label, group.bookings, group.amountMinor]), [
     ["Ginge Technology", 1, 10_000],
-    ["Anthropic Claude Subscription", 2, 4_760],
-    ["OpenAI / ChatGPT", 1, 2_300]
+    ["Anthropic Claude Subscription", 3, 7_140],
+    ["Amazon", 2, 3_500],
+    ["OpenAI / ChatGPT", 1, 2_300],
+    ["PayPal", 2, 1_200]
   ]);
   assert.deepEqual(groups[1].transactions.map((transaction) => transaction.date), [
+    "2026-07-01",
     "2026-06-01",
     "2026-04-01"
   ]);
