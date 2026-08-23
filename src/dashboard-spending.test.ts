@@ -43,6 +43,10 @@ test("Prüffenster umfasst die letzten vollständigen Monate", () => {
       endMonth: "2026-07"
     }
   );
+  assert.equal(
+    reviewWindowSelection(new Date("2026-08-11T08:00:00Z"), "Europe/Berlin", 24).months,
+    24
+  );
 });
 
 test("Actual-Ausgaben schließen Transfers und Off-Budget aus und verrechnen Erstattungen", async () => {

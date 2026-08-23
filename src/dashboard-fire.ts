@@ -3,6 +3,7 @@ import type { DashboardAssets } from "./dashboard-assets.js";
 import type { AnalysisTransaction, DashboardAnalyses } from "./dashboard-analyses.js";
 import type { DashboardRecurringExpenseOptimizations } from "./dashboard-recurring-expenses.js";
 import { DEFAULT_FIRE_ASSUMPTIONS, type FireAssumptions } from "./fire-assumptions.js";
+import { fireGapClose, type FireGapClose } from "./fire-gap.js";
 import {
   DEFAULT_MERCHANT_RULES,
   applyMerchantRules,
@@ -68,6 +69,7 @@ export interface DashboardFireTracking {
   oneTimeCandidates: FireOneTimeImpact[];
   selectedOneTimeKeys: string[];
   nextChecks: FireNextCheck[];
+  gapClose: FireGapClose;
   basis: string[];
   warnings: string[];
 }
@@ -703,6 +705,12 @@ export function buildDashboardFireTracking(
     oneTimeCandidates,
     selectedOneTimeKeys,
     nextChecks,
+    gapClose: fireGapClose({
+      targetAge,
+      selectedRecurringAnnualSavingsMinor,
+      currentExitAge: centralCurrent,
+      annualGapToTargetMinor: gap
+    }),
     basis: [
       "FIRE-Phasenmodell v3.1; Basisjahr 2026, Modellende 2071",
       "3 % Realrendite als Mitte; 2 % und 4 % als Sensitivität [SCHÄTZUNG]",

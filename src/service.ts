@@ -111,6 +111,10 @@ import {
 } from "./dashboard-review.js";
 import { resolveFireAssumptions } from "./fire-assumptions.js";
 import { createNamedScenario } from "./named-scenarios.js";
+import { createLifeEvent, lifeEventMonthlyDelta } from "./life-events.js";
+import { compareNamedScenarios } from "./scenario-compare.js";
+import { previewMilesMore, importMilesMoreStatement } from "./miles-more-import.js";
+import { DEFAULT_MERCHANT_RULES, mergeMerchantRules } from "./merchant-rules.js";
 
 export class FinanceServiceError extends Error {
   constructor(message: string, readonly status: number) {
@@ -422,12 +426,16 @@ export class FinanceService {
       this.db.listRecurringExpenseOptimizations(),
       { stale: recurring.stale }
     );
+    const eventDelta = lifeEventMonthlyDelta(
+      this.db.listLifeEvents(),
+      `${currentYear}-${String(new Date().getMonth() + 1).padStart(2, "0")}`
+    );
     return buildDashboardDecisionLab(
       assets,
       cashflow,
       optimizations,
       analyses,
-      request,
+      { ...request, monthlyChangeMinor: (request.monthlyChangeMinor ?? 0) + eventDelta },
       new Date(),
       resolveFireAssumptions(this.config.analysis?.fire),
       this.db.listMerchantRules(),
@@ -635,6 +643,8 @@ export class FinanceService {
     recurring: DashboardRecurringExpenses;
     optimizations: DashboardRecurringExpenseOptimizations;
     aliases: Array<{ fromKey: string; toLabel: string }>;
+    merchantRules: Array<{ pattern: string; label: string }>;
+    monthCloses: Array<{ month: string; note: string; closedAt: string }>;
   }> {
     if (!this.config.actual?.enabled) throw new FinanceServiceError("Actual ist deaktiviert", 400);
     const window = reviewWindowSelection(new Date(), this.config.timezone, months);
@@ -681,7 +691,9 @@ export class FinanceService {
       }),
       recurring,
       optimizations,
-      aliases: aliases.map(({ fromKey, toLabel }) => ({ fromKey, toLabel }))
+      aliases: aliases.map(({ fromKey, toLabel }) => ({ fromKey, toLabel })),
+      merchantRules: this.listMerchantRuleBook(),
+      monthCloses: this.db.listMonthCloses()
     };
   }
 
@@ -758,6 +770,83 @@ export class FinanceService {
     if (!/^scenario-[a-f0-9]{16}$/.test(id)) throw new FinanceServiceError("Szenario nicht gefunden", 404);
     if (!this.db.deleteNamedScenario(id)) throw new FinanceServiceError("Szenario nicht gefunden", 404);
     return { id };
+  }
+
+  listMerchantRuleBook() {
+    return mergeMerchantRules(DEFAULT_MERCHANT_RULES, this.db.listMerchantRules());
+  }
+
+  saveMerchantRule(pattern: string, label: string) {
+    const saved = this.db.setMerchantRule(pattern.trim().slice(0, 80), label.trim().slice(0, 80));
+    this.invalidateReviewCaches();
+    return saved;
+  }
+
+  deleteMerchantRule(pattern: string) {
+    if (!this.db.deleteMerchantRule(pattern)) throw new FinanceServiceError("Regel nicht gefunden", 404);
+    this.invalidateReviewCaches();
+    return { pattern };
+  }
+
+  listLifeEvents() {
+    return this.db.listLifeEvents();
+  }
+
+  saveLifeEvent(name: string, startMonth: string, monthlyChangeMinor: number) {
+    try {
+      return this.db.saveLifeEvent(createLifeEvent(name, startMonth, monthlyChangeMinor));
+    } catch (error) {
+      throw new FinanceServiceError(error instanceof Error ? error.message : "Ereignis ungültig", 400);
+    }
+  }
+
+  deleteLifeEvent(id: string) {
+    if (!this.db.deleteLifeEvent(id)) throw new FinanceServiceError("Ereignis nicht gefunden", 404);
+    return { id };
+  }
+
+  listMonthCloses() {
+    return this.db.listMonthCloses();
+  }
+
+  closeReviewMonth(month: string, note = "") {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new FinanceServiceError("Monat ungültig", 400);
+    return this.db.closeMonth(month, note);
+  }
+
+  compareScenarios(leftId: string, rightId: string) {
+    const left = this.db.listNamedScenarios().find((item) => item.id === leftId);
+    const right = this.db.listNamedScenarios().find((item) => item.id === rightId);
+    if (!left || !right) throw new FinanceServiceError("Szenario nicht gefunden", 404);
+    return compareNamedScenarios(left, right);
+  }
+
+  previewMilesMoreStatement(text: string, statementDate: string) {
+    try {
+      return previewMilesMore(text, statementDate);
+    } catch (error) {
+      throw new FinanceServiceError(error instanceof Error ? error.message : "Abrechnung ungültig", 400);
+    }
+  }
+
+  async importMilesMoreStatement(text: string, statementDate: string) {
+    if (!this.config.actual?.enabled) throw new FinanceServiceError("Actual ist deaktiviert", 400);
+    const password = readSecret("actual-password");
+    if (!password) throw new FinanceServiceError("Actual-Zugang ist nicht verfügbar", 503);
+    try {
+      const result = await this.withActual(() => importMilesMoreStatement({
+        text,
+        statementDate,
+        serverURL: this.config.actual!.serverUrl,
+        budgetId: this.config.actual!.budgetId,
+        password,
+        loadApi: async () => await import("@actual-app/api") as never
+      }));
+      this.invalidateReviewCaches();
+      return result;
+    } catch (error) {
+      throw new FinanceServiceError(error instanceof Error ? error.message : "Import fehlgeschlagen", 400);
+    }
   }
 
   private async importSourceBundle(

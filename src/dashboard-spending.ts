@@ -368,7 +368,7 @@ export function reviewWindowSelection(
   timezone: string,
   months = 6
 ): { months: number; startDate: string; endDate: string; startMonth: string; endMonth: string } {
-  const allowed = [3, 6, 12].includes(months) ? months : 6;
+  const allowed = [3, 6, 12, 24].includes(months) ? months : 6;
   const { latestMonth } = spendingMonthSelection(now, timezone);
   const startMonth = shiftSpendingMonth(latestMonth, -(allowed - 1));
   return {

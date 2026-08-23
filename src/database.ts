@@ -2,6 +2,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { parseNamedScenario, type NamedScenario } from "./named-scenarios.js";
+import type { LifeEvent } from "./life-events.js";
 import type {
   NormalizedActivity,
   NormalizedBalance,
@@ -171,6 +172,18 @@ export class FinanceDatabase {
         payload TEXT NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS life_events (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        start_month TEXT NOT NULL,
+        monthly_change_minor INTEGER NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS month_closes (
+        month TEXT PRIMARY KEY,
+        note TEXT NOT NULL,
+        closed_at TEXT NOT NULL
       );
       CREATE TABLE IF NOT EXISTS asset_market_snapshots (
         valuation_date TEXT NOT NULL,
@@ -655,6 +668,49 @@ export class FinanceDatabase {
         updated_at=excluded.updated_at
     `).run(pattern, label, timestamp, timestamp);
     return { pattern, label };
+  }
+
+  deleteMerchantRule(pattern: string): boolean {
+    return this.db.prepare(`DELETE FROM merchant_rules WHERE pattern = ?`).run(pattern).changes > 0;
+  }
+
+  listLifeEvents(): LifeEvent[] {
+    return this.db.prepare(`
+      SELECT id, name, start_month AS startMonth, monthly_change_minor AS monthlyChangeMinor, created_at AS createdAt
+      FROM life_events ORDER BY start_month, name
+    `).all() as unknown as LifeEvent[];
+  }
+
+  saveLifeEvent(event: LifeEvent): LifeEvent {
+    this.db.prepare(`
+      INSERT INTO life_events(id, name, start_month, monthly_change_minor, created_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        name=excluded.name,
+        start_month=excluded.start_month,
+        monthly_change_minor=excluded.monthly_change_minor
+    `).run(event.id, event.name, event.startMonth, event.monthlyChangeMinor, event.createdAt);
+    return event;
+  }
+
+  deleteLifeEvent(id: string): boolean {
+    return this.db.prepare(`DELETE FROM life_events WHERE id = ?`).run(id).changes > 0;
+  }
+
+  listMonthCloses(): Array<{ month: string; note: string; closedAt: string }> {
+    return this.db.prepare(`
+      SELECT month, note, closed_at AS closedAt FROM month_closes ORDER BY month DESC
+    `).all() as Array<{ month: string; note: string; closedAt: string }>;
+  }
+
+  closeMonth(month: string, note = "", now = new Date()): { month: string; note: string; closedAt: string } {
+    const closedAt = now.toISOString();
+    this.db.prepare(`
+      INSERT INTO month_closes(month, note, closed_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(month) DO UPDATE SET note=excluded.note, closed_at=excluded.closed_at
+    `).run(month, note.slice(0, 200), closedAt);
+    return { month, note: note.slice(0, 200), closedAt };
   }
 
   listNamedScenarios(): NamedScenario[] {

@@ -108,6 +108,60 @@ const server = createServer(async (req, res) => {
         String(payload.toLabel ?? "")
       ));
     }
+    if (req.method === "GET" && url.pathname === "/api/dashboard/merchant-rules") {
+      return json(res, 200, { rules: service.listMerchantRuleBook() });
+    }
+    if (req.method === "PUT" && url.pathname === "/api/dashboard/merchant-rules") {
+      const payload = await body(req, 4096).catch(() => {
+        throw new FinanceServiceError("Ungültige Händlerregel", 400);
+      }) as { pattern?: string; label?: string };
+      return json(res, 200, service.saveMerchantRule(String(payload.pattern ?? ""), String(payload.label ?? "")));
+    }
+    const ruleDelete = /^\/api\/dashboard\/merchant-rules\/(.+)$/.exec(url.pathname);
+    if (req.method === "DELETE" && ruleDelete) {
+      return json(res, 200, service.deleteMerchantRule(decodeURIComponent(ruleDelete[1])));
+    }
+    if (req.method === "GET" && url.pathname === "/api/dashboard/events") {
+      return json(res, 200, { events: service.listLifeEvents() });
+    }
+    if (req.method === "PUT" && url.pathname === "/api/dashboard/events") {
+      const payload = await body(req, 4096).catch(() => {
+        throw new FinanceServiceError("Ungültiges Ereignis", 400);
+      }) as { name?: string; startMonth?: string; monthlyChangeMinor?: number };
+      return json(res, 200, service.saveLifeEvent(
+        String(payload.name ?? ""),
+        String(payload.startMonth ?? ""),
+        Number(payload.monthlyChangeMinor ?? 0)
+      ));
+    }
+    const eventDelete = /^\/api\/dashboard\/events\/(event-[a-f0-9]{16})$/.exec(url.pathname);
+    if (req.method === "DELETE" && eventDelete) {
+      return json(res, 200, service.deleteLifeEvent(eventDelete[1]));
+    }
+    if (req.method === "PUT" && url.pathname === "/api/dashboard/review/close") {
+      const payload = await body(req, 4096).catch(() => {
+        throw new FinanceServiceError("Ungültiger Monatsabschluss", 400);
+      }) as { month?: string; note?: string };
+      return json(res, 200, service.closeReviewMonth(String(payload.month ?? ""), String(payload.note ?? "")));
+    }
+    if (req.method === "GET" && url.pathname === "/api/dashboard/scenarios/compare") {
+      return json(res, 200, service.compareScenarios(
+        String(url.searchParams.get("left") ?? ""),
+        String(url.searchParams.get("right") ?? "")
+      ));
+    }
+    if (req.method === "POST" && url.pathname === "/api/miles-more/preview") {
+      const payload = await body(req, 200_000).catch(() => {
+        throw new FinanceServiceError("Ungültige Abrechnung", 400);
+      }) as { text?: string; statementDate?: string };
+      return json(res, 200, service.previewMilesMoreStatement(String(payload.text ?? ""), String(payload.statementDate ?? "")));
+    }
+    if (req.method === "POST" && url.pathname === "/api/miles-more/import") {
+      const payload = await body(req, 200_000).catch(() => {
+        throw new FinanceServiceError("Ungültige Abrechnung", 400);
+      }) as { text?: string; statementDate?: string };
+      return json(res, 200, await service.importMilesMoreStatement(String(payload.text ?? ""), String(payload.statementDate ?? "")));
+    }
     if (req.method === "GET" && url.pathname === "/api/dashboard/scenarios") {
       return json(res, 200, { scenarios: service.listNamedScenarios() });
     }
