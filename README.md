@@ -57,6 +57,9 @@ bereits angelegt.
 - `GET /api/dashboard/analyses/recurring-expenses`
 - `GET /api/dashboard/analyses/recurring-expenses/:candidate`
 - `PUT /api/decisions/recurring-expenses/:candidate`
+- `GET /api/dashboard/review`
+- `PUT /api/dashboard/review/transaction`
+- `PUT /api/dashboard/review/merchant-alias`
 
 Die API für regelmäßige Ausgaben wertet ausschließlich bereinigte
 Actual-Einzelbuchungen aus. Kandidaten und Buchungsschlüssel sind

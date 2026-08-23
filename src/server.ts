@@ -81,6 +81,29 @@ const server = createServer(async (req, res) => {
       return res.end(financeHubMark);
     }
     if (!authorized(req)) return json(res, 401, { error: "Nicht autorisiert" });
+    if (req.method === "GET" && url.pathname === "/api/dashboard/review") {
+      return json(res, 200, await service.getDashboardReview(url.searchParams.get("refresh") === "1"));
+    }
+    if (req.method === "PUT" && url.pathname === "/api/dashboard/review/transaction") {
+      const payload = await body(req, 8192).catch(() => {
+        throw new FinanceServiceError("Ungültige Prüfanfrage", 400);
+      }) as { lineId?: string; categoryKey?: string; payeeName?: string; aliasTo?: string };
+      return json(res, 200, await service.applyReviewTransaction({
+        lineId: String(payload.lineId ?? ""),
+        categoryKey: payload.categoryKey,
+        payeeName: payload.payeeName,
+        aliasTo: payload.aliasTo
+      }));
+    }
+    if (req.method === "PUT" && url.pathname === "/api/dashboard/review/merchant-alias") {
+      const payload = await body(req, 4096).catch(() => {
+        throw new FinanceServiceError("Ungültiger Händleralias", 400);
+      }) as { fromKey?: string; toLabel?: string };
+      return json(res, 200, await service.applyMerchantAlias(
+        String(payload.fromKey ?? ""),
+        String(payload.toLabel ?? "")
+      ));
+    }
     if (req.method === "GET" && url.pathname === "/api/dashboard/overview") {
       const requestedMonths = Number(url.searchParams.get("months") ?? 4);
       const months = [4, 6, 12].includes(requestedMonths) ? requestedMonths : 4;

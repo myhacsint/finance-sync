@@ -128,6 +128,7 @@ test("Kategorie, Konto, Suche und Pagination greifen gemeinsam", () => {
     latestMonth: "2026-07",
     oldestMonth: "2016-07",
     generatedAt: "2026-08-11T08:00:00.000Z",
+    catalog: [],
     accounts: [
       { key: "account-one", label: "Giro Erik" },
       { key: "account-two", label: "Giro Gemeinschaft" }

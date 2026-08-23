@@ -152,6 +152,12 @@ export class FinanceDatabase {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS merchant_aliases (
+        from_key TEXT PRIMARY KEY,
+        to_label TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS asset_market_snapshots (
         valuation_date TEXT NOT NULL,
         source_id TEXT NOT NULL,
@@ -583,6 +589,37 @@ export class FinanceDatabase {
     );
     return this.listRecurringExpenseOptimizations()
       .find((row) => row.candidateKey === candidateKey)!;
+  }
+
+  listMerchantAliases(): Array<{ fromKey: string; toLabel: string; createdAt: string; updatedAt: string }> {
+    const rows = this.db.prepare(`
+      SELECT from_key, to_label, created_at, updated_at
+      FROM merchant_aliases
+      ORDER BY to_label, from_key
+    `).all() as Array<{
+      from_key: string;
+      to_label: string;
+      created_at: string;
+      updated_at: string;
+    }>;
+    return rows.map((row) => ({
+      fromKey: row.from_key,
+      toLabel: row.to_label,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
+  }
+
+  setMerchantAlias(fromKey: string, toLabel: string, now = new Date()): { fromKey: string; toLabel: string } {
+    const timestamp = now.toISOString();
+    this.db.prepare(`
+      INSERT INTO merchant_aliases(from_key, to_label, created_at, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(from_key) DO UPDATE SET
+        to_label=excluded.to_label,
+        updated_at=excluded.updated_at
+    `).run(fromKey, toLabel, timestamp, timestamp);
+    return { fromKey, toLabel };
   }
 
   close(): void {

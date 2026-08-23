@@ -86,7 +86,8 @@ function snapshot(lines: SpendingLine[]): ActualSpendingRangeSnapshot {
     endDate: "2025-12-31",
     generatedAt: "2026-08-11T08:00:00.000Z",
     lines,
-    accounts: [{ key: "account", label: "Giro" }]
+    accounts: [{ key: "account", label: "Giro" }],
+    catalog: []
   };
 }
 

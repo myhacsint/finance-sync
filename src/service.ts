@@ -9,7 +9,7 @@ import type {
 } from "./types.js";
 import type { FinanceDatabase } from "./database.js";
 import { join } from "node:path";
-import { paths } from "./config.js";
+import { paths, readSecret } from "./config.js";
 import { archiveRaw } from "./archive.js";
 import { snapshotSqlite } from "./backup.js";
 import { fetchSolana } from "./connectors/solana.js";
@@ -99,6 +99,12 @@ import {
   type DashboardDecisionLab,
   type DecisionLabRequest
 } from "./dashboard-decision-lab.js";
+import {
+  applyMerchantAliases,
+  buildDashboardReview,
+  updateActualReviewTransaction,
+  type DashboardReview
+} from "./dashboard-review.js";
 
 export class FinanceServiceError extends Error {
   constructor(message: string, readonly status: number) {
@@ -593,6 +599,101 @@ export class FinanceService {
       this.db.listRecurringExpenseDecisions(),
       this.db.listRecurringExpenseOptimizations()
     );
+  }
+
+  private invalidateReviewCaches(): void {
+    this.spendingCache.clear();
+    this.recurringCache = undefined;
+    this.analysesCache.clear();
+    this.savingsBaselineCache = undefined;
+    this.savingsHistoryCache = undefined;
+  }
+
+  async getDashboardReview(force = false): Promise<DashboardReview & {
+    recurring: DashboardRecurringExpenses;
+    optimizations: DashboardRecurringExpenseOptimizations;
+    aliases: Array<{ fromKey: string; toLabel: string }>;
+  }> {
+    const spending = await this.getDashboardSpending(force, { page: 1, pageSize: 100 });
+    const snapshot = this.spendingCache.get("latest")?.value
+      ?? this.spendingCache.values().next().value?.value;
+    if (!snapshot) throw new FinanceServiceError("Ausgabendaten fehlen", 503);
+    const aliases = this.db.listMerchantAliases();
+    const uncategorized = applyMerchantAliases(
+      snapshot.lines.filter((line) => !line.categorized),
+      aliases
+    );
+    const recurring = await this.getDashboardRecurringExpenses(force, { review: "moeglich" });
+    const optimizations = await this.getDashboardRecurringExpenseOptimizations(force);
+    const optimizationsOpen = optimizations.items.filter((item) =>
+      !item.optimization || item.optimization.status === "PRUEFEN" || item.optimization.stale
+    ).length;
+    return {
+      ...buildDashboardReview({
+        generatedAt: snapshot.generatedAt,
+        uncategorized,
+        recurringOpen: recurring.summary.possible,
+        optimizationsOpen,
+        categories: snapshot.catalog.map(({ key, name, group, isIncome }) => ({
+          key, id: key, name, group, isIncome
+        }))
+      }),
+      recurring,
+      optimizations,
+      aliases: aliases.map(({ fromKey, toLabel }) => ({ fromKey, toLabel }))
+    };
+  }
+
+  async applyReviewTransaction(payload: {
+    lineId: string;
+    categoryKey?: string;
+    payeeName?: string;
+    aliasTo?: string;
+  }): Promise<DashboardReview & {
+    recurring: DashboardRecurringExpenses;
+    optimizations: DashboardRecurringExpenseOptimizations;
+    aliases: Array<{ fromKey: string; toLabel: string }>;
+  }> {
+    if (!this.config.actual?.enabled) throw new FinanceServiceError("Actual ist deaktiviert", 400);
+    await this.getDashboardSpending(false, { page: 1, pageSize: 20 });
+    const snapshot = this.spendingCache.get("latest")?.value
+      ?? [...this.spendingCache.values()].at(-1)?.value;
+    const line = snapshot?.lines.find((item) => item.id === payload.lineId);
+    if (!line) throw new FinanceServiceError("Buchung nicht gefunden. Bitte Prüfen neu laden.", 404);
+    const category = payload.categoryKey
+      ? snapshot!.catalog.find((item) => item.key === payload.categoryKey)
+      : undefined;
+    if (payload.categoryKey && !category) {
+      throw new FinanceServiceError("Kategorie nicht gefunden", 400);
+    }
+    const password = readSecret("actual-password");
+    if (!password) throw new FinanceServiceError("Actual-Zugang ist nicht verfügbar", 503);
+    const payeeName = payload.payeeName?.trim() || payload.aliasTo?.trim() || "";
+    await this.withActual(() => updateActualReviewTransaction({
+      lineId: payload.lineId,
+      categoryId: category?.id,
+      payeeName,
+      serverURL: this.config.actual!.serverUrl,
+      budgetId: this.config.actual!.budgetId,
+      password,
+      loadApi: async () => await import("@actual-app/api") as never
+    }));
+    if (payload.aliasTo?.trim()) {
+      this.db.setMerchantAlias(line.merchantKey, payload.aliasTo.trim().slice(0, 80));
+    }
+    this.invalidateReviewCaches();
+    return this.getDashboardReview(true);
+  }
+
+  async applyMerchantAlias(fromKey: string, toLabel: string): Promise<{ fromKey: string; toLabel: string }> {
+    if (!/^merchant-[a-f0-9]{16}$/.test(fromKey)) {
+      throw new FinanceServiceError("Ungültiger Händlerschlüssel", 400);
+    }
+    const label = toLabel.trim().slice(0, 80);
+    if (!label) throw new FinanceServiceError("Händlername fehlt", 400);
+    const saved = this.db.setMerchantAlias(fromKey, label);
+    this.invalidateReviewCaches();
+    return saved;
   }
 
   private async importSourceBundle(

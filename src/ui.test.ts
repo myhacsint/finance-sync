@@ -49,6 +49,8 @@ test("Übersicht und Datenstatus sind als tiefe Links erreichbar", () => {
   const html = renderUi();
   assert.match(html, /#\/overview/);
   assert.match(html, /#\/spending/);
+  assert.match(html, /#\/review/);
+  assert.match(html, /#\/decision-lab/);
   assert.match(html, /#\/data-status/);
   assert.match(html, /window\.addEventListener\("hashchange"/);
   assert.match(html, /window\.addEventListener\("popstate"/);
@@ -230,4 +232,19 @@ test("Verwaltungstoken bleibt nur für die Browsersitzung gespeichert", () => {
   assert.match(html, /sessionStorage\.setItem\("financeToken"/);
   assert.match(html, /localStorage\.removeItem\("financeToken"\)/);
   assert.doesNotMatch(html, /localStorage\.setItem\("financeToken"/);
+});
+
+test("Prüfen und Labor sind eigene Flächen mit einer Taxonomie", () => {
+  const html = renderUi();
+  assert.match(html, /label:"Prüfen"/);
+  assert.match(html, /label:"Labor"/);
+  assert.match(html, /\/api\/dashboard\/review/);
+  assert.match(html, /\/api\/dashboard\/review\/transaction/);
+  assert.match(html, /Eine Taxonomie/);
+  assert.match(html, /In Actual speichern/);
+  assert.match(html, /Buchungen ohne Kategorie/);
+  assert.match(html, /Händler bündeln als/);
+  assert.match(html, /function renderReview\(/);
+  assert.match(html, /hash==="#\/review"/);
+  assert.match(html, /hash==="#\/decision-lab"/);
 });

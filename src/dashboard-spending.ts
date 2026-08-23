@@ -76,12 +76,21 @@ export interface SpendingLine {
   amountMinor: number;
 }
 
+export interface SpendingCatalogCategory {
+  key: string;
+  id: string;
+  name: string;
+  group: string;
+  isIncome: boolean;
+}
+
 export interface ActualSpendingRangeSnapshot {
   startDate: string;
   endDate: string;
   generatedAt: string;
   lines: SpendingLine[];
   accounts: Array<{ key: string; label: string }>;
+  catalog: SpendingCatalogCategory[];
 }
 
 export interface ActualSpendingMonthSnapshot {
@@ -92,6 +101,7 @@ export interface ActualSpendingMonthSnapshot {
   generatedAt: string;
   lines: SpendingLine[];
   accounts: Array<{ key: string; label: string }>;
+  catalog: SpendingCatalogCategory[];
 }
 
 export interface SpendingQuery {
@@ -332,7 +342,8 @@ export async function readActualSpendingMonth(
     }).format(new Date(`${selected.month}-15T12:00:00Z`)),
     generatedAt: snapshot.generatedAt,
     lines: snapshot.lines,
-    accounts: snapshot.accounts
+    accounts: snapshot.accounts,
+    catalog: snapshot.catalog
   };
 }
 
@@ -364,11 +375,26 @@ export async function readActualSpendingRange(
       api.getCategories({ hidden: true }),
       api.getPayees()
     ]);
+    const categoryRows = [...actualCategories, ...hiddenCategories];
+    const groupNames = new Map(
+      categoryRows
+        .filter((row): row is ActualCategoryGroup => "categories" in row)
+        .map((group) => [group.id, safeLabel(group.name, "Gruppe")])
+    );
     const categories = new Map(
-      categoriesFromApi([...actualCategories, ...hiddenCategories])
-        .map((category) => [category.id, category])
+      categoriesFromApi(categoryRows).map((category) => [category.id, category])
     );
     const payees = new Map(actualPayees.map((payee) => [payee.id, payee]));
+    const catalog: SpendingCatalogCategory[] = [...categories.values()]
+      .map((category) => ({
+        key: publicKey("category", category.id),
+        id: category.id,
+        name: safeLabel(category.name, "Kategorie"),
+        group: groupNames.get(category.group_id ?? "") ?? (category.is_income ? "Einnahmen" : "Ausgaben"),
+        isIncome: Boolean(category.is_income)
+      }))
+      .sort((left, right) => left.group.localeCompare(right.group, "de")
+        || left.name.localeCompare(right.name, "de"));
     const accounts = actualAccounts
       .filter((account) => !account.offbudget)
       .sort((left, right) => left.name.localeCompare(right.name, "de"))
@@ -389,7 +415,8 @@ export async function readActualSpendingRange(
       endDate,
       generatedAt: now.toISOString(),
       lines,
-      accounts: accounts.map(({ key, label }) => ({ key, label }))
+      accounts: accounts.map(({ key, label }) => ({ key, label })),
+      catalog
     };
   } finally {
     if (initialized) await api.shutdown().catch(() => undefined);
