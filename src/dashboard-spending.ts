@@ -201,6 +201,14 @@ export interface DashboardSpending {
     amountMinor: number;
   }>;
   merchantGroups: SpendingMerchantGroup[];
+  medical?: {
+    categoryLabel: string;
+    grossMinor: number;
+    reimbursedMinor: number;
+    netMinor: number;
+    bills: number;
+    reimbursements: number;
+  };
   pagination: {
     page: number;
     pageSize: number;
@@ -685,6 +693,25 @@ export function groupSpendingMerchants(
       || left.label.localeCompare(right.label, "de"));
 }
 
+export function medicalBreakdown(
+  lines: Array<{ categoryLabel: string; amountMinor: number }>
+): DashboardSpending["medical"] {
+  const medical = lines.filter((line) => line.categoryLabel === "Arzt & Apotheke");
+  if (!medical.length) return undefined;
+  const bills = medical.filter((line) => line.amountMinor > 0);
+  const reimbursements = medical.filter((line) => line.amountMinor < 0);
+  const grossMinor = bills.reduce((sum, line) => sum + line.amountMinor, 0);
+  const reimbursedMinor = reimbursements.reduce((sum, line) => sum + Math.abs(line.amountMinor), 0);
+  return {
+    categoryLabel: "Arzt & Apotheke",
+    grossMinor,
+    reimbursedMinor,
+    netMinor: grossMinor - reimbursedMinor,
+    bills: bills.length,
+    reimbursements: reimbursements.length
+  };
+}
+
 function sortMerchantGroups(
   groups: SpendingMerchantGroup[],
   sort: SpendingSort
@@ -812,6 +839,7 @@ export function buildDashboardSpending(
       amountMinor: line.amountMinor
     })),
     merchantGroups: sortMerchantGroups(groupSpendingMerchants(filteredLines, merchantRules), sort),
+    medical: medicalBreakdown(snapshot.lines),
     pagination: {
       page,
       pageSize,

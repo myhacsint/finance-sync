@@ -16,7 +16,10 @@ export const DEFAULT_MERCHANT_RULES: MerchantRule[] = [
   { pattern: "fraport parken", label: "Fraport Parken" },
   { pattern: "jufa hotel", label: "JUFA Hotels" },
   { pattern: "rhoen park hotel", label: "Rhön Park Hotel" },
-  { pattern: "bauhaus", label: "BAUHAUS" }
+  { pattern: "bauhaus", label: "BAUHAUS" },
+  { pattern: "friedrich report", label: "Friedrich Report" },
+  { pattern: "bye.bye", label: "Bye.Bye" },
+  { pattern: "mvz labor", label: "MVZ Labor" }
 ];
 
 export function normalizeMerchantLabel(value: string): string {

@@ -335,3 +335,54 @@ test("Ausgaben bündeln Händler wie das Labor", () => {
   assert.equal(result.merchantGroups[0].transactions.length, 2);
   assert.equal(result.transactions[0].merchant, "Amazon");
 });
+
+test("Arzt zeigt brutto, erstattet und netto", () => {
+  const snapshot = {
+    month: "2026-07",
+    monthLabel: "Juli 2026",
+    latestMonth: "2026-07",
+    oldestMonth: "2016-07",
+    generatedAt: "2026-08-23T18:00:00.000Z",
+    accounts: [{ key: "account-one", label: "comdirect Giro" }],
+    catalog: [],
+    lines: [
+      {
+        id: "bill",
+        date: "2026-07-09",
+        merchantKey: "merchant-pvs",
+        merchant: "Pvs Suedwest Gmbh",
+        displayMerchant: "Pvs Suedwest Gmbh",
+        notes: "",
+        accountKey: "account-one",
+        accountLabel: "comdirect Giro",
+        categoryKey: "category-arzt",
+        categoryLabel: "Arzt & Apotheke",
+        categorized: true,
+        amountMinor: 10_000
+      },
+      {
+        id: "refund",
+        date: "2026-07-18",
+        merchantKey: "merchant-ao",
+        merchant: "Alte Oldenburger Krankenversicherung Ag",
+        displayMerchant: "Alte Oldenburger Krankenversicherung Ag",
+        notes: "",
+        accountKey: "account-one",
+        accountLabel: "comdirect Giro",
+        categoryKey: "category-arzt",
+        categoryLabel: "Arzt & Apotheke",
+        categorized: true,
+        amountMinor: -8_000
+      }
+    ]
+  };
+  const result = buildDashboardSpending(snapshot);
+  assert.deepEqual(result.medical, {
+    categoryLabel: "Arzt & Apotheke",
+    grossMinor: 10_000,
+    reimbursedMinor: 8_000,
+    netMinor: 2_000,
+    bills: 1,
+    reimbursements: 1
+  });
+});
