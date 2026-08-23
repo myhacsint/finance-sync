@@ -4,6 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readSecret } from "./config.js";
 import type { AppConfig } from "./types.js";
+import {
+  DEFAULT_MERCHANT_RULES,
+  applyMerchantRules,
+  mergeMerchantRules,
+  type MerchantRule
+} from "./merchant-rules.js";
 
 interface ActualAccount {
   id: string;
@@ -139,6 +145,20 @@ export interface SpendingPeriodSelection {
   oldestMonth: string;
 }
 
+export interface SpendingMerchantGroup {
+  key: string;
+  label: string;
+  amountMinor: number;
+  bookings: number;
+  transactions: Array<{
+    date: string;
+    merchant: string;
+    account: string;
+    category: string;
+    amountMinor: number;
+  }>;
+}
+
 export interface DashboardSpending {
   generatedAt: string;
   state: "current";
@@ -180,6 +200,7 @@ export interface DashboardSpending {
     category: string;
     amountMinor: number;
   }>;
+  merchantGroups: SpendingMerchantGroup[];
   pagination: {
     page: number;
     pageSize: number;
@@ -621,19 +642,87 @@ function compareSpendingLines(left: SpendingLine, right: SpendingLine, sort: Spe
   return right.date.localeCompare(left.date) || right.id.localeCompare(left.id);
 }
 
+export function groupSpendingMerchants(
+  lines: SpendingLine[],
+  rules: MerchantRule[] = DEFAULT_MERCHANT_RULES
+): SpendingMerchantGroup[] {
+  const groups = new Map<string, SpendingMerchantGroup & { newest: string }>();
+  for (const line of lines) {
+    const identity = applyMerchantRules(line.displayMerchant ?? line.merchant, rules);
+    const existing = groups.get(identity.key) ?? {
+      key: `merchant-${createHash("sha256")
+        .update(`finance-hub:spend-merchant:${identity.key}`)
+        .digest("hex")
+        .slice(0, 12)}`,
+      label: identity.label,
+      amountMinor: 0,
+      bookings: 0,
+      newest: line.date,
+      transactions: []
+    };
+    existing.amountMinor += line.amountMinor;
+    existing.bookings += 1;
+    if (line.date > existing.newest) existing.newest = line.date;
+    existing.transactions.push({
+      date: line.date,
+      merchant: line.displayMerchant ?? line.merchant,
+      account: line.accountLabel,
+      category: line.categoryLabel,
+      amountMinor: line.amountMinor
+    });
+    groups.set(identity.key, existing);
+  }
+  return [...groups.values()]
+    .map((group) => ({
+      key: group.key,
+      label: group.label,
+      amountMinor: group.amountMinor,
+      bookings: group.bookings,
+      transactions: group.transactions.sort((left, right) => right.date.localeCompare(left.date)
+        || right.amountMinor - left.amountMinor)
+    }))
+    .sort((left, right) => right.amountMinor - left.amountMinor
+      || left.label.localeCompare(right.label, "de"));
+}
+
+function sortMerchantGroups(
+  groups: SpendingMerchantGroup[],
+  sort: SpendingSort
+): SpendingMerchantGroup[] {
+  const copy = [...groups];
+  if (sort === "merchant-asc") return copy.sort((left, right) => left.label.localeCompare(right.label, "de"));
+  if (sort === "merchant-desc") return copy.sort((left, right) => right.label.localeCompare(left.label, "de"));
+  if (sort === "amount-asc") return copy.sort((left, right) => left.amountMinor - right.amountMinor);
+  if (sort === "date-asc") {
+    return copy.sort((left, right) => (left.transactions.at(-1)?.date ?? "").localeCompare(right.transactions[0]?.date ?? "")
+      || left.label.localeCompare(right.label, "de"));
+  }
+  if (sort === "date-desc") {
+    return copy.sort((left, right) => (right.transactions[0]?.date ?? "").localeCompare(left.transactions[0]?.date ?? "")
+      || right.amountMinor - left.amountMinor);
+  }
+  return copy.sort((left, right) => right.amountMinor - left.amountMinor || left.label.localeCompare(right.label, "de"));
+}
+
 export function buildDashboardSpending(
   snapshot: ActualSpendingMonthSnapshot,
-  query: SpendingQuery = {}
+  query: SpendingQuery = {},
+  rules: MerchantRule[] = DEFAULT_MERCHANT_RULES
 ): DashboardSpending {
+  const merchantRules = mergeMerchantRules(DEFAULT_MERCHANT_RULES, rules);
   const search = String(query.search ?? "").trim().slice(0, 80);
   const searchKey = search.toLocaleLowerCase("de-DE");
   const selectedAccount = snapshot.accounts.some((account) => account.key === query.account)
     ? String(query.account)
     : "all";
-  const basis = snapshot.lines.filter((line) => {
+  const labeled = snapshot.lines.map((line) => ({
+    ...line,
+    groupedMerchant: applyMerchantRules(line.displayMerchant ?? line.merchant, merchantRules).label
+  }));
+  const basis = labeled.filter((line) => {
     if (selectedAccount !== "all" && line.accountKey !== selectedAccount) return false;
     if (!searchKey) return true;
-    return `${line.merchant} ${line.notes} ${line.categoryLabel}`
+    return `${line.groupedMerchant} ${line.merchant} ${line.displayMerchant ?? ""} ${line.notes} ${line.categoryLabel}`
       .toLocaleLowerCase("de-DE")
       .includes(searchKey);
   });
@@ -717,11 +806,12 @@ export function buildDashboardSpending(
     accounts: snapshot.accounts,
     transactions: filteredLines.slice(start, start + pageSize).map((line) => ({
       date: line.date,
-      merchant: line.displayMerchant ?? line.merchant,
+      merchant: line.groupedMerchant ?? applyMerchantRules(line.displayMerchant ?? line.merchant, merchantRules).label,
       account: line.accountLabel,
       category: line.categoryLabel,
       amountMinor: line.amountMinor
     })),
+    merchantGroups: sortMerchantGroups(groupSpendingMerchants(filteredLines, merchantRules), sort),
     pagination: {
       page,
       pageSize,

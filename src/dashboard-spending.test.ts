@@ -272,3 +272,66 @@ test("Buchungsliste sortiert nach Datum oder Betrag", () => {
   assert.deepEqual(amountAsc.transactions.map((row) => row.amountMinor), [300, 900]);
   assert.equal(amountDesc.selection.sort, "amount-desc");
 });
+
+test("Ausgaben bündeln Händler wie das Labor", () => {
+  const snapshot = {
+    month: "2026-07",
+    monthLabel: "Juli 2026",
+    latestMonth: "2026-07",
+    oldestMonth: "2016-07",
+    generatedAt: "2026-08-23T18:00:00.000Z",
+    accounts: [{ key: "account-one", label: "Giro" }],
+    catalog: [],
+    lines: [
+      {
+        id: "a1",
+        date: "2026-07-30",
+        merchantKey: "merchant-amazon-1",
+        merchant: "Amazon Eu S.A R.L., Niederlassung Deutschland",
+        displayMerchant: "Amazon Eu S.A R.L., Niederlassung Deutschland",
+        notes: "",
+        accountKey: "account-one",
+        accountLabel: "Giro",
+        categoryKey: "category-shop",
+        categoryLabel: "Sonstige Einkäufe",
+        categorized: true,
+        amountMinor: 1_149
+      },
+      {
+        id: "a2",
+        date: "2026-07-20",
+        merchantKey: "merchant-amazon-2",
+        merchant: "Amazon Payments Europe S.C.A.",
+        displayMerchant: "Amazon Payments Europe S.C.A.",
+        notes: "",
+        accountKey: "account-one",
+        accountLabel: "Giro",
+        categoryKey: "category-shop",
+        categoryLabel: "Sonstige Einkäufe",
+        categorized: true,
+        amountMinor: 2_499
+      },
+      {
+        id: "p1",
+        date: "2026-07-29",
+        merchantKey: "merchant-paypal",
+        merchant: "Paypal Europe S.A.R.L. Et Cie S.C.A",
+        displayMerchant: "Paypal Europe S.A.R.L. Et Cie S.C.A",
+        notes: "",
+        accountKey: "account-one",
+        accountLabel: "Giro",
+        categoryKey: "category-shop",
+        categoryLabel: "Sonstige Einkäufe",
+        categorized: true,
+        amountMinor: 2_500
+      }
+    ]
+  };
+  const result = buildDashboardSpending(snapshot);
+  assert.deepEqual(result.merchantGroups.map((group) => [group.label, group.bookings, group.amountMinor]), [
+    ["Amazon", 2, 3_648],
+    ["PayPal", 1, 2_500]
+  ]);
+  assert.equal(result.merchantGroups[0].transactions.length, 2);
+  assert.equal(result.transactions[0].merchant, "Amazon");
+});

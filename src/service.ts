@@ -271,7 +271,7 @@ export class FinanceService {
         this.spendingLoading.delete(cacheKey);
       }
     }
-    return buildDashboardSpending(snapshot.value, request);
+    return buildDashboardSpending(snapshot.value, request, this.db.listMerchantRules());
   }
 
   async getDashboardAssets(force = false): Promise<DashboardAssets> {

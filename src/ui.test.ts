@@ -75,7 +75,8 @@ test("Ausgabenansicht besitzt Navigation, Filter, Pagination und mobile Buchunge
   assert.match(html, /Händler oder Buchung suchen …/);
   assert.match(html, /Alle Konten/);
   assert.match(html, /expense-pagination/);
-  assert.match(html, /expense-mobile-list/);
+  assert.match(html, /expense-merchant-group/);
+  assert.match(html, /Händler und Dienste/);
   assert.match(html, /Kategorisiert/);
   assert.match(html, /new Intl\.DateTimeFormat\("de-DE",\{day:"2-digit",month:"2-digit",year:"numeric",timeZone:"UTC"\}\)/);
 });
