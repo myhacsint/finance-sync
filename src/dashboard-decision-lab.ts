@@ -3,6 +3,8 @@ import type { DashboardAnalyses } from "./dashboard-analyses.js";
 import type { DashboardSavingsBaseline } from "./dashboard-savings-baseline.js";
 import { buildDashboardFireTracking, type DashboardFireTracking } from "./dashboard-fire.js";
 import type { DashboardRecurringExpenseOptimizations } from "./dashboard-recurring-expenses.js";
+import { explainMonthVariance, type MonthVarianceReason } from "./month-variance.js";
+import { mergeMerchantRules, DEFAULT_MERCHANT_RULES, type MerchantRule } from "./merchant-rules.js";
 
 export interface DecisionLabRequest {
   trendBasis?: DecisionTrendBasis;
@@ -124,6 +126,7 @@ export interface DashboardDecisionLab {
       incomeDifferenceMinor: number | null;
       expensesDifferenceMinor: number | null;
       netDifferenceMinor: number | null;
+      explanations: MonthVarianceReason[];
     };
     currentMonthProgress: {
       month: string | null;
@@ -138,7 +141,12 @@ export interface DashboardDecisionLab {
       pendingCardExpensesMinor: number;
       pendingCardCapturedAt: string | null;
       pendingCardLabel: string | null;
+      explanations: MonthVarianceReason[];
     };
+  };
+  models: {
+    fire: { id: string; label: string; appliesTo: string[] };
+    trajectory: { id: string; label: string; appliesTo: string[] };
   };
   series: Array<{
     year: number;
@@ -501,7 +509,8 @@ export function buildDashboardDecisionLab(
   analyses: DashboardAnalyses,
   request: DecisionLabRequest = {},
   now = new Date(),
-  fireAssumptions?: import("./fire-assumptions.js").FireAssumptions
+  fireAssumptions?: import("./fire-assumptions.js").FireAssumptions,
+  merchantRules: MerchantRule[] = DEFAULT_MERCHANT_RULES
 ): DashboardDecisionLab {
   const inputs = decisionLabInputs(request);
   const trendOptions = decisionTrendOptions(cashflow);
@@ -562,7 +571,8 @@ export function buildDashboardDecisionLab(
     liveProjectedAnnualExpensesMinor: annual.projectedYearEnd.expensesMinor,
     normalizedAnnualExpensesMinor: annual.medianFullYear.expensesMinor
   }, optimizations, analyses, inputs.fireTargetAge, inputs.fireActionKeys,
-  inputs.fireCategoryCuts, inputs.fireOneTimeKeys, fireAssumptions);
+  inputs.fireCategoryCuts, inputs.fireOneTimeKeys, fireAssumptions,
+  mergeMerchantRules(DEFAULT_MERCHANT_RULES, merchantRules));
   const warnings = [...assets.warnings];
   if (startingAssetsMinor === null) {
     warnings.push("Das aktuelle Finanzvermögen ist unvollständig; die Projektion ist nicht verfügbar.");
@@ -617,6 +627,18 @@ export function buildDashboardDecisionLab(
       : "partial",
     source: "FinanceSync + Actual",
     estimate: true,
+    models: {
+      fire: {
+        id: "fire-v3.1",
+        label: "FIRE-Phasenmodell v3.1",
+        appliesTo: ["Ausstiegsalter", "FIRE-Kapital", "Lücke zum Ziel"]
+      },
+      trajectory: {
+        id: "cashflow-20y",
+        label: "20-Jahres-Cashflow",
+        appliesTo: ["Jahresausblick", "Monatsverlauf", "Vermögenslinie"]
+      }
+    },
     scope: {
       label: "Finanzvermögen ohne Immobilien",
       includes: assets.areas
@@ -647,7 +669,17 @@ export function buildDashboardDecisionLab(
           : null,
         netDifferenceMinor: lastMonthNetMinor !== null && typicalTrend.averageMonthlyNetMinor !== null
           ? lastMonthNetMinor - typicalTrend.averageMonthlyNetMinor
-          : null
+          : null,
+        explanations: explainMonthVariance({
+          complete: true,
+          pendingCardMinor: lastMonth?.pendingCardExpenseMinor ?? 0,
+          excludedIncomeMinor: lastMonthValues?.incomeBreakdown.unreviewedExcludedMinor ?? 0,
+          workRegularMinor: lastMonthValues?.incomeBreakdown.workRegularMinor ?? 0,
+          workVariableMinor: lastMonthValues?.incomeBreakdown.workVariableMinor ?? 0,
+          typicalWorkRegularMinor: typicalTrend.incomeBreakdown?.workRegularMinor ?? null,
+          expensesMinor: lastMonthValues?.expensesMinor ?? 0,
+          typicalExpensesMinor: typicalTrend.monthlyExpensesMinor
+        })
       },
       currentMonthProgress: {
         month: currentMonth?.month ?? null,
@@ -669,7 +701,18 @@ export function buildDashboardDecisionLab(
         pendingCardCapturedAt: pendingCardEntries.at(-1)?.capturedAt ?? null,
         pendingCardLabel: pendingCardEntries.length === 1
           ? pendingCardEntries[0].label
-          : pendingCardEntries.length > 1 ? "Kreditkarten" : null
+          : pendingCardEntries.length > 1 ? "Kreditkarten" : null,
+        explanations: explainMonthVariance({
+          complete: false,
+          pendingCardMinor: pendingCardExpensesMinor,
+          pendingCardLabel: pendingCardEntries.length === 1 ? pendingCardEntries[0].label : "Kreditkarte",
+          excludedIncomeMinor: currentMonthValues?.incomeBreakdown.unreviewedExcludedMinor ?? 0,
+          workRegularMinor: currentMonthValues?.incomeBreakdown.workRegularMinor ?? 0,
+          workVariableMinor: currentMonthValues?.incomeBreakdown.workVariableMinor ?? 0,
+          typicalWorkRegularMinor: typicalTrend.incomeBreakdown?.workRegularMinor ?? null,
+          expensesMinor: currentMonthValues?.expensesMinor ?? 0,
+          typicalExpensesMinor: typicalTrend.monthlyExpensesMinor
+        })
       }
     },
     series,

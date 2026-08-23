@@ -217,7 +217,8 @@ test("Basis und Szenario bleiben getrennt und alle Werte sind Schätzungen", () 
     netMinor: 200_000,
     incomeDifferenceMinor: 100_000,
     expensesDifferenceMinor: 50_000,
-    netDifferenceMinor: 50_000
+    netDifferenceMinor: 50_000,
+    explanations: []
   });
   assert.equal(result.series[0].baselineMinor, 20_000_000);
   assert.equal(result.series[0].scenarioMinor, 19_000_000);
@@ -288,7 +289,11 @@ test("aktueller unvollständiger Monat bleibt sichtbar, aber außerhalb der Proj
     excludedIncomeMinor: 0,
     pendingCardExpensesMinor: 0,
     pendingCardCapturedAt: null,
-    pendingCardLabel: null
+    pendingCardLabel: null,
+    explanations: [{
+      code: "incomplete",
+      label: "Monat noch nicht abgeschlossen; zählt nicht in die Projektion."
+    }]
   });
   assert.deepEqual(result.basis.annualOutlook.months.at(-1), {
     month: "2026-08",
@@ -330,6 +335,12 @@ test("offener Kartenstand ergänzt nur den laufenden Monat und bleibt aus der Pr
   assert.equal(result.basis.currentMonthProgress.netMinor, 15_219);
   assert.equal(result.basis.currentMonthProgress.pendingCardExpensesMinor, 34_781);
   assert.equal(result.basis.currentMonthProgress.pendingCardLabel, "Miles & More Kreditkarte");
+  assert.deepEqual(result.basis.currentMonthProgress.explanations.map((item) => item.code), [
+    "incomplete",
+    "pending-card"
+  ]);
+  assert.deepEqual(result.models.fire.appliesTo, ["Ausstiegsalter", "FIRE-Kapital", "Lücke zum Ziel"]);
+  assert.deepEqual(result.models.trajectory.appliesTo, ["Jahresausblick", "Monatsverlauf", "Vermögenslinie"]);
   assert.equal(result.basis.annualOutlook.currentMonthExcluded, true);
   assert.equal(result.basis.annualOutlook.actualToDate.netMinor, 1_100_000);
   assert.equal(result.basis.annualOutlook.projectedYearEnd.netMinor, 1_850_000);

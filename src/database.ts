@@ -158,6 +158,12 @@ export class FinanceDatabase {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS merchant_rules (
+        pattern TEXT PRIMARY KEY,
+        label TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS asset_market_snapshots (
         valuation_date TEXT NOT NULL,
         source_id TEXT NOT NULL,
@@ -620,6 +626,27 @@ export class FinanceDatabase {
         updated_at=excluded.updated_at
     `).run(fromKey, toLabel, timestamp, timestamp);
     return { fromKey, toLabel };
+  }
+
+  listMerchantRules(): Array<{ pattern: string; label: string }> {
+    const rows = this.db.prepare(`
+      SELECT pattern, label
+      FROM merchant_rules
+      ORDER BY label, pattern
+    `).all() as Array<{ pattern: string; label: string }>;
+    return rows;
+  }
+
+  setMerchantRule(pattern: string, label: string, now = new Date()): { pattern: string; label: string } {
+    const timestamp = now.toISOString();
+    this.db.prepare(`
+      INSERT INTO merchant_rules(pattern, label, created_at, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(pattern) DO UPDATE SET
+        label=excluded.label,
+        updated_at=excluded.updated_at
+    `).run(pattern, label, timestamp, timestamp);
+    return { pattern, label };
   }
 
   close(): void {

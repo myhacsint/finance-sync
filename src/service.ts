@@ -423,7 +423,8 @@ export class FinanceService {
       analyses,
       request,
       new Date(),
-      resolveFireAssumptions(this.config.analysis?.fire)
+      resolveFireAssumptions(this.config.analysis?.fire),
+      this.db.listMerchantRules()
     );
   }
 
@@ -715,7 +716,9 @@ export class FinanceService {
       loadApi: async () => await import("@actual-app/api") as never
     }));
     if (payload.aliasTo?.trim()) {
-      this.db.setMerchantAlias(line.merchantKey, payload.aliasTo.trim().slice(0, 80));
+      const alias = payload.aliasTo.trim().slice(0, 80);
+      this.db.setMerchantAlias(line.merchantKey, alias);
+      this.db.setMerchantRule(line.displayMerchant || line.merchant, alias);
     }
     this.invalidateReviewCaches();
     return this.getDashboardReview(true);

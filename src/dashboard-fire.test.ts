@@ -173,10 +173,12 @@ test("nur best채tigte geplante oder umgesetzte Entlastungen z채hlen standardm채�
   assert.equal(sport.recurringSavingsExcludedMinor, 47_880);
   assert.equal(sport.planningAnnualMinor, 62_120);
   assert.equal(sport.annualSavingsMinor, 15_530);
-  assert.equal(withCategoryCut.selectedAnnualSavingsMinor, 63_410);
+  assert.equal(sport.countsTowardScenario, false);
+  assert.equal(withCategoryCut.selectedAnnualSavingsMinor, 47_880);
+  assert.equal(result.nextChecks[0].label, "Versicherung");
 });
 
-test("variable Kategorien und Einmalposten bleiben getrennte FIRE-Hebel", () => {
+test("Kategorieprozente und Einmalposten z채hlen nicht als FIRE-Hebel", () => {
   const result = buildDashboardFireTracking(assets, {
     liveProjectedAnnualExpensesMinor: 11_500_000,
     normalizedAnnualExpensesMinor: 11_500_000
@@ -190,11 +192,12 @@ test("variable Kategorien und Einmalposten bleiben getrennte FIRE-Hebel", () => 
       .reduce((sum, transaction) => sum + transaction.amountMinor, 0)
   );
   assert.equal(result.variableCategories[0].planningAnnualMinor, 1_050_000);
-  assert.equal(result.selectedVariableAnnualSavingsMinor, 262_500);
+  assert.equal(result.selectedVariableAnnualSavingsMinor, 0);
   assert.equal(result.oneTimeCandidates[0].observedMinor, 300_000);
-  assert.equal(result.selectedOneTimeSavingsMinor, 225_000);
-  assert.equal(result.scenarioAnnualExpensesMinor, 11_237_500);
-  assert.equal(result.scenarioBridgeCapitalMinor, 7_383_400);
+  assert.equal(result.oneTimeCandidates[0].countsTowardScenario, false);
+  assert.equal(result.selectedOneTimeSavingsMinor, 0);
+  assert.equal(result.scenarioAnnualExpensesMinor, 11_500_000);
+  assert.equal(result.scenarioBridgeCapitalMinor, 7_158_400);
 });
 
 test("Buchungen werden je H채ndler geb체ndelt und innerhalb neueste zuerst sortiert", () => {

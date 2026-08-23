@@ -3,6 +3,11 @@ import type { DashboardAssets } from "./dashboard-assets.js";
 import type { AnalysisTransaction, DashboardAnalyses } from "./dashboard-analyses.js";
 import type { DashboardRecurringExpenseOptimizations } from "./dashboard-recurring-expenses.js";
 import { DEFAULT_FIRE_ASSUMPTIONS, type FireAssumptions } from "./fire-assumptions.js";
+import {
+  DEFAULT_MERCHANT_RULES,
+  applyMerchantRules,
+  type MerchantRule
+} from "./merchant-rules.js";
 
 export interface FireActionImpact {
   key: string;
@@ -62,8 +67,17 @@ export interface DashboardFireTracking {
   selectedCategoryCuts: string[];
   oneTimeCandidates: FireOneTimeImpact[];
   selectedOneTimeKeys: string[];
+  nextChecks: FireNextCheck[];
   basis: string[];
   warnings: string[];
+}
+
+export interface FireNextCheck {
+  key: string;
+  label: string;
+  reason: string;
+  estimatedAnnualCostMinor: number;
+  classificationLabel: string;
 }
 
 export interface FireCapitalGoal {
@@ -93,6 +107,7 @@ export interface FireVariableCategoryImpact {
   recurringSavingsExcludedMinor: number;
   selectedReductionPercent: 0 | 10 | 25 | 50;
   annualSavingsMinor: number;
+  countsTowardScenario: false;
   exitAgeIfApplied: number | null;
   yearsGained: number | null;
   estimate: true;
@@ -115,6 +130,7 @@ export interface FireOneTimeImpact {
   observedMinor: number;
   selected: boolean;
   countedOneTimeMinor: number;
+  countsTowardScenario: false;
   exitAgeIfApplied: number | null;
   yearsGained: number | null;
   estimate: true;
@@ -383,49 +399,17 @@ function normalizedLabel(value: string): string {
   return value.toLocaleLowerCase("de-DE").replace(/[^a-z0-9äöüß]+/g, " ").trim();
 }
 
-function merchantIdentity(value: string): { key: string; label: string } {
-  const normalized = normalizedLabel(value);
-  if (normalized.includes("amazon")) {
-    return { key: "amazon", label: "Amazon" };
-  }
-  if (normalized.includes("anthropic") || /\bclaude ai subscription\b/.test(normalized)) {
-    return { key: "anthropic-claude", label: "Anthropic Claude Subscription" };
-  }
-  if (normalized.includes("openai") || normalized.includes("chatgpt")) {
-    return { key: "openai-chatgpt", label: "OpenAI / ChatGPT" };
-  }
-  if (normalized.includes("paypal")) {
-    return { key: "paypal", label: "PayPal" };
-  }
-  if (normalized.includes("hetzner online")) {
-    return { key: "hetzner-online", label: "Hetzner Online" };
-  }
-  if (normalized.includes("tipp24")) {
-    return { key: "tipp24", label: "Tipp24" };
-  }
-  if (normalized.includes("eschacher") && normalized.includes("liftbetriebe")) {
-    return { key: "eschacher-liftbetriebe", label: "Eschacher Liftbetriebe" };
-  }
-  if (normalized.includes("fraport") && normalized.includes("parken")) {
-    return { key: "fraport-parken", label: "Fraport Parken" };
-  }
-  if (normalized.includes("jufa") && normalized.includes("hotel")) {
-    return { key: "jufa-hotels", label: "JUFA Hotels" };
-  }
-  if (normalized.includes("rhoen") && normalized.includes("park")
-    && normalized.includes("hotel")) {
-    return { key: "rhoen-park-hotel", label: "Rhön Park Hotel" };
-  }
-  if (/^bauhaus(?:\b|\s)/.test(normalized)) {
-    return { key: "bauhaus", label: "BAUHAUS" };
-  }
-  return { key: normalized || "unbekannt", label: value.trim() || "Unbekannter Händler" };
+function merchantIdentity(value: string, rules: MerchantRule[] = DEFAULT_MERCHANT_RULES): { key: string; label: string } {
+  return applyMerchantRules(value, rules);
 }
 
-export function groupFireTransactions(transactions: AnalysisTransaction[]): FireMerchantGroup[] {
+export function groupFireTransactions(
+  transactions: AnalysisTransaction[],
+  rules: MerchantRule[] = DEFAULT_MERCHANT_RULES
+): FireMerchantGroup[] {
   const groups = new Map<string, FireMerchantGroup>();
   for (const transaction of transactions) {
-    const identity = merchantIdentity(transaction.merchant);
+    const identity = merchantIdentity(transaction.merchant, rules);
     const existing = groups.get(identity.key) ?? {
       key: `merchant-${createHash("sha256")
         .update(`finance-hub:fire-merchant:${identity.key}`)
@@ -465,7 +449,8 @@ function variableCategoryImpacts(
   recurringSavingsByCategory: Map<string, number>,
   annualExpensesMinor: number | null,
   bridgeCapital: number | null,
-  baselineExitAge: number | null
+  baselineExitAge: number | null,
+  rules: MerchantRule[] = DEFAULT_MERCHANT_RULES
 ): FireVariableCategoryImpact[] {
   const cuts = new Map<string, 10 | 25 | 50>();
   for (const value of requestedCuts) {
@@ -504,14 +489,15 @@ function variableCategoryImpacts(
         previousPeriodLabel: analyses.comparison.label,
         currentTransactions: category.periodTransactions,
         previousTransactions: category.comparisonTransactions,
-        currentMerchantGroups: groupFireTransactions(category.periodTransactions),
-        previousMerchantGroups: groupFireTransactions(category.comparisonTransactions),
+        currentMerchantGroups: groupFireTransactions(category.periodTransactions, rules),
+        previousMerchantGroups: groupFireTransactions(category.comparisonTransactions, rules),
         annualizedCurrentMinor,
         grossPlanningAnnualMinor,
         planningAnnualMinor,
         recurringSavingsExcludedMinor,
         selectedReductionPercent,
         annualSavingsMinor,
+        countsTowardScenario: false as const,
         exitAgeIfApplied,
         yearsGained: baselineExitAge !== null && exitAgeIfApplied !== null
           ? Math.max(0, baselineExitAge - exitAgeIfApplied) : null,
@@ -557,7 +543,8 @@ function oneTimeImpacts(
         month: position.months[0].month,
         observedMinor: position.amountMinor,
         selected,
-        countedOneTimeMinor,
+        countedOneTimeMinor: 0,
+        countsTowardScenario: false as const,
         exitAgeIfApplied,
         yearsGained: baselineExitAge !== null && exitAgeIfApplied !== null
           ? Math.max(0, baselineExitAge - exitAgeIfApplied) : null,
@@ -578,7 +565,8 @@ export function buildDashboardFireTracking(
   requestedActionKeys: string[] = [],
   requestedCategoryCuts: string[] = [],
   requestedOneTimeKeys: string[] = [],
-  assumptions: FireAssumptions = DEFAULT_FIRE_ASSUMPTIONS
+  assumptions: FireAssumptions = DEFAULT_FIRE_ASSUMPTIONS,
+  merchantRules: MerchantRule[] = DEFAULT_MERCHANT_RULES
 ): DashboardFireTracking {
   const a = assumptions;
   const safeTargetAge = Math.max(50, Math.min(67, Math.round(targetAge)));
@@ -613,7 +601,8 @@ export function buildDashboardFireTracking(
     recurringSavingsByCategory,
     trackedAnnualExpensesMinor,
     bridgeCapital,
-    baselineExitAge
+    baselineExitAge,
+    merchantRules
   );
   const selectedCategoryCuts = variableCategories
     .filter((category) => category.selectedReductionPercent > 0)
@@ -622,8 +611,7 @@ export function buildDashboardFireTracking(
     category.key,
     category.selectedReductionPercent
   ]));
-  const selectedVariableAnnualSavingsMinor = variableCategories
-    .reduce((sum, category) => sum + category.annualSavingsMinor, 0);
+  const selectedVariableAnnualSavingsMinor = 0;
   const oneTimeCandidates = oneTimeImpacts(
     analyses,
     optimizations,
@@ -634,8 +622,17 @@ export function buildDashboardFireTracking(
     baselineExitAge
   );
   const selectedOneTimeKeys = oneTimeCandidates.filter((item) => item.selected).map((item) => item.key);
-  const selectedOneTimeSavingsMinor = oneTimeCandidates
-    .reduce((sum, item) => sum + item.countedOneTimeMinor, 0);
+  const selectedOneTimeSavingsMinor = 0;
+  const nextChecks = actions
+    .filter((action) => action.status === "PRUEFEN" || action.leverQuality === "pruefen")
+    .slice(0, 5)
+    .map((action) => ({
+      key: action.key,
+      label: action.label,
+      reason: action.leverLabel,
+      estimatedAnnualCostMinor: action.estimatedAnnualCostMinor,
+      classificationLabel: action.classificationLabel
+    }));
   const selectedAnnualSavingsMinor = selectedRecurringAnnualSavingsMinor
     + selectedVariableAnnualSavingsMinor;
   const scenarioAnnualExpensesMinor = trackedAnnualExpensesMinor === null ? null
@@ -705,6 +702,7 @@ export function buildDashboardFireTracking(
     selectedCategoryCuts,
     oneTimeCandidates,
     selectedOneTimeKeys,
+    nextChecks,
     basis: [
       "FIRE-Phasenmodell v3.1; Basisjahr 2026, Modellende 2071",
       "3 % Realrendite als Mitte; 2 % und 4 % als Sensitivität [SCHÄTZUNG]",
@@ -712,8 +710,7 @@ export function buildDashboardFireTracking(
       "Kapitalziele vergleichen das bis zum Ausstiegsalter erwartete freie Finanzvermögen mit dem ab diesem Zeitpunkt benötigten FIRE-Kapital; alle Beträge sind reale Euro in heutiger Kaufkraft mit Basisjahr 2026, gebundene Vorsorge bleibt separat [SCHÄTZUNG]",
       "Kinderkosten sinken ab 2030 und 2048 und werden vollständig der Sparrate zugeführt [SCHÄTZUNG]",
       "Erbschaft und unbelegte Riester-Kapitalhöhe werden nicht angesetzt",
-      "Variable Kategorien verwenden den Mittelwert aus laufender Jahreshochrechnung und Vorjahr [SCHÄTZUNG]",
-      "Einzelposten wirken nur einmal auf das Überbrückungskapital; vergangene Ausgaben werden nicht rückwirkend als Ersparnis gezählt [SCHÄTZUNG]"
+      "Nur bestätigte laufende Maßnahmen zählen als Szenario-Hebel; Kategorieprozente und vergangene Einmalposten nicht [SCHÄTZUNG]"
     ],
     warnings
   };

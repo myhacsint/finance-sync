@@ -187,7 +187,8 @@ test("Analysenansicht besitzt ein zugängliches Entscheidungslabor", () => {
   assert.match(html, /Reale Ausgabenhebel/);
   assert.match(html, /estimatedAnnualCostMinor/);
   assert.match(html, /Mögliche Entlastung erst nach Prüfung/);
-  assert.match(html, /Grundbedarf bleibt ausgeschlossen/);
+  assert.match(html, /Nächste 5 prüfbare Dinge/);
+  assert.match(html, /Nur bestätigte laufende Maßnahmen zählen/);
   assert.match(html, /Variable Ausgabenkategorien/);
   assert.match(html, /fireCategoryCuts/);
   assert.match(html, /fire-category-cut/);
@@ -202,7 +203,7 @@ test("Analysenansicht besitzt ein zugängliches Entscheidungslabor", () => {
   assert.match(html, /fire-booking-row/);
   assert.match(html, /fireOneTimeKeys/);
   assert.match(html, /fire-one-time/);
-  assert.match(html, /Vergangene Ausgaben werden nicht rückwirkend gespart/);
+  assert.match(html, /zählt nicht als Ersparnis/);
   assert.match(html, /fireTargetAge/);
   assert.match(html, /fireActionKeys/);
   assert.match(html, /decision-milestones/);
@@ -253,7 +254,12 @@ test("Prüfen und Labor sind eigene Flächen mit einer Taxonomie", () => {
   assert.match(html, /setReviewMonths/);
   assert.match(html, /FIRE-Kurs/);
   assert.match(html, /Jahresausblick/);
-  assert.match(html, /Trajektorie/);
+  assert.match(html, /Nächste 5 prüfbare Dinge/);
+  assert.match(html, /zählt nicht ins Szenario/);
+  assert.match(html, /Plan vs\. Ist/);
+  assert.match(html, /Cashflow-Modell/);
+  assert.match(html, /nur dieses Modell/);
+  assert.match(html, /function monthReasons\(/);
 });
 
 test("alte Analyse-URLs landen auf Prüfen oder Labor", () => {
