@@ -114,7 +114,9 @@ test("Actual-Ausgaben schließen Transfers und Off-Budget aus und verrechnen Ers
     result.categories.slice(1).reduce((sum, category) => sum + category.amountMinor, 0),
     result.categories[0].amountMinor
   );
-  assert.equal(result.transactions.find((row) => row.date === "2026-07-29")?.merchant, "Private Gegenpartei");
+  assert.equal(snapshot.lines.find((row) => row.date === "2026-07-29")?.merchant, "Private Gegenpartei");
+  assert.equal(snapshot.lines.find((row) => row.date === "2026-07-29")?.displayMerchant, "Max Mustermann");
+  assert.equal(result.transactions.find((row) => row.date === "2026-07-29")?.merchant, "Max Mustermann");
   assert.equal(result.transactions.some((row) => row.merchant === "Transfer"), false);
   assert.deepEqual(calls, ["init", "download", "shutdown"]);
 });

@@ -244,7 +244,7 @@ function buildPeriod(
       return {
         id: line.id,
         date: line.date,
-        merchant: line.merchant,
+        merchant: line.displayMerchant ?? line.merchant,
         category: corrected.category,
         class: corrected.class,
         amountMinor: line.amountMinor,

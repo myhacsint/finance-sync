@@ -67,6 +67,19 @@ function line(
   };
 }
 
+function privateLine(
+  id: string,
+  date: string,
+  displayMerchant: string,
+  categoryLabel: string,
+  amountMinor: number
+): SpendingLine {
+  return {
+    ...line(id, date, "Private Gegenpartei", categoryLabel, amountMinor),
+    displayMerchant
+  };
+}
+
 function snapshot(lines: SpendingLine[]): ActualSpendingRangeSnapshot {
   return {
     startDate: "2024-01-01",
@@ -139,6 +152,16 @@ test("2025 wird mit Zusatzwerten exakt und ohne Sparen reconciliert", () => {
   assert.deepEqual(homelab.comparisonTransactions, []);
   assert.equal(data.comparison.estimate, true);
   assert.equal(data.state, "current");
+});
+
+test("authentifizierte Buchungsdetails zeigen private Gegenparteien ohne technische Kennungen", () => {
+  const data = buildDashboardAnalyses(snapshot([
+    privateLine("private-payment", "2025-03-12", "Max Mustermann", "Freizeit & Hobbys", 12_500)
+  ]), config, 2025, 2024, new Date("2026-08-11T08:00:00Z"));
+  const category = data.categories.find((row) => row.label === "Freizeit & Hobbys");
+  assert.equal(category?.periodTransactions[0]?.merchant, "Max Mustermann");
+  assert.match(category?.periodTransactions[0]?.key ?? "", /^booking-[a-f0-9]{14}$/);
+  assert.doesNotMatch(JSON.stringify(category?.periodTransactions), /private-payment/);
 });
 
 test("lokale Händlerausnahme korrigiert die Klasse ohne den Betrag zu ändern", () => {

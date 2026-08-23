@@ -66,6 +66,7 @@ export interface SpendingLine {
   date: string;
   merchantKey: string;
   merchant: string;
+  displayMerchant?: string;
   notes: string;
   accountKey: string;
   accountLabel: string;
@@ -268,15 +269,18 @@ function normalizeLine(
   const amountMinor = -Math.round(transaction.amount);
   if (amountMinor === 0) return null;
   const categoryId = category?.id ?? "uncategorized";
-  const merchant = safeMerchant(
+  const displayMerchant = safeLabel(
     payee?.name ?? parentPayee?.name ?? transaction.imported_payee
-      ?? parent.imported_payee ?? transaction.notes ?? parent.notes
+      ?? parent.imported_payee ?? transaction.notes ?? parent.notes,
+    "Unbekannter Händler"
   );
+  const merchant = safeMerchant(displayMerchant);
   return {
     id: `${parent.id}:${transaction.id}`,
     date: transaction.date || parent.date,
     merchantKey: merchantKey(transaction, parent, payee, parentPayee, merchant),
     merchant,
+    displayMerchant,
     notes: safeLabel(transaction.notes ?? parent.notes, ""),
     accountKey: account.key,
     accountLabel: account.label,
@@ -490,7 +494,7 @@ export function buildDashboardSpending(
     accounts: snapshot.accounts,
     transactions: filteredLines.slice(start, start + pageSize).map((line) => ({
       date: line.date,
-      merchant: line.merchant,
+      merchant: line.displayMerchant ?? line.merchant,
       account: line.accountLabel,
       category: line.categoryLabel,
       amountMinor: line.amountMinor
