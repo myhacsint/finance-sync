@@ -174,6 +174,24 @@ test("Jahresausblick vergleicht Ist mit Median-Pfad und schreibt nur Restmonate 
       expensesMinor: 7_800_000,
       netMinor: 1_800_000
     },
+    months: [
+      ...Array.from({ length: 6 }, (_, index) => ({
+        month: `2026-${String(index + 1).padStart(2, "0")}`,
+        throughDate: null,
+        incomeMinor: 800_000,
+        expensesMinor: 650_000,
+        netMinor: 150_000,
+        complete: true
+      })),
+      {
+        month: "2026-07",
+        throughDate: null,
+        incomeMinor: 900_000,
+        expensesMinor: 700_000,
+        netMinor: 200_000,
+        complete: true
+      }
+    ],
     currentMonthExcluded: false,
     estimate: true
   });
@@ -272,6 +290,18 @@ test("aktueller unvollständiger Monat bleibt sichtbar, aber außerhalb der Proj
     pendingCardCapturedAt: null,
     pendingCardLabel: null
   });
+  assert.deepEqual(result.basis.annualOutlook.months.at(-1), {
+    month: "2026-08",
+    throughDate: "2026-08-22",
+    incomeMinor: 300_000,
+    expensesMinor: 250_000,
+    netMinor: 50_000,
+    complete: false
+  });
+  const completed = result.basis.annualOutlook.months.filter((month) => month.complete);
+  assert.equal(completed.reduce((sum, month) => sum + month.incomeMinor, 0), result.basis.annualOutlook.actualToDate.incomeMinor);
+  assert.equal(completed.reduce((sum, month) => sum + month.expensesMinor, 0), result.basis.annualOutlook.actualToDate.expensesMinor);
+  assert.equal(completed.reduce((sum, month) => sum + month.netMinor, 0), result.basis.annualOutlook.actualToDate.netMinor);
 });
 
 test("offener Kartenstand ergänzt nur den laufenden Monat und bleibt aus der Projektion", () => {

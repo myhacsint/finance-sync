@@ -113,6 +113,13 @@ Geheimnisse bleiben pseudonymisiert oder maskiert. Die Buchungssummen stimmen
 centgenau mit der jeweiligen Kategorie überein; weitere Buchungen werden
 progressiv eingeblendet.
 
+Der Jahresausblick enthält außerdem einen standardmäßig eingeklappten
+Monatsverlauf. Er zeigt je Monat die bereinigten Einnahmen, Ausgaben und den
+Saldo aus derselben serverseitigen Berechnung wie die YTD-Bilanz. Die
+abgeschlossenen Monate stimmen centgenau mit dem YTD-Ist überein. Der laufende
+Monat wird als unvollständig gekennzeichnet und weder in diese Summe noch in
+die Jahresend-Hochrechnung als abgeschlossener Monat einbezogen.
+
 ## Datenbedeutung
 
 - Interne Überträge sind keine Ausgaben.

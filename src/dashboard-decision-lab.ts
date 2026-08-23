@@ -74,6 +74,14 @@ export interface DecisionAnnualOutlook {
   varianceToExpected: DecisionAnnualValues;
   projectedYearEnd: DecisionAnnualValues;
   medianFullYear: DecisionAnnualValues;
+  months: Array<{
+    month: string;
+    throughDate: string | null;
+    incomeMinor: number;
+    expensesMinor: number;
+    netMinor: number;
+    complete: boolean;
+  }>;
   currentMonthExcluded: boolean;
   estimate: true;
 }
@@ -420,7 +428,8 @@ function annualValues(
 
 function annualOutlook(
   trend: DecisionTrendOption,
-  currentMonthExcluded: boolean
+  currentMonthExcluded: boolean,
+  months: DecisionAnnualOutlook["months"]
 ): DecisionAnnualOutlook {
   const year = trend.periodEnd ? Number(trend.periodEnd.slice(0, 4)) : null;
   const available = trend.available
@@ -443,6 +452,7 @@ function annualOutlook(
       varianceToExpected: unavailable,
       projectedYearEnd: unavailable,
       medianFullYear: unavailable,
+      months,
       currentMonthExcluded,
       estimate: true
     };
@@ -478,6 +488,7 @@ function annualOutlook(
       monthlyIncomeMinor * 12,
       monthlyExpensesMinor * 12
     ),
+    months,
     currentMonthExcluded,
     estimate: true
   };
@@ -512,7 +523,40 @@ export function buildDashboardDecisionLab(
     : null;
   const pendingCardEntries = cashflow.pendingCreditCardBalances?.entries ?? [];
   const pendingCardExpensesMinor = currentMonth?.pendingCardExpenseMinor ?? 0;
-  const annual = annualOutlook(typicalTrend, cashflow.window.currentMonthIncluded);
+  const annualYear = typicalTrend.periodEnd?.slice(0, 4) ?? null;
+  const annualMonths: DecisionAnnualOutlook["months"] = [
+    ...completeMonths
+      .filter((month) => annualYear !== null && month.month.startsWith(`${annualYear}-`))
+      .map((month) => {
+        const values = trendMonthValues(month);
+        return {
+          month: month.month,
+          throughDate: null,
+          incomeMinor: values.incomeMinor,
+          expensesMinor: values.expensesMinor,
+          netMinor: values.incomeMinor - values.expensesMinor,
+          complete: true
+        };
+      }),
+    ...(currentMonth && annualYear !== null && currentMonth.month.startsWith(`${annualYear}-`)
+      ? (() => {
+          const values = trendMonthValues(currentMonth);
+          return [{
+            month: currentMonth.month,
+            throughDate: cashflow.generatedAt.slice(0, 10),
+            incomeMinor: values.incomeMinor,
+            expensesMinor: values.expensesMinor,
+            netMinor: values.incomeMinor - values.expensesMinor,
+            complete: false
+          }];
+        })()
+      : [])
+  ];
+  const annual = annualOutlook(
+    typicalTrend,
+    cashflow.window.currentMonthIncluded,
+    annualMonths
+  );
   const fire = buildDashboardFireTracking(assets, {
     liveProjectedAnnualExpensesMinor: annual.projectedYearEnd.expensesMinor,
     normalizedAnnualExpensesMinor: annual.medianFullYear.expensesMinor
