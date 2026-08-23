@@ -99,8 +99,12 @@ Alle drei Hebelarten verwenden dieselbe Leserichtung: Bezeichnung,
 Kostenbasis, Maßnahme und angesetzte Wirkung. Die Gruppen sind zunächst
 kompakt eingeklappt und weisen Kostenbasis sowie bereits angesetzte Wirkung
 in der Kopfzeile aus. Variable Kategorien öffnen auf Wunsch die zugehörigen
-Buchungen des laufenden Analysezeitraums oder des Vorjahrs, absteigend nach
-Einzelbetrag. In dieser authentifizierten persönlichen Detailansicht werden
+Buchungen des laufenden Analysezeitraums oder des Vorjahrs. Innerhalb einer
+Kategorie werden sie zunächst pro Händler oder Dienst gebündelt und nach ihrer
+Gesamtsumme sortiert. Erst die zweite Aufklappstufe zeigt die Einzelbuchungen
+dieses Händlers in absteigender Datumsfolge. Bekannte Namensvarianten desselben
+Dienstes werden nur über explizite, geprüfte Aliase zusammengeführt. In dieser
+authentifizierten persönlichen Detailansicht werden
 echte Gegenparteien angezeigt; technische Actual-IDs, IBANs, Kontonummern und
 Geheimnisse bleiben pseudonymisiert oder maskiert. Die Buchungssummen stimmen
 centgenau mit der jeweiligen Kategorie überein; weitere Buchungen werden

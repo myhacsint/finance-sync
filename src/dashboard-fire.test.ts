@@ -3,7 +3,7 @@ import test from "node:test";
 import type { DashboardAssets } from "./dashboard-assets.js";
 import type { DashboardAnalyses } from "./dashboard-analyses.js";
 import type { DashboardRecurringExpenseOptimizations } from "./dashboard-recurring-expenses.js";
-import { buildDashboardFireTracking } from "./dashboard-fire.js";
+import { buildDashboardFireTracking, groupFireTransactions } from "./dashboard-fire.js";
 
 const assets = {
   generatedAt: "2026-08-22T12:00:00.000Z",
@@ -183,10 +183,34 @@ test("variable Kategorien und Einmalposten bleiben getrennte FIRE-Hebel", () => 
   }, emptyOptimizations, analyses, 60, [], ["category-aaaaaaaaaa:25"], ["position-bbbbbbbbbbbb"]);
   assert.equal(result.variableCategories[0].annualizedCurrentMinor, 1_200_000);
   assert.deepEqual(result.variableCategories[0].currentTransactions, analyses.categories[0].periodTransactions);
+  assert.equal(
+    result.variableCategories[0].currentMerchantGroups
+      .reduce((sum, group) => sum + group.amountMinor, 0),
+    analyses.categories[0].periodTransactions
+      .reduce((sum, transaction) => sum + transaction.amountMinor, 0)
+  );
   assert.equal(result.variableCategories[0].planningAnnualMinor, 1_050_000);
   assert.equal(result.selectedVariableAnnualSavingsMinor, 262_500);
   assert.equal(result.oneTimeCandidates[0].observedMinor, 300_000);
   assert.equal(result.selectedOneTimeSavingsMinor, 225_000);
   assert.equal(result.scenarioAnnualExpensesMinor, 11_237_500);
   assert.equal(result.scenarioBridgeCapitalMinor, 7_383_400);
+});
+
+test("Buchungen werden je Händler gebündelt und innerhalb neueste zuerst sortiert", () => {
+  const groups = groupFireTransactions([
+    { key: "booking-a", date: "2026-04-01", merchant: "Anthropic", amountMinor: 2_380, estimate: false },
+    { key: "booking-b", date: "2026-06-01", merchant: "Anthropic Claude Subscription", amountMinor: 2_380, estimate: false },
+    { key: "booking-c", date: "2026-05-01", merchant: "Openai Ireland Limited", amountMinor: 2_300, estimate: false },
+    { key: "booking-d", date: "2026-07-01", merchant: "Ginge Technology", amountMinor: 10_000, estimate: false }
+  ]);
+  assert.deepEqual(groups.map((group) => [group.label, group.bookings, group.amountMinor]), [
+    ["Ginge Technology", 1, 10_000],
+    ["Anthropic Claude Subscription", 2, 4_760],
+    ["OpenAI / ChatGPT", 1, 2_300]
+  ]);
+  assert.deepEqual(groups[1].transactions.map((transaction) => transaction.date), [
+    "2026-06-01",
+    "2026-04-01"
+  ]);
 });

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { DashboardAssets } from "./dashboard-assets.js";
 import type { AnalysisTransaction, DashboardAnalyses } from "./dashboard-analyses.js";
 import type { DashboardRecurringExpenseOptimizations } from "./dashboard-recurring-expenses.js";
@@ -117,6 +118,8 @@ export interface FireVariableCategoryImpact {
   previousPeriodLabel: string;
   currentTransactions: AnalysisTransaction[];
   previousTransactions: AnalysisTransaction[];
+  currentMerchantGroups: FireMerchantGroup[];
+  previousMerchantGroups: FireMerchantGroup[];
   annualizedCurrentMinor: number;
   grossPlanningAnnualMinor: number;
   planningAnnualMinor: number;
@@ -126,6 +129,15 @@ export interface FireVariableCategoryImpact {
   exitAgeIfApplied: number | null;
   yearsGained: number | null;
   estimate: true;
+}
+
+export interface FireMerchantGroup {
+  key: string;
+  label: string;
+  amountMinor: number;
+  bookings: number;
+  estimate: boolean;
+  transactions: AnalysisTransaction[];
 }
 
 export interface FireOneTimeImpact {
@@ -397,6 +409,48 @@ function normalizedLabel(value: string): string {
   return value.toLocaleLowerCase("de-DE").replace(/[^a-z0-9äöüß]+/g, " ").trim();
 }
 
+function merchantIdentity(value: string): { key: string; label: string } {
+  const normalized = normalizedLabel(value);
+  if (normalized.includes("anthropic")) {
+    return { key: "anthropic-claude", label: "Anthropic Claude Subscription" };
+  }
+  if (normalized.includes("openai") || normalized.includes("chatgpt")) {
+    return { key: "openai-chatgpt", label: "OpenAI / ChatGPT" };
+  }
+  return { key: normalized || "unbekannt", label: value.trim() || "Unbekannter Händler" };
+}
+
+export function groupFireTransactions(transactions: AnalysisTransaction[]): FireMerchantGroup[] {
+  const groups = new Map<string, FireMerchantGroup>();
+  for (const transaction of transactions) {
+    const identity = merchantIdentity(transaction.merchant);
+    const existing = groups.get(identity.key) ?? {
+      key: `merchant-${createHash("sha256")
+        .update(`finance-hub:fire-merchant:${identity.key}`)
+        .digest("hex").slice(0, 12)}`,
+      label: identity.label,
+      amountMinor: 0,
+      bookings: 0,
+      estimate: false,
+      transactions: []
+    };
+    existing.amountMinor += transaction.amountMinor;
+    existing.bookings += 1;
+    existing.estimate ||= transaction.estimate;
+    existing.transactions.push(transaction);
+    groups.set(identity.key, existing);
+  }
+  return [...groups.values()]
+    .map((group) => ({
+      ...group,
+      transactions: group.transactions.sort((left, right) => right.date.localeCompare(left.date)
+        || right.amountMinor - left.amountMinor
+        || left.merchant.localeCompare(right.merchant, "de"))
+    }))
+    .sort((left, right) => right.amountMinor - left.amountMinor
+      || left.label.localeCompare(right.label, "de"));
+}
+
 function monthsInclusive(start: string, end: string): number {
   const [startYear, startMonth] = start.slice(0, 7).split("-").map(Number);
   const [endYear, endMonth] = end.slice(0, 7).split("-").map(Number);
@@ -448,6 +502,8 @@ function variableCategoryImpacts(
         previousPeriodLabel: analyses.comparison.label,
         currentTransactions: category.periodTransactions,
         previousTransactions: category.comparisonTransactions,
+        currentMerchantGroups: groupFireTransactions(category.periodTransactions),
+        previousMerchantGroups: groupFireTransactions(category.comparisonTransactions),
         annualizedCurrentMinor,
         grossPlanningAnnualMinor,
         planningAnnualMinor,

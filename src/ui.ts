@@ -941,16 +941,25 @@ export function renderUi(): string {
     .fire-period-switch { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--line-soft); border-radius: 8px; }
     .fire-period-switch button { min-height: 44px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
     .fire-period-switch button:hover, .fire-row-drill:hover { background: var(--surface-2); color: var(--text); }
-    .fire-period-switch button:focus-visible, .fire-row-drill:focus-visible, .fire-booking-more summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+    .fire-period-switch button:focus-visible, .fire-row-drill:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
     .fire-period-switch button[aria-pressed="true"] { background: var(--surface-2); color: var(--text); }
-    .fire-booking-list { margin-top: 10px; border: 1px solid var(--line-soft); border-radius: 8px; }
+    .fire-merchant-list { display: grid; margin-top: 10px; overflow: hidden; border: 1px solid var(--line-soft); border-radius: 8px; }
+    .fire-merchant-group { border-bottom: 1px solid var(--line-soft); }
+    .fire-merchant-group:last-child { border-bottom: 0; }
+    .fire-merchant-group > summary { display: grid; grid-template-columns: minmax(0, 1fr) auto 18px; gap: 12px; align-items: center; min-height: 48px; padding: 7px 10px; cursor: pointer; list-style: none; }
+    .fire-merchant-group > summary::-webkit-details-marker { display: none; }
+    .fire-merchant-group > summary:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+    .fire-merchant-main { display: grid; gap: 2px; min-width: 0; }
+    .fire-merchant-main strong { overflow-wrap: anywhere; }
+    .fire-merchant-main small { color: var(--muted); font-size: 11px; }
+    .fire-merchant-group > summary > strong { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .fire-merchant-group > summary svg { width: 17px; height: 17px; color: var(--muted); transform: rotate(-90deg); transition: transform .16s ease; }
+    .fire-merchant-group[open] > summary svg { transform: rotate(0); }
+    .fire-merchant-bookings { border-top: 1px solid var(--line-soft); background: rgba(0,0,0,.12); }
     .fire-booking-row { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 42px; padding: 7px 10px; border-bottom: 1px solid var(--line-soft); }
     .fire-booking-row:last-child { border-bottom: 0; }
     .fire-booking-row time, .fire-booking-row small { color: var(--muted); font-size: 11px; }
     .fire-booking-row strong { font-variant-numeric: tabular-nums; }
-    .fire-booking-more { border-top: 1px solid var(--line-soft); }
-    .fire-booking-more summary { min-height: 44px; padding: 13px 10px; color: var(--blue); cursor: pointer; }
-    .fire-booking-more .fire-booking-row { border-top: 1px solid var(--line-soft); border-bottom: 0; }
     .fire-action-umgesetzt { box-shadow: inset 3px 0 #5cc99a; }
     .fire-action-klar { box-shadow: inset 3px 0 #6ea8ff; }
     .fire-action-pruefen { box-shadow: inset 3px 0 #d8a24d; }
@@ -2175,6 +2184,9 @@ function setFireCategoryDetailPeriod(value){
 function fireBookingRows(rows){
   return rows.map(row=>'<div class="fire-booking-row"><time datetime="'+esc(row.date)+'">'+esc(formatDate(row.date))+'</time><span>'+esc(row.merchant)+(row.estimate?' '+analysisEstimate(true):'')+'</span><strong>'+money(row.amountMinor)+'</strong></div>').join('');
 }
+function fireMerchantRows(groups){
+  return groups.map(group=>'<details class="fire-merchant-group"><summary><span class="fire-merchant-main"><strong>'+esc(group.label)+'</strong><small>'+group.bookings+' '+(group.bookings===1?'Buchung':'Buchungen')+(group.estimate?' · '+analysisEstimate(true):'')+'</small></span><strong>'+money(group.amountMinor)+'</strong>'+icons.chevron+'</summary><div class="fire-merchant-bookings" aria-label="Einzelbuchungen für '+esc(group.label)+'">'+fireBookingRows(group.transactions)+'</div></details>').join('');
+}
 function renderFireTracking(fire){
   const state=analysisSelection();
   const gap=fire.central.annualGapToTargetMinor;
@@ -2200,9 +2212,9 @@ function renderFireTracking(fire){
     const open=state.fireCategory===category.key;
     const previous=state.fireCategoryPeriod==="previous";
     const transactions=previous?category.previousTransactions:category.currentTransactions;
+    const merchantGroups=previous?category.previousMerchantGroups:category.currentMerchantGroups;
     const periodLabel=previous?category.previousPeriodLabel:category.currentPeriodLabel;
-    const visible=transactions.slice(0,10);const remaining=transactions.slice(10);
-    const detail=open?'<div class="fire-category-detail"><div class="fire-category-detail-head"><div><h5>Buchungen · '+esc(category.label)+'</h5><p>'+transactions.length+' Buchungen · '+money(transactions.reduce((sum,row)=>sum+row.amountMinor,0))+' · größte zuerst</p></div><div class="fire-period-switch" aria-label="Zeitraum für Kategorie"><button type="button" aria-pressed="'+String(!previous)+'" onclick="setFireCategoryDetailPeriod(&quot;current&quot;)">'+esc(category.currentPeriodLabel)+'</button><button type="button" aria-pressed="'+String(previous)+'" onclick="setFireCategoryDetailPeriod(&quot;previous&quot;)">'+esc(category.previousPeriodLabel)+'</button></div></div><div class="fire-booking-list" aria-label="Buchungen '+esc(periodLabel)+'">'+(visible.length?fireBookingRows(visible):'<div class="fire-empty">In diesem Zeitraum liegen keine Buchungen vor.</div>')+(remaining.length?'<details class="fire-booking-more"><summary>Weitere '+remaining.length+' Buchungen anzeigen</summary>'+fireBookingRows(remaining)+'</details>':'')+'</div></div>':'';
+    const detail=open?'<div class="fire-category-detail"><div class="fire-category-detail-head"><div><h5>Händler und Dienste · '+esc(category.label)+'</h5><p>'+merchantGroups.length+' '+(merchantGroups.length===1?'Gruppe':'Gruppen')+' · '+transactions.length+' Buchungen · '+money(transactions.reduce((sum,row)=>sum+row.amountMinor,0))+' · größte Summe zuerst</p></div><div class="fire-period-switch" aria-label="Zeitraum für Kategorie"><button type="button" aria-pressed="'+String(!previous)+'" onclick="setFireCategoryDetailPeriod(&quot;current&quot;)">'+esc(category.currentPeriodLabel)+'</button><button type="button" aria-pressed="'+String(previous)+'" onclick="setFireCategoryDetailPeriod(&quot;previous&quot;)">'+esc(category.previousPeriodLabel)+'</button></div></div><div class="fire-merchant-list" aria-label="Händlergruppen '+esc(periodLabel)+'">'+(merchantGroups.length?fireMerchantRows(merchantGroups):'<div class="fire-empty">In diesem Zeitraum liegen keine Buchungen vor.</div>')+'</div></div>':'';
     return '<div class="fire-row"><button class="fire-row-drill" type="button" aria-label="Buchungen für '+esc(category.label)+' '+(open?'ausblenden':'anzeigen')+'" aria-expanded="'+String(open)+'" onclick="toggleFireCategoryDetail(&quot;'+esc(category.key)+'&quot;)">'+icons.chevron+'</button><span class="fire-row-main"><strong>'+esc(category.label)+'</strong><small>'+esc(category.currentPeriodLabel)+' '+money(category.currentPeriodMinor)+' · '+esc(category.previousPeriodLabel)+' '+money(category.previousYearMinor)+'</small></span><span class="fire-row-metric fire-row-cost"><small>Geglättete Jahresbasis</small><strong>'+money(category.planningAnnualMinor)+' '+analysisEstimate(true)+'</strong><small>'+excluded.replace(/^ · /,'')+'</small></span><span class="fire-row-metric fire-row-choice"><small>Maßnahme</small><select name="fire-category-cut" data-key="'+esc(category.key)+'" aria-label="Reduktion für '+esc(category.label)+'">'+options+'</select></span><span class="fire-row-metric fire-row-effect"><small>Angesetzte Wirkung</small><strong>'+saving+'</strong><small>'+esc(impact)+' '+analysisEstimate(true)+'</small></span>'+detail+'</div>';
   }).join('');
   const oneTimeRows=fire.oneTimeCandidates.map(item=>{

@@ -189,8 +189,10 @@ test("Analysenansicht besitzt ein zugängliches Entscheidungslabor", () => {
   assert.match(html, /Historische Einzelposten/);
   assert.match(html, /Geglättete Jahresbasis/);
   assert.match(html, /Beobachteter Betrag/);
-  assert.match(html, /Buchungen ·/);
-  assert.match(html, /größte zuerst/);
+  assert.match(html, /Händler und Dienste ·/);
+  assert.match(html, /größte Summe zuerst/);
+  assert.match(html, /fire-merchant-group/);
+  assert.match(html, /Einzelbuchungen für/);
   assert.match(html, /fireCategoryPeriod/);
   assert.match(html, /fire-booking-row/);
   assert.match(html, /fireOneTimeKeys/);
