@@ -59,6 +59,14 @@ interface AnalysisItem {
   note?: string;
 }
 
+export interface AnalysisTransaction {
+  key: string;
+  date: string;
+  merchant: string;
+  amountMinor: number;
+  estimate: boolean;
+}
+
 interface PeriodResult {
   year: number;
   label: string;
@@ -85,6 +93,8 @@ export interface DashboardAnalyses {
     label: string;
     periodMinor: number;
     comparisonMinor: number;
+    periodTransactions: AnalysisTransaction[];
+    comparisonTransactions: AnalysisTransaction[];
   }>;
   classes: Array<{
     key: ExpenseClass;
@@ -289,6 +299,27 @@ function publicPositionKey(label: string, category: string): string {
     .digest("hex").slice(0, 12)}`;
 }
 
+function publicTransactionKey(item: AnalysisItem): string {
+  return `booking-${createHash("sha256")
+    .update(`finance-hub:analysis-transaction:${item.category}:${item.id}`)
+    .digest("hex").slice(0, 14)}`;
+}
+
+function publicTransactions(items: AnalysisItem[], category: string): AnalysisTransaction[] {
+  return items
+    .filter((item) => item.category === category)
+    .map((item) => ({
+      key: publicTransactionKey(item),
+      date: item.date,
+      merchant: positionLabel(item),
+      amountMinor: item.amountMinor,
+      estimate: item.estimate
+    }))
+    .sort((left, right) => right.amountMinor - left.amountMinor
+      || right.date.localeCompare(left.date)
+      || left.merchant.localeCompare(right.merchant, "de"));
+}
+
 function withoutItems(period: PeriodResult): Omit<PeriodResult, "items"> {
   const { items: _items, ...publicPeriod } = period;
   return publicPeriod;
@@ -394,7 +425,9 @@ export function buildDashboardAnalyses(
       .map(([label, amounts]) => ({
         key: `category-${createHash("sha256").update(`analysis:${label}`).digest("hex").slice(0, 10)}`,
         label,
-        ...amounts
+        ...amounts,
+        periodTransactions: publicTransactions(period.items, label),
+        comparisonTransactions: publicTransactions(comparison.items, label)
       }))
       .sort((left, right) => right.periodMinor - left.periodMinor
         || left.label.localeCompare(right.label, "de")),

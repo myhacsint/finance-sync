@@ -1,5 +1,5 @@
 import type { DashboardAssets } from "./dashboard-assets.js";
-import type { DashboardAnalyses } from "./dashboard-analyses.js";
+import type { AnalysisTransaction, DashboardAnalyses } from "./dashboard-analyses.js";
 import type { DashboardRecurringExpenseOptimizations } from "./dashboard-recurring-expenses.js";
 
 const MODEL_YEAR = 2026;
@@ -102,7 +102,11 @@ export interface FireVariableCategoryImpact {
   currentPeriodMinor: number;
   currentPeriodStart: string;
   currentPeriodEnd: string;
+  currentPeriodLabel: string;
   previousYearMinor: number;
+  previousPeriodLabel: string;
+  currentTransactions: AnalysisTransaction[];
+  previousTransactions: AnalysisTransaction[];
   annualizedCurrentMinor: number;
   grossPlanningAnnualMinor: number;
   planningAnnualMinor: number;
@@ -331,7 +335,11 @@ function variableCategoryImpacts(
         currentPeriodMinor: category.periodMinor,
         currentPeriodStart: analyses.period.startDate,
         currentPeriodEnd: analyses.period.endDate,
+        currentPeriodLabel: analyses.period.label,
         previousYearMinor: category.comparisonMinor,
+        previousPeriodLabel: analyses.comparison.label,
+        currentTransactions: category.periodTransactions,
+        previousTransactions: category.comparisonTransactions,
         annualizedCurrentMinor,
         grossPlanningAnnualMinor,
         planningAnnualMinor,

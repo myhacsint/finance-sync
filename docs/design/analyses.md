@@ -86,6 +86,14 @@ strukturelle Ausgaben, unbekannte Zuordnungen, interne Überträge und
 Vermögensbildung bleiben aus diesen beiden zusätzlichen Hebellisten
 ausgeschlossen.
 
+Alle drei Hebelarten verwenden dieselbe Leserichtung: Bezeichnung,
+Kostenbasis, Maßnahme und angesetzte Wirkung. Die Gruppen sind zunächst
+kompakt eingeklappt und weisen Kostenbasis sowie bereits angesetzte Wirkung
+in der Kopfzeile aus. Variable Kategorien öffnen auf Wunsch die zugehörigen
+pseudonymisierten Buchungen des laufenden Analysezeitraums oder des Vorjahrs,
+absteigend nach Einzelbetrag. Die Buchungssummen stimmen centgenau mit der
+jeweiligen Kategorie überein; weitere Buchungen werden progressiv eingeblendet.
+
 ## Datenbedeutung
 
 - Interne Überträge sind keine Ausgaben.

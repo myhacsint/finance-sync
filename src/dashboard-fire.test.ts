@@ -49,7 +49,20 @@ const analyses = {
   changePercent: null,
   unknownMinor: 0,
   unknownPercent: 0,
-  categories: [{ key: "category-aaaaaaaaaa", label: "Urlaub & Reisen", periodMinor: 700_000, comparisonMinor: 900_000 }],
+  categories: [{
+    key: "category-aaaaaaaaaa",
+    label: "Urlaub & Reisen",
+    periodMinor: 700_000,
+    comparisonMinor: 900_000,
+    periodTransactions: [{
+      key: "booking-aaaaaaaaaaaaaa",
+      date: "2026-07-12",
+      merchant: "Ferienhof",
+      amountMinor: 300_000,
+      estimate: false
+    }],
+    comparisonTransactions: []
+  }],
   classes: [],
   positions: [{
     key: "position-bbbbbbbbbbbb",
@@ -129,7 +142,9 @@ test("nur bestätigte geplante oder umgesetzte Entlastungen zählen standardmä�
       key: "category-cccccccccc",
       label: "Sport",
       periodMinor: 70_000,
-      comparisonMinor: 100_000
+      comparisonMinor: 100_000,
+      periodTransactions: [],
+      comparisonTransactions: []
     }],
     positions: [...analyses.positions, {
       key: "position-dddddddddddd",
@@ -159,6 +174,7 @@ test("variable Kategorien und Einmalposten bleiben getrennte FIRE-Hebel", () => 
     normalizedAnnualExpensesMinor: 11_500_000
   }, emptyOptimizations, analyses, 60, [], ["category-aaaaaaaaaa:25"], ["position-bbbbbbbbbbbb"]);
   assert.equal(result.variableCategories[0].annualizedCurrentMinor, 1_200_000);
+  assert.deepEqual(result.variableCategories[0].currentTransactions, analyses.categories[0].periodTransactions);
   assert.equal(result.variableCategories[0].planningAnnualMinor, 1_050_000);
   assert.equal(result.selectedVariableAnnualSavingsMinor, 262_500);
   assert.equal(result.oneTimeCandidates[0].observedMinor, 300_000);

@@ -181,7 +181,13 @@ test("Analysenansicht besitzt ein zugängliches Entscheidungslabor", () => {
   assert.match(html, /Variable Ausgabenkategorien/);
   assert.match(html, /fireCategoryCuts/);
   assert.match(html, /fire-category-cut/);
-  assert.match(html, /Historische Einzelposten als Zukunftsszenario/);
+  assert.match(html, /Historische Einzelposten/);
+  assert.match(html, /Geglättete Jahresbasis/);
+  assert.match(html, /Beobachteter Betrag/);
+  assert.match(html, /Buchungen ·/);
+  assert.match(html, /größte zuerst/);
+  assert.match(html, /fireCategoryPeriod/);
+  assert.match(html, /fire-booking-row/);
   assert.match(html, /fireOneTimeKeys/);
   assert.match(html, /fire-one-time/);
   assert.match(html, /Vergangene Ausgaben werden nicht rückwirkend gespart/);

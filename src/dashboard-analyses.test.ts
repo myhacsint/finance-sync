@@ -111,9 +111,32 @@ test("2025 wird mit Zusatzwerten exakt und ohne Sparen reconciliert", () => {
     ["UNBEKANNT", 2_531_966]
   ]);
   assert.equal(data.classes.reduce((sum, row) => sum + row.amountMinor, 0), data.period.totalMinor);
+  for (const category of data.categories) {
+    assert.equal(
+      category.periodTransactions.reduce((sum, row) => sum + row.amountMinor, 0),
+      category.periodMinor
+    );
+    assert.equal(
+      category.comparisonTransactions.reduce((sum, row) => sum + row.amountMinor, 0),
+      category.comparisonMinor
+    );
+    assert.deepEqual(
+      category.periodTransactions.map((row) => row.amountMinor),
+      category.periodTransactions.map((row) => row.amountMinor).sort((left, right) => right - left)
+    );
+  }
   assert.equal(data.unknownPercent, 22.2);
   assert.equal(data.positions.find((row) => row.label === "Firmenwagen")?.amountMinor, 951_987);
   assert.equal(data.positions.find((row) => row.label === "Lebensmittelhandel")?.amountMinor, 3_038_367);
+  const homelab = data.categories.find((row) => row.label === "Homelab & IT")!;
+  assert.deepEqual(homelab.periodTransactions.map((row) => [
+    row.date,
+    row.merchant,
+    row.amountMinor,
+    row.estimate
+  ]), [["2025-05-01", "Technik-Shop GmbH", 1_824_989, false]]);
+  assert.match(homelab.periodTransactions[0].key, /^booking-[a-f0-9]{14}$/);
+  assert.deepEqual(homelab.comparisonTransactions, []);
   assert.equal(data.comparison.estimate, true);
   assert.equal(data.state, "current");
 });
