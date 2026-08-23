@@ -5,6 +5,7 @@ import {
   applyMerchantAliases,
   buildDashboardReview,
   parseSpendingLineId,
+  resolveReviewCategory,
   updateActualReviewTransaction
 } from "./dashboard-review.js";
 
@@ -90,6 +91,19 @@ test("Buchungs-ID zerlegt Actual-Eltern- und Kindkennung", () => {
     parentId: "solo",
     transactionId: "solo"
   });
+});
+
+test("Review löst die echte Actual-Kategorie über den öffentlichen Schlüssel", () => {
+  const catalog = [
+    { key: "category-food", id: "food-uuid", name: "Lebensmittel", group: "Ausgaben", isIncome: false },
+    { key: "category-salary", id: "salary-uuid", name: "Gehalt", group: "Einnahmen", isIncome: true }
+  ];
+  assert.equal(resolveReviewCategory(catalog, "category-salary")?.id, "salary-uuid");
+  assert.equal(resolveReviewCategory(catalog)?.id, undefined);
+  assert.throws(
+    () => resolveReviewCategory(catalog, "category-missing"),
+    /Kategorie nicht gefunden/
+  );
 });
 
 test("Actual-Writeback setzt Kategorie und legt Payee bei Bedarf an", async () => {

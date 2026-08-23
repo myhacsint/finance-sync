@@ -70,6 +70,17 @@ export function parseSpendingLineId(lineId: string): { parentId: string; transac
   };
 }
 
+export function resolveReviewCategory(
+  catalog: Array<Pick<ReviewCategory, "key" | "id">>,
+  categoryKey?: string
+): Pick<ReviewCategory, "key" | "id"> | undefined {
+  const key = String(categoryKey ?? "").trim();
+  if (!key) return undefined;
+  const match = catalog.find((item) => item.key === key);
+  if (!match) throw new Error("Kategorie nicht gefunden");
+  return match;
+}
+
 export function applyMerchantAliases(
   lines: SpendingLine[],
   aliases: MerchantAlias[]

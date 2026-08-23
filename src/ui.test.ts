@@ -255,3 +255,13 @@ test("Prüfen und Labor sind eigene Flächen mit einer Taxonomie", () => {
   assert.match(html, /Jahresausblick/);
   assert.match(html, /Trajektorie/);
 });
+
+test("alte Analyse-URLs landen auf Prüfen oder Labor", () => {
+  const html = renderUi();
+  assert.match(html, /function migrateLegacyRoutes\(/);
+  assert.match(html, /params\.get\("analysisView"\)/);
+  assert.match(html, /view==="decision-lab"/);
+  assert.match(html, /view==="recurring-expenses"/);
+  assert.match(html, /view==="expense-optimizations"/);
+  assert.match(html, /migrateLegacyRoutes\(\)/);
+});

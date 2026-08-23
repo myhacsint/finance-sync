@@ -103,6 +103,7 @@ import {
 import {
   applyMerchantAliases,
   buildDashboardReview,
+  resolveReviewCategory,
   updateActualReviewTransaction,
   type DashboardReview
 } from "./dashboard-review.js";
@@ -692,11 +693,13 @@ export class FinanceService {
       ?? [...this.reviewCache.values()].flatMap((entry) => entry.value.lines)
         .find((item) => item.id === payload.lineId);
     if (!line) throw new FinanceServiceError("Buchung nicht gefunden. Bitte Prüfen neu laden.", 404);
-    const catalog = [...this.reviewCache.values()].at(-1)?.value.catalog ?? [];
-    const category = payload.categoryKey
-      ? catalog.find((item) => item.key === payload.categoryKey)
-      : undefined;
-    if (payload.categoryKey && !category) {
+    let category: { id: string } | undefined;
+    try {
+      category = resolveReviewCategory(
+        [...this.reviewCache.values()].flatMap((entry) => entry.value.catalog),
+        payload.categoryKey
+      );
+    } catch {
       throw new FinanceServiceError("Kategorie nicht gefunden", 400);
     }
     const password = readSecret("actual-password");
