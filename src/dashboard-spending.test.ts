@@ -386,3 +386,40 @@ test("Arzt zeigt brutto, erstattet und netto", () => {
     reimbursements: 1
   });
 });
+
+test("Pagination blättert Händlergruppen, nicht Einzelbuchungen", () => {
+  const snapshot = {
+    month: "2026-07",
+    monthLabel: "Juli 2026",
+    latestMonth: "2026-07",
+    oldestMonth: "2016-07",
+    generatedAt: "2026-08-23T18:00:00.000Z",
+    accounts: [{ key: "account-one", label: "Giro" }],
+    catalog: [],
+    lines: Array.from({ length: 25 }, (_, index) => ({
+      id: `ins-${index}`,
+      date: "2026-07-15",
+      merchantKey: `merchant-${index}`,
+      merchant: `Versicherung ${index}`,
+      displayMerchant: `Versicherung ${index}`,
+      notes: "",
+      accountKey: "account-one",
+      accountLabel: "Giro",
+      categoryKey: "category-ins",
+      categoryLabel: "Versicherungen",
+      categorized: true,
+      amountMinor: 1_000
+    }))
+  };
+  const first = buildDashboardSpending(snapshot, { page: 1, pageSize: 20 });
+  assert.equal(first.filtered.bookings, 25);
+  assert.equal(first.merchantGroups.length, 20);
+  assert.equal(first.pagination.total, 25);
+  assert.equal(first.pagination.pages, 2);
+  assert.equal(first.pagination.from, 1);
+  assert.equal(first.pagination.to, 20);
+  const second = buildDashboardSpending(snapshot, { page: 2, pageSize: 20 });
+  assert.equal(second.merchantGroups.length, 5);
+  assert.equal(second.pagination.from, 21);
+  assert.equal(second.pagination.to, 25);
+});

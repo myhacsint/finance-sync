@@ -182,6 +182,7 @@ export interface DashboardSpending {
   filtered: {
     totalMinor: number;
     bookings: number;
+    groups: number;
   };
   categories: Array<{
     key: string;
@@ -770,11 +771,13 @@ export function buildDashboardSpending(
     : basis.filter((line) => line.categoryKey === availableCategory);
   const sort = parseSpendingSort(query.sort);
   filteredLines.sort((left, right) => compareSpendingLines(left, right, sort));
+  const allGroups = sortMerchantGroups(groupSpendingMerchants(filteredLines, merchantRules), sort);
   const pageSize = safePageSize(query.pageSize);
-  const pages = Math.max(1, Math.ceil(filteredLines.length / pageSize));
+  const pages = Math.max(1, Math.ceil(allGroups.length / pageSize));
   const requestedPage = Math.max(1, Math.trunc(query.page ?? 1));
   const page = Math.min(requestedPage, pages);
   const start = (page - 1) * pageSize;
+  const merchantGroups = allGroups.slice(start, start + pageSize);
   const totalMinor = snapshot.lines.reduce((sum, line) => sum + line.amountMinor, 0);
   const grossExpenseMinor = snapshot.lines.reduce(
     (sum, line) => sum + Math.max(0, line.amountMinor),
@@ -819,7 +822,8 @@ export function buildDashboardSpending(
     },
     filtered: {
       totalMinor: filteredTotal,
-      bookings: filteredLines.length
+      bookings: filteredLines.length,
+      groups: allGroups.length
     },
     categories: [
       {
@@ -838,15 +842,15 @@ export function buildDashboardSpending(
       category: line.categoryLabel,
       amountMinor: line.amountMinor
     })),
-    merchantGroups: sortMerchantGroups(groupSpendingMerchants(filteredLines, merchantRules), sort),
+    merchantGroups,
     medical: medicalBreakdown(snapshot.lines),
     pagination: {
       page,
       pageSize,
       pages,
-      total: filteredLines.length,
-      from: filteredLines.length ? start + 1 : 0,
-      to: Math.min(start + pageSize, filteredLines.length)
+      total: allGroups.length,
+      from: allGroups.length ? start + 1 : 0,
+      to: Math.min(start + pageSize, allGroups.length)
     }
   };
 }
