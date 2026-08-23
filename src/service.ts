@@ -50,6 +50,7 @@ import {
   buildDashboardSpending,
   readActualSpendingRange,
   readActualSpendingMonth,
+  reviewWindowSelection,
   type ActualSpendingRangeSnapshot,
   type ActualSpendingMonthSnapshot,
   type DashboardSpending,
@@ -105,6 +106,7 @@ import {
   updateActualReviewTransaction,
   type DashboardReview
 } from "./dashboard-review.js";
+import { resolveFireAssumptions } from "./fire-assumptions.js";
 
 export class FinanceServiceError extends Error {
   constructor(message: string, readonly status: number) {
@@ -120,6 +122,8 @@ export class FinanceService {
   private overviewLoading = new Map<string, Promise<DashboardOverview>>();
   private spendingCache = new Map<string, { expiresAt: number; value: ActualSpendingMonthSnapshot }>();
   private spendingLoading = new Map<string, Promise<ActualSpendingMonthSnapshot>>();
+  private reviewCache = new Map<string, { expiresAt: number; value: ActualSpendingRangeSnapshot }>();
+  private reviewLoading = new Map<string, Promise<ActualSpendingRangeSnapshot>>();
   private analysesCache = new Map<string, { expiresAt: number; value: DashboardAnalyses }>();
   private analysesLoading = new Map<string, Promise<DashboardAnalyses>>();
   private savingsBaselineCache?: { expiresAt: number; value: DashboardSavingsBaseline };
@@ -411,7 +415,15 @@ export class FinanceService {
       this.db.listRecurringExpenseOptimizations(),
       { stale: recurring.stale }
     );
-    return buildDashboardDecisionLab(assets, cashflow, optimizations, analyses, request);
+    return buildDashboardDecisionLab(
+      assets,
+      cashflow,
+      optimizations,
+      analyses,
+      request,
+      new Date(),
+      resolveFireAssumptions(this.config.analysis?.fire)
+    );
   }
 
   getDashboardCryptoAnalysis(): DashboardCryptoAnalysis {
@@ -603,26 +615,45 @@ export class FinanceService {
 
   private invalidateReviewCaches(): void {
     this.spendingCache.clear();
+    this.reviewCache.clear();
     this.recurringCache = undefined;
     this.analysesCache.clear();
     this.savingsBaselineCache = undefined;
     this.savingsHistoryCache = undefined;
   }
 
-  async getDashboardReview(force = false): Promise<DashboardReview & {
+  async getDashboardReview(force = false, months = 6): Promise<DashboardReview & {
     recurring: DashboardRecurringExpenses;
     optimizations: DashboardRecurringExpenseOptimizations;
     aliases: Array<{ fromKey: string; toLabel: string }>;
   }> {
-    const spending = await this.getDashboardSpending(force, { page: 1, pageSize: 100 });
-    const snapshot = this.spendingCache.get("latest")?.value
-      ?? this.spendingCache.values().next().value?.value;
-    if (!snapshot) throw new FinanceServiceError("Ausgabendaten fehlen", 503);
+    if (!this.config.actual?.enabled) throw new FinanceServiceError("Actual ist deaktiviert", 400);
+    const window = reviewWindowSelection(new Date(), this.config.timezone, months);
+    const cacheKey = `${window.startDate}:${window.endDate}`;
+    const now = Date.now();
+    let snapshot = this.reviewCache.get(cacheKey);
+    if (force || !snapshot || snapshot.expiresAt <= now) {
+      let loading = this.reviewLoading.get(cacheKey);
+      if (!loading) {
+        loading = this.withActual(() => readActualSpendingRange(
+          this.config.actual!,
+          window.startDate,
+          window.endDate,
+          new Date(),
+          { mode: "review" }
+        ));
+        this.reviewLoading.set(cacheKey, loading);
+      }
+      try {
+        const value = await loading;
+        snapshot = { expiresAt: Date.now() + 5 * 60_000, value };
+        this.reviewCache.set(cacheKey, snapshot);
+      } finally {
+        this.reviewLoading.delete(cacheKey);
+      }
+    }
     const aliases = this.db.listMerchantAliases();
-    const uncategorized = applyMerchantAliases(
-      snapshot.lines.filter((line) => !line.categorized),
-      aliases
-    );
+    const uncategorized = applyMerchantAliases(snapshot.value.lines, aliases);
     const recurring = await this.getDashboardRecurringExpenses(force, { review: "moeglich" });
     const optimizations = await this.getDashboardRecurringExpenseOptimizations(force);
     const optimizationsOpen = optimizations.items.filter((item) =>
@@ -630,11 +661,12 @@ export class FinanceService {
     ).length;
     return {
       ...buildDashboardReview({
-        generatedAt: snapshot.generatedAt,
+        generatedAt: snapshot.value.generatedAt,
         uncategorized,
         recurringOpen: recurring.summary.possible,
         optimizationsOpen,
-        categories: snapshot.catalog.map(({ key, name, group, isIncome }) => ({
+        window,
+        categories: snapshot.value.catalog.map(({ key, name, group, isIncome }) => ({
           key, id: key, name, group, isIncome
         }))
       }),
@@ -655,13 +687,14 @@ export class FinanceService {
     aliases: Array<{ fromKey: string; toLabel: string }>;
   }> {
     if (!this.config.actual?.enabled) throw new FinanceServiceError("Actual ist deaktiviert", 400);
-    await this.getDashboardSpending(false, { page: 1, pageSize: 20 });
-    const snapshot = this.spendingCache.get("latest")?.value
-      ?? [...this.spendingCache.values()].at(-1)?.value;
-    const line = snapshot?.lines.find((item) => item.id === payload.lineId);
+    const review = await this.getDashboardReview(false);
+    const line = review.uncategorized.find((item) => item.id === payload.lineId)
+      ?? [...this.reviewCache.values()].flatMap((entry) => entry.value.lines)
+        .find((item) => item.id === payload.lineId);
     if (!line) throw new FinanceServiceError("Buchung nicht gefunden. Bitte Prüfen neu laden.", 404);
+    const catalog = [...this.reviewCache.values()].at(-1)?.value.catalog ?? [];
     const category = payload.categoryKey
-      ? snapshot!.catalog.find((item) => item.key === payload.categoryKey)
+      ? catalog.find((item) => item.key === payload.categoryKey)
       : undefined;
     if (payload.categoryKey && !category) {
       throw new FinanceServiceError("Kategorie nicht gefunden", 400);

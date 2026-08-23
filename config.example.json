@@ -155,6 +155,12 @@
       "categoryClasses": {},
       "overrides": [],
       "adjustments": []
+    },
+    "fire": {
+      "modelYear": 2026,
+      "erikBirthYear": 1978,
+      "wifeBirthYear": 1983,
+      "inflation": 0.02
     }
   },
   "ghostfolio": {

@@ -57,7 +57,7 @@ bereits angelegt.
 - `GET /api/dashboard/analyses/recurring-expenses`
 - `GET /api/dashboard/analyses/recurring-expenses/:candidate`
 - `PUT /api/decisions/recurring-expenses/:candidate`
-- `GET /api/dashboard/review`
+- `GET /api/dashboard/review` (`?months=3|6|12`, default 6)
 - `PUT /api/dashboard/review/transaction`
 - `PUT /api/dashboard/review/merchant-alias`
 

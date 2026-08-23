@@ -28,13 +28,22 @@ export interface MerchantAlias {
 export interface DashboardReview {
   generatedAt: string;
   taxonomy: RecurringExpenseDecision[];
+  window: {
+    months: number;
+    startDate: string;
+    endDate: string;
+  };
   counts: {
     uncategorized: number;
+    uncategorizedExpenses: number;
+    uncategorizedIncome: number;
     recurringOpen: number;
     optimizationsOpen: number;
     open: number;
   };
   uncategorized: SpendingLine[];
+  uncategorizedExpenses: SpendingLine[];
+  uncategorizedIncome: SpendingLine[];
   categories: ReviewCategory[];
 }
 
@@ -45,6 +54,7 @@ export interface DashboardReviewInput {
   optimizationsOpen: number;
   categories: ReviewCategory[];
   taxonomy?: RecurringExpenseDecision[];
+  window?: { months: number; startDate: string; endDate: string };
 }
 
 export function parseSpendingLineId(lineId: string): { parentId: string; transactionId: string } {
@@ -74,16 +84,23 @@ export function applyMerchantAliases(
 export function buildDashboardReview(input: DashboardReviewInput): DashboardReview {
   const taxonomy = input.taxonomy ?? REVIEW_TAXONOMY;
   const uncategorized = input.uncategorized.filter((item) => !item.categorized);
+  const uncategorizedExpenses = uncategorized.filter((item) => item.direction !== "income");
+  const uncategorizedIncome = uncategorized.filter((item) => item.direction === "income");
   return {
     generatedAt: input.generatedAt,
     taxonomy,
+    window: input.window ?? { months: 1, startDate: "", endDate: "" },
     counts: {
       uncategorized: uncategorized.length,
+      uncategorizedExpenses: uncategorizedExpenses.length,
+      uncategorizedIncome: uncategorizedIncome.length,
       recurringOpen: input.recurringOpen,
       optimizationsOpen: input.optimizationsOpen,
       open: uncategorized.length + input.recurringOpen + input.optimizationsOpen
     },
     uncategorized,
+    uncategorizedExpenses,
+    uncategorizedIncome,
     categories: input.categories
   };
 }

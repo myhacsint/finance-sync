@@ -48,6 +48,24 @@ test("Review-Queue zählt offene Buchungen, Kandidaten und Maßnahmen in einer T
   assert.equal(review.uncategorized[1].merchant, "OpenAI Ireland");
 });
 
+test("Review trennt unkategorisierte Einnahmen und Ausgaben", () => {
+  const review = buildDashboardReview({
+    generatedAt: "2026-08-23T18:00:00.000Z",
+    uncategorized: [
+      line({ id: "e:e", merchant: "Amazon", direction: "expense" }),
+      line({ id: "i:i", merchant: "Gehalt", direction: "income", amountMinor: 350000 })
+    ],
+    recurringOpen: 0,
+    optimizationsOpen: 0,
+    categories: [],
+    window: { months: 6, startDate: "2026-02-01", endDate: "2026-07-31" }
+  });
+  assert.equal(review.counts.uncategorizedExpenses, 1);
+  assert.equal(review.counts.uncategorizedIncome, 1);
+  assert.equal(review.uncategorizedIncome[0].merchant, "Gehalt");
+  assert.equal(review.window.months, 6);
+});
+
 test("Händleraliase bündeln sichtbare Namen ohne Originalbuchung zu verlieren", () => {
   const grouped = applyMerchantAliases([
     line({ id: "a:a", merchantKey: "merchant-amz1", merchant: "Amazon EU SARL" }),

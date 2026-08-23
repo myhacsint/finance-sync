@@ -500,7 +500,8 @@ export function buildDashboardDecisionLab(
   optimizations: DashboardRecurringExpenseOptimizations,
   analyses: DashboardAnalyses,
   request: DecisionLabRequest = {},
-  now = new Date()
+  now = new Date(),
+  fireAssumptions?: import("./fire-assumptions.js").FireAssumptions
 ): DashboardDecisionLab {
   const inputs = decisionLabInputs(request);
   const trendOptions = decisionTrendOptions(cashflow);
@@ -561,7 +562,7 @@ export function buildDashboardDecisionLab(
     liveProjectedAnnualExpensesMinor: annual.projectedYearEnd.expensesMinor,
     normalizedAnnualExpensesMinor: annual.medianFullYear.expensesMinor
   }, optimizations, analyses, inputs.fireTargetAge, inputs.fireActionKeys,
-  inputs.fireCategoryCuts, inputs.fireOneTimeKeys);
+  inputs.fireCategoryCuts, inputs.fireOneTimeKeys, fireAssumptions);
   const warnings = [...assets.warnings];
   if (startingAssetsMinor === null) {
     warnings.push("Das aktuelle Finanzvermögen ist unvollständig; die Projektion ist nicht verfügbar.");

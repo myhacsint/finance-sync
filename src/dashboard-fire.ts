@@ -2,40 +2,7 @@ import { createHash } from "node:crypto";
 import type { DashboardAssets } from "./dashboard-assets.js";
 import type { AnalysisTransaction, DashboardAnalyses } from "./dashboard-analyses.js";
 import type { DashboardRecurringExpenseOptimizations } from "./dashboard-recurring-expenses.js";
-
-const MODEL_YEAR = 2026;
-const END_YEAR = 2071;
-const ERIK_BIRTH_YEAR = 1978;
-const WIFE_BIRTH_YEAR = 1983;
-const HOUSEHOLD_ECONOMIC_MEANS_MINOR = 15_700_000;
-const WIFE_ECONOMIC_MEANS_MINOR = 3_880_000;
-const CHILDCARE_RELIEF_MINOR = 629_100;
-const CHILDCARE_RELIEF_YEAR = 2030;
-const OTHER_CHILD_RELIEF_MINOR = 660_000;
-const OTHER_CHILD_RELIEF_YEAR = 2048;
-const PKV_EMPLOYER_SUBSIDY_MINOR = 608_600;
-const WORK_COSTS_MINOR = 400_000;
-const COMPANY_CAR_ERIK_MINOR = 610_000;
-const COMPANY_CAR_WIFE_MINOR = 342_000;
-const REPLACEMENT_CAR_ONE_MINOR = 600_000;
-const REPLACEMENT_CAR_TWO_MINOR = 1_100_000;
-const WIFE_GKV_MINOR = 850_000;
-const RIESTER_CONTRIBUTION_MINOR = 137_500;
-const AL_CONTRIBUTION_MINOR = 177_000;
-const AL_NOMINAL_MINOR = 17_900_000;
-const AL_YEAR = 2045;
-const INFLATION = 0.02;
-const RENT_VALUE_MINOR = 4_079;
-const ERIK_POINTS_2026 = 42.6;
-const WIFE_POINTS_2026 = 10.3234;
-const ERIK_POINTS_PER_YEAR = 1.9;
-const WIFE_POINTS_PER_YEAR = 1.05;
-const ERIK_NET_FACTOR = 0.85;
-const WIFE_NET_FACTOR = 0.80;
-const BAV_ACCRUED_MINOR = 162_200;
-const BAV_PER_YEAR_MINOR = 16_600;
-const BAV_BASE_YEAR = 2025;
-const BAV_START_YEAR = 2041;
+import { DEFAULT_FIRE_ASSUMPTIONS, type FireAssumptions } from "./fire-assumptions.js";
 
 export interface FireActionImpact {
   key: string;
@@ -174,20 +141,20 @@ interface FirePhaseContext {
   alPayoutMinor: number;
 }
 
-function phaseContext(exitAge: number): FirePhaseContext | null {
-  const exitYear = ERIK_BIRTH_YEAR + exitAge;
-  const wifeExitYear = WIFE_BIRTH_YEAR + 60;
-  const erikPensionYear = ERIK_BIRTH_YEAR + 67;
+function phaseContext(exitAge: number, a: FireAssumptions = DEFAULT_FIRE_ASSUMPTIONS): FirePhaseContext | null {
+  const exitYear = a.erikBirthYear + exitAge;
+  const wifeExitYear = a.wifeBirthYear + a.wifeExitAge;
+  const erikPensionYear = a.erikBirthYear + a.erikPensionAge;
   const wifePensionYear = 2051;
-  if (exitYear <= MODEL_YEAR) return null;
-  const erikPoints = ERIK_POINTS_2026 + ERIK_POINTS_PER_YEAR * (exitYear - MODEL_YEAR);
-  const wifePoints = WIFE_POINTS_2026 + WIFE_POINTS_PER_YEAR * (wifeExitYear - MODEL_YEAR);
-  const erikPensionMinor = erikPoints * RENT_VALUE_MINOR * 12 * ERIK_NET_FACTOR;
-  const wifePensionMinor = wifePoints * RENT_VALUE_MINOR * 12 * WIFE_NET_FACTOR;
-  const bavPensionMinor = BAV_ACCRUED_MINOR
-    + BAV_PER_YEAR_MINOR * Math.max(0, exitYear - BAV_BASE_YEAR);
+  if (exitYear <= a.modelYear) return null;
+  const erikPoints = a.erikPointsBase + a.erikPointsPerYear * (exitYear - a.modelYear);
+  const wifePoints = a.wifePointsBase + a.wifePointsPerYear * (wifeExitYear - a.modelYear);
+  const erikPensionMinor = erikPoints * a.rentValueMinor * 12 * a.erikNetFactor;
+  const wifePensionMinor = wifePoints * a.rentValueMinor * 12 * a.wifeNetFactor;
+  const bavPensionMinor = a.bavAccruedMinor
+    + a.bavPerYearMinor * Math.max(0, exitYear - a.bavBaseYear);
   const alPayoutMinor = Math.round(
-    AL_NOMINAL_MINOR / Math.pow(1 + INFLATION, AL_YEAR - MODEL_YEAR)
+    a.alNominalMinor / Math.pow(1 + a.inflation, a.alYear - a.modelYear)
   );
   return {
     exitYear,
@@ -206,50 +173,52 @@ function capitalAfterYear(
   annualExpensesMinor: number,
   year: number,
   context: FirePhaseContext,
-  realReturnBps: number
+  realReturnBps: number,
+  a: FireAssumptions = DEFAULT_FIRE_ASSUMPTIONS
 ): number {
     const erikWorks = year < context.exitYear;
     const wifeWorks = year < context.wifeExitYear;
     let income = 0;
-    if (erikWorks && wifeWorks) income += HOUSEHOLD_ECONOMIC_MEANS_MINOR;
-    else if (erikWorks) income += HOUSEHOLD_ECONOMIC_MEANS_MINOR - WIFE_ECONOMIC_MEANS_MINOR;
-    else if (wifeWorks) income += WIFE_ECONOMIC_MEANS_MINOR;
+    if (erikWorks && wifeWorks) income += a.householdEconomicMeansMinor;
+    else if (erikWorks) income += a.householdEconomicMeansMinor - a.wifeEconomicMeansMinor;
+    else if (wifeWorks) income += a.wifeEconomicMeansMinor;
     if (year > context.erikPensionYear) income += context.erikPensionMinor;
     else if (year === context.erikPensionYear) income += context.erikPensionMinor * 3 / 12;
     if (year >= context.wifePensionYear) income += context.wifePensionMinor;
-    if (year >= Math.max(BAV_START_YEAR, context.exitYear)) income += context.bavPensionMinor;
+    if (year >= Math.max(a.bavStartYear, context.exitYear)) income += context.bavPensionMinor;
     let need = annualExpensesMinor;
     if (!erikWorks) {
-      need += PKV_EMPLOYER_SUBSIDY_MINOR;
-      need -= WORK_COSTS_MINOR;
-      need -= COMPANY_CAR_ERIK_MINOR;
+      need += a.pkvEmployerSubsidyMinor;
+      need -= a.workCostsMinor;
+      need -= a.companyCarErikMinor;
     }
     if (!wifeWorks) {
-      need -= COMPANY_CAR_WIFE_MINOR;
-      if (year < context.wifePensionYear) need += WIFE_GKV_MINOR;
+      need -= a.companyCarWifeMinor;
+      if (year < context.wifePensionYear) need += a.wifeGkvMinor;
     }
     const lostCars = Number(!erikWorks) + Number(!wifeWorks);
-    if (lostCars === 1) need += REPLACEMENT_CAR_ONE_MINOR;
-    else if (lostCars === 2) need += REPLACEMENT_CAR_TWO_MINOR;
-    if (year >= CHILDCARE_RELIEF_YEAR) need -= CHILDCARE_RELIEF_MINOR;
-    if (year >= OTHER_CHILD_RELIEF_YEAR) need -= OTHER_CHILD_RELIEF_MINOR;
-    if (year < AL_YEAR) need += AL_CONTRIBUTION_MINOR;
-    if (year < BAV_START_YEAR) need += RIESTER_CONTRIBUTION_MINOR;
+    if (lostCars === 1) need += a.replacementCarOneMinor;
+    else if (lostCars === 2) need += a.replacementCarTwoMinor;
+    if (year >= a.childcareReliefYear) need -= a.childcareReliefMinor;
+    if (year >= a.otherChildReliefYear) need -= a.otherChildReliefMinor;
+    if (year < a.alYear) need += a.alContributionMinor;
+    if (year < a.bavStartYear) need += a.riesterContributionMinor;
     return capital * (1 + realReturnBps / 10_000)
-      + income + (year === AL_YEAR ? context.alPayoutMinor : 0) - need;
+      + income + (year === a.alYear ? context.alPayoutMinor : 0) - need;
 }
 
 function sustainable(
   annualExpensesMinor: number,
   exitAge: number,
   bridgeCapitalMinor: number,
-  realReturnBps: number
+  realReturnBps: number,
+  a: FireAssumptions = DEFAULT_FIRE_ASSUMPTIONS
 ): boolean {
-  const context = phaseContext(exitAge);
+  const context = phaseContext(exitAge, a);
   if (!context) return false;
   let capital = bridgeCapitalMinor;
-  for (let year = MODEL_YEAR; year <= END_YEAR; year += 1) {
-    capital = capitalAfterYear(capital, annualExpensesMinor, year, context, realReturnBps);
+  for (let year = a.modelYear; year <= a.endYear; year += 1) {
+    capital = capitalAfterYear(capital, annualExpensesMinor, year, context, realReturnBps, a);
     if (capital < 0) return false;
   }
   return true;
@@ -259,13 +228,14 @@ function projectedCapitalAtExit(
   annualExpensesMinor: number,
   exitAge: number,
   bridgeCapitalMinor: number,
-  realReturnBps: number
+  realReturnBps: number,
+  a: FireAssumptions = DEFAULT_FIRE_ASSUMPTIONS
 ): number | null {
-  const context = phaseContext(exitAge);
+  const context = phaseContext(exitAge, a);
   if (!context) return null;
   let capital = bridgeCapitalMinor;
-  for (let year = MODEL_YEAR; year < context.exitYear; year += 1) {
-    capital = capitalAfterYear(capital, annualExpensesMinor, year, context, realReturnBps);
+  for (let year = a.modelYear; year < context.exitYear; year += 1) {
+    capital = capitalAfterYear(capital, annualExpensesMinor, year, context, realReturnBps, a);
     if (capital < 0) return 0;
   }
   return Math.floor(capital / 10_000) * 10_000;
@@ -274,14 +244,15 @@ function projectedCapitalAtExit(
 function requiredCapitalAtExit(
   annualExpensesMinor: number,
   exitAge: number,
-  realReturnBps: number
+  realReturnBps: number,
+  a: FireAssumptions = DEFAULT_FIRE_ASSUMPTIONS
 ): number | null {
-  const context = phaseContext(exitAge);
+  const context = phaseContext(exitAge, a);
   if (!context) return null;
   const supports = (initialCapital: number): boolean => {
     let capital = initialCapital;
-    for (let year = context.exitYear; year <= END_YEAR; year += 1) {
-      capital = capitalAfterYear(capital, annualExpensesMinor, year, context, realReturnBps);
+    for (let year = context.exitYear; year <= a.endYear; year += 1) {
+      capital = capitalAfterYear(capital, annualExpensesMinor, year, context, realReturnBps, a);
       if (capital < 0) return false;
     }
     return true;
@@ -302,12 +273,13 @@ function capitalGoal(
   annualExpensesMinor: number | null,
   age: number,
   bridgeCapitalMinor: number | null,
-  realReturnBps: number
+  realReturnBps: number,
+  a: FireAssumptions = DEFAULT_FIRE_ASSUMPTIONS
 ): FireCapitalGoal {
   const projected = annualExpensesMinor === null || bridgeCapitalMinor === null ? null
-    : projectedCapitalAtExit(annualExpensesMinor, age, bridgeCapitalMinor, realReturnBps);
+    : projectedCapitalAtExit(annualExpensesMinor, age, bridgeCapitalMinor, realReturnBps, a);
   const required = annualExpensesMinor === null ? null
-    : requiredCapitalAtExit(annualExpensesMinor, age, realReturnBps);
+    : requiredCapitalAtExit(annualExpensesMinor, age, realReturnBps, a);
   return {
     age,
     projectedCapitalMinor: projected,
@@ -320,11 +292,12 @@ function capitalGoal(
 function earliestExitAge(
   annualExpensesMinor: number,
   bridgeCapitalMinor: number | null,
-  realReturnBps: number
+  realReturnBps: number,
+  a: FireAssumptions = DEFAULT_FIRE_ASSUMPTIONS
 ): number | null {
   if (bridgeCapitalMinor === null) return null;
   for (let age = 50; age <= 67; age += 1) {
-    if (sustainable(annualExpensesMinor, age, bridgeCapitalMinor, realReturnBps)) return age;
+    if (sustainable(annualExpensesMinor, age, bridgeCapitalMinor, realReturnBps, a)) return age;
   }
   return null;
 }
@@ -332,14 +305,15 @@ function earliestExitAge(
 function maximumExpensesAtTarget(
   targetAge: number,
   bridgeCapitalMinor: number | null,
-  realReturnBps: number
+  realReturnBps: number,
+  a: FireAssumptions = DEFAULT_FIRE_ASSUMPTIONS
 ): number | null {
   if (bridgeCapitalMinor === null) return null;
   let low = 0;
   let high = 20_000_000;
   while (low < high) {
     const middle = Math.ceil((low + high) / 2);
-    if (sustainable(middle, targetAge, bridgeCapitalMinor, realReturnBps)) low = middle;
+    if (sustainable(middle, targetAge, bridgeCapitalMinor, realReturnBps, a)) low = middle;
     else high = middle - 1;
   }
   return Math.floor(low / 10_000) * 10_000;
@@ -603,14 +577,16 @@ export function buildDashboardFireTracking(
   targetAge = 60,
   requestedActionKeys: string[] = [],
   requestedCategoryCuts: string[] = [],
-  requestedOneTimeKeys: string[] = []
+  requestedOneTimeKeys: string[] = [],
+  assumptions: FireAssumptions = DEFAULT_FIRE_ASSUMPTIONS
 ): DashboardFireTracking {
+  const a = assumptions;
   const safeTargetAge = Math.max(50, Math.min(67, Math.round(targetAge)));
   const bridgeCapital = freeCapitalMinor(assets);
   const trackedAnnualExpensesMinor = annual.liveProjectedAnnualExpensesMinor
     ?? annual.normalizedAnnualExpensesMinor;
   const baselineExitAge = trackedAnnualExpensesMinor === null ? null
-    : earliestExitAge(trackedAnnualExpensesMinor, bridgeCapital, 300);
+    : earliestExitAge(trackedAnnualExpensesMinor, bridgeCapital, 300, a);
   const actions = actionImpacts(optimizations, trackedAnnualExpensesMinor, bridgeCapital, baselineExitAge);
   const allowedKeys = new Set(actions.filter((action) => action.selectable).map((action) => action.key));
   const defaultKeys = actions.filter((action) => action.countedByDefault).map((action) => action.key);
@@ -666,25 +642,26 @@ export function buildDashboardFireTracking(
     : Math.max(0, trackedAnnualExpensesMinor - selectedAnnualSavingsMinor);
   const scenarioBridgeCapitalMinor = bridgeCapital === null ? null
     : bridgeCapital + selectedOneTimeSavingsMinor;
-  const maximumAtTarget = maximumExpensesAtTarget(safeTargetAge, bridgeCapital, 300);
+  const maximumAtTarget = maximumExpensesAtTarget(safeTargetAge, bridgeCapital, 300, a);
   const gap = trackedAnnualExpensesMinor === null || maximumAtTarget === null ? null
     : Math.max(0, trackedAnnualExpensesMinor - maximumAtTarget);
   const returnBand = ([200, 300, 400] as const).map((realReturnBps) => ({
     realReturnBps,
     currentExitAge: trackedAnnualExpensesMinor === null ? null
-      : earliestExitAge(trackedAnnualExpensesMinor, bridgeCapital, realReturnBps),
+      : earliestExitAge(trackedAnnualExpensesMinor, bridgeCapital, realReturnBps, a),
     scenarioExitAge: scenarioAnnualExpensesMinor === null ? null
-      : earliestExitAge(scenarioAnnualExpensesMinor, scenarioBridgeCapitalMinor, realReturnBps)
+      : earliestExitAge(scenarioAnnualExpensesMinor, scenarioBridgeCapitalMinor, realReturnBps, a)
   }));
   const centralCurrent = returnBand.find((row) => row.realReturnBps === 300)!.currentExitAge;
   const centralScenario = returnBand.find((row) => row.realReturnBps === 300)!.scenarioExitAge;
   const currentCapitalGoal = centralCurrent === null ? null
-    : capitalGoal(trackedAnnualExpensesMinor, centralCurrent, bridgeCapital, 300);
+    : capitalGoal(trackedAnnualExpensesMinor, centralCurrent, bridgeCapital, 300, a);
   const targetCapitalGoal = capitalGoal(
     trackedAnnualExpensesMinor,
     safeTargetAge,
     bridgeCapital,
-    300
+    300,
+    a
   );
   const warnings: string[] = [];
   if (bridgeCapital === null) warnings.push("Das frei verfügbare Überbrückungskapital ist unvollständig.");
@@ -696,11 +673,11 @@ export function buildDashboardFireTracking(
     modelVersion: "FIRE-Phasenmodell v3.1",
     estimate: true,
     targetAge: safeTargetAge,
-    currentAge: MODEL_YEAR - ERIK_BIRTH_YEAR,
+    currentAge: a.modelYear - a.erikBirthYear,
     trackedAnnualExpensesMinor,
     normalizedAnnualExpensesMinor: annual.normalizedAnnualExpensesMinor,
     liveProjectedAnnualExpensesMinor: annual.liveProjectedAnnualExpensesMinor,
-    economicMeansAnnualMinor: HOUSEHOLD_ECONOMIC_MEANS_MINOR,
+    economicMeansAnnualMinor: a.householdEconomicMeansMinor,
     bridgeCapitalMinor: bridgeCapital,
     lockedPensionMinor: pensionCapitalMinor(assets),
     selectedRecurringAnnualSavingsMinor,

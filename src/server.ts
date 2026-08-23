@@ -82,7 +82,10 @@ const server = createServer(async (req, res) => {
     }
     if (!authorized(req)) return json(res, 401, { error: "Nicht autorisiert" });
     if (req.method === "GET" && url.pathname === "/api/dashboard/review") {
-      return json(res, 200, await service.getDashboardReview(url.searchParams.get("refresh") === "1"));
+      return json(res, 200, await service.getDashboardReview(
+        url.searchParams.get("refresh") === "1",
+        Number(url.searchParams.get("months") ?? 6)
+      ));
     }
     if (req.method === "PUT" && url.pathname === "/api/dashboard/review/transaction") {
       const payload = await body(req, 8192).catch(() => {

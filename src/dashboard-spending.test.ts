@@ -4,6 +4,7 @@ import type { AppConfig } from "./types.js";
 import {
   buildDashboardSpending,
   readActualSpendingMonth,
+  reviewWindowSelection,
   spendingMonthSelection
 } from "./dashboard-spending.js";
 
@@ -27,6 +28,19 @@ test("letzter vollständiger Monat ist Standard und Zukunft wird abgewiesen", ()
   assert.equal(
     spendingMonthSelection(new Date("2026-08-11T08:00:00Z"), "Europe/Berlin", "2025-12").month,
     "2025-12"
+  );
+});
+
+test("Prüffenster umfasst die letzten vollständigen Monate", () => {
+  assert.deepEqual(
+    reviewWindowSelection(new Date("2026-08-11T08:00:00Z"), "Europe/Berlin", 6),
+    {
+      months: 6,
+      startDate: "2026-02-01",
+      endDate: "2026-07-31",
+      startMonth: "2026-02",
+      endMonth: "2026-07"
+    }
   );
 });
 

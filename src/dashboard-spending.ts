@@ -74,6 +74,7 @@ export interface SpendingLine {
   categoryLabel: string;
   categorized: boolean;
   amountMinor: number;
+  direction?: "expense" | "income";
 }
 
 export interface SpendingCatalogCategory {
@@ -207,6 +208,23 @@ function monthEnd(key: string): string {
   return `${key}-${String(day).padStart(2, "0")}`;
 }
 
+export function reviewWindowSelection(
+  now: Date,
+  timezone: string,
+  months = 6
+): { months: number; startDate: string; endDate: string; startMonth: string; endMonth: string } {
+  const allowed = [3, 6, 12].includes(months) ? months : 6;
+  const { latestMonth } = spendingMonthSelection(now, timezone);
+  const startMonth = shiftSpendingMonth(latestMonth, -(allowed - 1));
+  return {
+    months: allowed,
+    startDate: `${startMonth}-01`,
+    endDate: monthEnd(latestMonth),
+    startMonth,
+    endMonth: latestMonth
+  };
+}
+
 function publicKey(kind: "account" | "category", id: string): string {
   return `${kind}-${createHash("sha256").update(`finance-hub:${kind}:${id}`).digest("hex").slice(0, 12)}`;
 }
@@ -266,7 +284,8 @@ function normalizeLine(
   parent: ActualTransaction,
   account: { key: string; label: string },
   categories: Map<string, ActualCategory>,
-  payees: Map<string, ActualPayee>
+  payees: Map<string, ActualPayee>,
+  mode: "expenses" | "review" = "expenses"
 ): SpendingLine | null {
   const category = transaction.category ? categories.get(transaction.category) : undefined;
   const payee = transaction.payee ? payees.get(transaction.payee) : undefined;
@@ -274,6 +293,34 @@ function normalizeLine(
   const transfer = Boolean(parent.transfer_id || transaction.transfer_id
     || parentPayee?.transfer_acct || payee?.transfer_acct);
   if (transfer || parent.starting_balance_flag || transaction.starting_balance_flag) return null;
+  if (mode === "review") {
+    if (category) return null;
+    const signed = Math.round(transaction.amount);
+    if (signed === 0) return null;
+    const direction = signed > 0 ? "income" : "expense";
+    const amountMinor = Math.abs(signed);
+    const displayMerchant = safeLabel(
+      payee?.name ?? parentPayee?.name ?? transaction.imported_payee
+        ?? parent.imported_payee ?? transaction.notes ?? parent.notes,
+      direction === "income" ? "Unbekannte Einnahme" : "Unbekannter Händler"
+    );
+    const merchant = safeMerchant(displayMerchant);
+    return {
+      id: `${parent.id}:${transaction.id}`,
+      date: transaction.date || parent.date,
+      merchantKey: merchantKey(transaction, parent, payee, parentPayee, merchant),
+      merchant,
+      displayMerchant,
+      notes: safeLabel(transaction.notes ?? parent.notes, ""),
+      accountKey: account.key,
+      accountLabel: account.label,
+      categoryKey: "uncategorized",
+      categoryLabel: "Ohne Kategorie",
+      categorized: false,
+      amountMinor,
+      direction
+    };
+  }
   if (category?.is_income) return null;
   if (transaction.amount >= 0 && !category) return null;
   const amountMinor = -Math.round(transaction.amount);
@@ -297,7 +344,8 @@ function normalizeLine(
     categoryKey: category ? publicKey("category", categoryId) : "uncategorized",
     categoryLabel: safeLabel(category?.name, "Ohne Kategorie"),
     categorized: Boolean(category),
-    amountMinor
+    amountMinor,
+    direction: "expense"
   };
 }
 
@@ -305,7 +353,8 @@ function normalizeTransactions(
   transactions: ActualTransaction[],
   account: { key: string; label: string },
   categories: Map<string, ActualCategory>,
-  payees: Map<string, ActualPayee>
+  payees: Map<string, ActualPayee>,
+  mode: "expenses" | "review" = "expenses"
 ): SpendingLine[] {
   return transactions.flatMap((transaction) => {
     if (transaction.is_child) return [];
@@ -313,7 +362,7 @@ function normalizeTransactions(
       ? transaction.subtransactions
       : [transaction];
     return parts
-      .map((part) => normalizeLine(part, transaction, account, categories, payees))
+      .map((part) => normalizeLine(part, transaction, account, categories, payees, mode))
       .filter((line): line is SpendingLine => Boolean(line));
   });
 }
@@ -352,7 +401,7 @@ export async function readActualSpendingRange(
   startDate: string,
   endDate: string,
   now = new Date(),
-  options: { loadApi?: ActualSpendingApiLoader; password?: string } = {}
+  options: { loadApi?: ActualSpendingApiLoader; password?: string; mode?: "expenses" | "review" } = {}
 ): Promise<ActualSpendingRangeSnapshot> {
   if (!config.enabled) throw new Error("Actual ist deaktiviert");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)
@@ -408,7 +457,7 @@ export async function readActualSpendingRange(
       transactions: await api.getTransactions(account.id, startDate, endDate)
     })));
     const lines = accountTransactions
-      .flatMap(({ account, transactions }) => normalizeTransactions(transactions, account, categories, payees))
+      .flatMap(({ account, transactions }) => normalizeTransactions(transactions, account, categories, payees, options.mode ?? "expenses"))
       .sort((left, right) => right.date.localeCompare(left.date) || right.id.localeCompare(left.id));
     return {
       startDate,

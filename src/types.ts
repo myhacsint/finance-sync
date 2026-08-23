@@ -211,6 +211,7 @@ export interface AppConfig {
       adjustments?: ExpenseAnalysisAdjustment[];
     };
     cryptoPosition?: CryptoPositionAnalysisConfig;
+    fire?: Partial<import("./fire-assumptions.js").FireAssumptions>;
   };
 }
 
