@@ -259,7 +259,10 @@ test("Prüfen und Labor sind eigene Flächen mit einer Taxonomie", () => {
   assert.match(html, /Plan vs\. Ist/);
   assert.match(html, /Cashflow-Modell/);
   assert.match(html, /nur dieses Modell/);
-  assert.match(html, /function monthReasons\(/);
+  assert.match(html, /Szenario speichern/);
+  assert.match(html, /\/api\/dashboard\/scenarios/);
+  assert.match(html, /Modellzahlen sind Schätzungen/);
+  assert.match(html, /function saveNamedScenario\(/);
 });
 
 test("alte Analyse-URLs landen auf Prüfen oder Labor", () => {

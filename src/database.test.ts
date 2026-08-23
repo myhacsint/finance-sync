@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { FinanceDatabase } from "./database.js";
+import { createNamedScenario } from "./named-scenarios.js";
 import { importBundle } from "./importer.js";
 import { exportAll } from "./exporter.js";
 import {
@@ -342,5 +343,19 @@ test("Übertragshinweis wird erkannt, unterschiedliche Währungen jedoch nicht",
   const pairs = findInternalTransferPairs(db, []);
   assert.equal(pairs.length, 1);
   assert.equal(pairs[0].left.sourceTransactionId, "eur-out");
+  db.close();
+});
+
+test("benannte Szenarien bleiben persistiert und löschbar", () => {
+  const root = mkdtempSync(join(tmpdir(), "finance-sync-scenarios-"));
+  const db = new FinanceDatabase(join(root, "finance.sqlite"));
+  const saved = db.saveNamedScenario(createNamedScenario("Abo weg", {
+    monthlyChangeMinor: 20_000,
+    fireTargetAge: 62
+  }, new Date("2026-08-23T18:00:00.000Z")));
+  assert.equal(db.listNamedScenarios()[0].name, "Abo weg");
+  assert.equal(db.listNamedScenarios()[0].inputs.fireTargetAge, 62);
+  assert.equal(db.deleteNamedScenario(saved.id), true);
+  assert.equal(db.listNamedScenarios().length, 0);
   db.close();
 });

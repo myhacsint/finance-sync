@@ -375,3 +375,24 @@ test("aufgebrauchtes Finanzvermögen wird bei null begrenzt statt als Schuld for
   assert.equal(result.series[1].baselineMinor, 0);
   assert.equal(result.series[20].baselineMinor, 0);
 });
+
+test("konfigurierter Mitarbeiteraktienvorteil ist ein eigener monatlicher Zufluss", () => {
+  const baseline = buildDashboardDecisionLab(assets, cashflow, optimizations, analyses);
+  const result = buildDashboardDecisionLab(
+    assets,
+    cashflow,
+    optimizations,
+    analyses,
+    {},
+    new Date("2026-08-22T12:02:00.000Z"),
+    undefined,
+    [],
+    12_000
+  );
+  assert.equal(result.basis.selectedTrend.wealthBuilding?.employeeStockBenefitStatus, "configured");
+  assert.equal(result.basis.selectedTrend.wealthBuilding?.employeeStockBenefitMinor, 12_000);
+  assert.equal(
+    result.basis.projectedMonthlyCapacityMinor,
+    (baseline.basis.projectedMonthlyCapacityMinor ?? 0) + 12_000
+  );
+});

@@ -161,6 +161,10 @@
       "erikBirthYear": 1978,
       "wifeBirthYear": 1983,
       "inflation": 0.02
+    },
+    "savingsBaseline": {
+      "employeeStockBenefitMonthlyMinor": 0,
+      "employeeStockBenefitLabel": "Mitarbeiteraktien / SAP-Rabatt"
     }
   },
   "ghostfolio": {

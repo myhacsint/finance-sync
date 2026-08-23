@@ -34,8 +34,8 @@ export interface DecisionMonthlyWealthBuilding {
   committedInvestingMinor: number;
   earmarkedFundingMinor: number;
   householdContributionMinor: number;
-  employeeStockBenefitMinor: null;
-  employeeStockBenefitStatus: "unavailable";
+  employeeStockBenefitMinor: number | null;
+  employeeStockBenefitStatus: "unavailable" | "configured";
 }
 
 export interface DecisionTrendOption {
@@ -171,6 +171,19 @@ export interface DashboardDecisionLab {
 function clampInteger(value: number | undefined, fallback: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return fallback;
   return Math.max(min, Math.min(max, Math.round(Number(value))));
+}
+
+export function applyEmployeeStockBenefit(
+  wealth: DecisionMonthlyWealthBuilding,
+  monthlyMinor = 0
+): DecisionMonthlyWealthBuilding {
+  if (!Number.isFinite(monthlyMinor) || monthlyMinor <= 0) return wealth;
+  return {
+    ...wealth,
+    committedInvestingMinor: wealth.committedInvestingMinor + monthlyMinor,
+    employeeStockBenefitMinor: monthlyMinor,
+    employeeStockBenefitStatus: "configured"
+  };
 }
 
 export function decisionLabInputs(request: DecisionLabRequest = {}): DashboardDecisionLab["inputs"] {
@@ -510,10 +523,23 @@ export function buildDashboardDecisionLab(
   request: DecisionLabRequest = {},
   now = new Date(),
   fireAssumptions?: import("./fire-assumptions.js").FireAssumptions,
-  merchantRules: MerchantRule[] = DEFAULT_MERCHANT_RULES
+  merchantRules: MerchantRule[] = DEFAULT_MERCHANT_RULES,
+  employeeStockBenefitMonthlyMinor = 0
 ): DashboardDecisionLab {
   const inputs = decisionLabInputs(request);
-  const trendOptions = decisionTrendOptions(cashflow);
+  const stock = Math.max(0, Math.round(employeeStockBenefitMonthlyMinor || 0));
+  const trendOptions = decisionTrendOptions(cashflow).map((option) => ({
+    ...option,
+    wealthBuilding: option.wealthBuilding
+      ? applyEmployeeStockBenefit(option.wealthBuilding, stock)
+      : option.wealthBuilding,
+    averageMonthlyNetMinor: option.averageMonthlyNetMinor === null || stock === 0
+      ? option.averageMonthlyNetMinor
+      : option.averageMonthlyNetMinor + stock,
+    annualizedNetMinor: option.annualizedNetMinor === null || stock === 0
+      ? option.annualizedNetMinor
+      : option.annualizedNetMinor + stock * 12
+  }));
   const selectedTrend = trendOptions.find((option) => option.key === inputs.trendBasis)!;
   const startingAssetsMinor = assets.totalMinor;
   const projectedMonthlyCapacityMinor = selectedTrend.averageMonthlyNetMinor;

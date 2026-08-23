@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { parseNamedScenario, type NamedScenario } from "./named-scenarios.js";
 import type {
   NormalizedActivity,
   NormalizedBalance,
@@ -161,6 +162,13 @@ export class FinanceDatabase {
       CREATE TABLE IF NOT EXISTS merchant_rules (
         pattern TEXT PRIMARY KEY,
         label TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS named_scenarios (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        payload TEXT NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -647,6 +655,30 @@ export class FinanceDatabase {
         updated_at=excluded.updated_at
     `).run(pattern, label, timestamp, timestamp);
     return { pattern, label };
+  }
+
+  listNamedScenarios(): NamedScenario[] {
+    const rows = this.db.prepare(`
+      SELECT payload FROM named_scenarios ORDER BY updated_at DESC, name
+    `).all() as Array<{ payload: string }>;
+    return rows.map((row) => parseNamedScenario(JSON.parse(row.payload)));
+  }
+
+  saveNamedScenario(scenario: NamedScenario): NamedScenario {
+    this.db.prepare(`
+      INSERT INTO named_scenarios(id, name, payload, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        name=excluded.name,
+        payload=excluded.payload,
+        updated_at=excluded.updated_at
+    `).run(scenario.id, scenario.name, JSON.stringify(scenario), scenario.createdAt, scenario.updatedAt);
+    return scenario;
+  }
+
+  deleteNamedScenario(id: string): boolean {
+    const result = this.db.prepare(`DELETE FROM named_scenarios WHERE id = ?`).run(id);
+    return result.changes > 0;
   }
 
   close(): void {

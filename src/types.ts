@@ -203,6 +203,8 @@ export interface AppConfig {
         capturedAt: string;
         source: string;
       }>;
+      employeeStockBenefitMonthlyMinor?: number;
+      employeeStockBenefitLabel?: string;
     };
     expenseStructure?: {
       oldestYear?: number;

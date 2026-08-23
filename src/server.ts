@@ -18,6 +18,7 @@ import { renderUi } from "./ui.js";
 import { buildHealth } from "./health.js";
 import { ManualPreviewStore } from "./manual-workflow.js";
 import { buildDashboardStatus, type SourceStatusRow } from "./dashboard-status.js";
+import type { DecisionLabRequest } from "./dashboard-decision-lab.js";
 
 mkdirSync(paths.data, { recursive: true });
 mkdirSync(paths.archive, { recursive: true });
@@ -106,6 +107,19 @@ const server = createServer(async (req, res) => {
         String(payload.fromKey ?? ""),
         String(payload.toLabel ?? "")
       ));
+    }
+    if (req.method === "GET" && url.pathname === "/api/dashboard/scenarios") {
+      return json(res, 200, { scenarios: service.listNamedScenarios() });
+    }
+    if (req.method === "PUT" && url.pathname === "/api/dashboard/scenarios") {
+      const payload = await body(req, 8192).catch(() => {
+        throw new FinanceServiceError("Ungültiges Szenario", 400);
+      }) as { name?: string } & Record<string, unknown>;
+      return json(res, 200, service.saveNamedScenario(String(payload.name ?? ""), payload as DecisionLabRequest));
+    }
+    const scenarioDelete = /^\/api\/dashboard\/scenarios\/(scenario-[a-f0-9]{16})$/.exec(url.pathname);
+    if (req.method === "DELETE" && scenarioDelete) {
+      return json(res, 200, service.deleteNamedScenario(scenarioDelete[1]));
     }
     if (req.method === "GET" && url.pathname === "/api/dashboard/overview") {
       const requestedMonths = Number(url.searchParams.get("months") ?? 4);

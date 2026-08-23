@@ -108,6 +108,7 @@ import {
   type DashboardReview
 } from "./dashboard-review.js";
 import { resolveFireAssumptions } from "./fire-assumptions.js";
+import { createNamedScenario } from "./named-scenarios.js";
 
 export class FinanceServiceError extends Error {
   constructor(message: string, readonly status: number) {
@@ -424,7 +425,8 @@ export class FinanceService {
       request,
       new Date(),
       resolveFireAssumptions(this.config.analysis?.fire),
-      this.db.listMerchantRules()
+      this.db.listMerchantRules(),
+      this.config.analysis?.savingsBaseline?.employeeStockBenefitMonthlyMinor ?? 0
     );
   }
 
@@ -733,6 +735,24 @@ export class FinanceService {
     const saved = this.db.setMerchantAlias(fromKey, label);
     this.invalidateReviewCaches();
     return saved;
+  }
+
+  listNamedScenarios() {
+    return this.db.listNamedScenarios();
+  }
+
+  saveNamedScenario(name: string, request: DecisionLabRequest) {
+    try {
+      return this.db.saveNamedScenario(createNamedScenario(name, request));
+    } catch (error) {
+      throw new FinanceServiceError(error instanceof Error ? error.message : "Szenario ungültig", 400);
+    }
+  }
+
+  deleteNamedScenario(id: string) {
+    if (!/^scenario-[a-f0-9]{16}$/.test(id)) throw new FinanceServiceError("Szenario nicht gefunden", 404);
+    if (!this.db.deleteNamedScenario(id)) throw new FinanceServiceError("Szenario nicht gefunden", 404);
+    return { id };
   }
 
   private async importSourceBundle(
