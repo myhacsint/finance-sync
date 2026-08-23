@@ -90,6 +90,14 @@ test("FIRE-Port reproduziert die freigegebenen v3.1-Alterswerte", () => {
   assert.equal(at115.lockedPensionMinor, 11_308_900);
   assert.equal(at115.central.currentExitAge, 67);
   assert.equal(at974.central.currentExitAge, 62);
+  assert.equal(at115.central.currentCapitalGoal?.age, 67);
+  assert.equal(at115.central.targetCapitalGoal.age, 60);
+  assert.ok((at115.central.currentCapitalGoal?.projectedCapitalMinor ?? -1)
+    >= (at115.central.currentCapitalGoal?.requiredCapitalMinor ?? 0));
+  assert.ok((at115.central.targetCapitalGoal.projectedCapitalMinor ?? 0)
+    < (at115.central.targetCapitalGoal.requiredCapitalMinor ?? 0));
+  assert.ok((at115.central.currentCapitalGoal?.differenceMinor ?? -1) >= 0);
+  assert.ok((at115.central.targetCapitalGoal.differenceMinor ?? 0) < 0);
   assert.ok((at115.central.maximumExpensesAtTargetMinor ?? 0) >= 9_200_000);
   assert.ok((at115.central.maximumExpensesAtTargetMinor ?? 0) <= 9_300_000);
 });

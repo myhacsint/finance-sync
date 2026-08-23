@@ -174,6 +174,10 @@ test("Analysenansicht besitzt ein zugängliches Entscheidungslabor", () => {
   assert.match(html, /FIRE-Kurs und konkrete Stellschrauben/);
   assert.match(html, /Überbrückungskapital heute/);
   assert.match(html, /Gebundene Vorsorge/);
+  assert.match(html, /Erwartet frei mit/);
+  assert.match(html, /Benötigtes FIRE-Kapital/);
+  assert.match(html, /Kapitallücke/);
+  assert.match(html, /Puffer/);
   assert.match(html, /Reale Ausgabenhebel/);
   assert.match(html, /estimatedAnnualCostMinor/);
   assert.match(html, /Mögliche Entlastung erst nach Prüfung/);
