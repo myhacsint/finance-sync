@@ -118,6 +118,7 @@ import {
   readDashboardWealthHistory,
   type DashboardWealthHistory
 } from "./dashboard-wealth-history.js";
+import type { NewsletterAnalysis } from "./types.js";
 
 export class FinanceServiceError extends Error {
   constructor(message: string, readonly status: number) {
@@ -159,6 +160,19 @@ export class FinanceService {
 
   getSource(id: string): SourceConfig | undefined {
     return this.config.sources.find((source) => source.id === id);
+  }
+
+  getNewsletterAnalyses(limit = 100): {
+    generatedAt: string;
+    state: "empty" | "ready";
+    items: NewsletterAnalysis[];
+  } {
+    const items = this.db.listNewsletterAnalyses(limit);
+    return {
+      generatedAt: new Date().toISOString(),
+      state: items.length === 0 ? "empty" : "ready",
+      items
+    };
   }
 
   private async withActual<T>(operation: () => Promise<T>): Promise<T> {

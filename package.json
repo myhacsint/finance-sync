@@ -11,11 +11,14 @@
     "build": "tsc -p tsconfig.json",
     "start": "node --experimental-sqlite dist/server.js",
     "dev": "tsx --experimental-sqlite src/server.ts",
+    "newsletter:run": "node --experimental-sqlite dist/newsletter-worker.js",
     "test": "npm run build && node --experimental-sqlite --test dist/*.test.js dist/**/*.test.js && PYTHONPATH=python python3 -m unittest python/test_dkb_fints_helper.py",
     "check": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@actual-app/api": "26.7.0"
+    "@actual-app/api": "26.7.0",
+    "agentmail": "^0.5.20",
+    "openai": "^7.5.0"
   },
   "overrides": {
     "adm-zip": "0.6.0"

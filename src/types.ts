@@ -14,6 +14,37 @@ export type SyncState =
   | "WAITING_FOR_USER"
   | "ERROR";
 
+export type NewsletterAnalysisState = "UNREVIEWED" | "REVIEWED" | "DISMISSED";
+
+export interface NewsletterThesis {
+  instrument: string;
+  ticker: string | null;
+  assetClass: string;
+  stance: "BULLISH" | "BEARISH" | "NEUTRAL" | "MIXED";
+  horizon: string | null;
+  entryZone: string | null;
+  targetZone: string | null;
+  invalidation: string | null;
+  catalysts: string[];
+  risks: string[];
+  evidence: string[];
+}
+
+export interface NewsletterAnalysis {
+  messageId: string;
+  inboxId: string;
+  sender: string;
+  subject: string;
+  receivedAt: string;
+  contentHash: string;
+  model: string;
+  summary: string;
+  theses: NewsletterThesis[];
+  uncertainties: string[];
+  state: NewsletterAnalysisState;
+  analyzedAt: string;
+}
+
 export type ExpenseClass =
   | "VERTRAGLICH"
   | "STRUKTURELL"

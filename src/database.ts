@@ -15,6 +15,7 @@ import type {
   RecurringExpenseOptimizationRecord,
   RecurringExpenseOptimizationStatus,
   SyncState
+  , NewsletterAnalysis
 } from "./types.js";
 
 export class FinanceDatabase {
@@ -197,6 +198,20 @@ export class FinanceDatabase {
         provider TEXT NOT NULL CHECK(provider='Ghostfolio'),
         PRIMARY KEY(valuation_date, source_id, account_id)
       );
+      CREATE TABLE IF NOT EXISTS newsletter_analyses (
+        message_id TEXT PRIMARY KEY,
+        inbox_id TEXT NOT NULL,
+        sender TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        received_at TEXT NOT NULL,
+        content_hash TEXT NOT NULL,
+        model TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        state TEXT NOT NULL CHECK(state IN ('UNREVIEWED', 'REVIEWED', 'DISMISSED')),
+        analyzed_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_newsletter_analyses_content_hash
+        ON newsletter_analyses(content_hash);
       CREATE INDEX IF NOT EXISTS idx_transactions_account_date
         ON transactions(account_id, booked_at);
       CREATE INDEX IF NOT EXISTS idx_balances_account_date
@@ -230,6 +245,53 @@ export class FinanceDatabase {
     if (!monthCloseColumns.has("checklist_json")) {
       this.db.exec("ALTER TABLE month_closes ADD COLUMN checklist_json TEXT");
     }
+  }
+
+  hasNewsletterAnalysis(messageId: string, contentHash: string): boolean {
+    return Boolean(this.db.prepare(`
+      SELECT 1 FROM newsletter_analyses
+      WHERE message_id = ? OR content_hash = ? LIMIT 1
+    `).get(messageId, contentHash));
+  }
+
+  saveNewsletterAnalysis(analysis: NewsletterAnalysis): NewsletterAnalysis {
+    this.db.prepare(`
+      INSERT INTO newsletter_analyses(
+        message_id, inbox_id, sender, subject, received_at, content_hash,
+        model, payload_json, state, analyzed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(message_id) DO UPDATE SET
+        inbox_id=excluded.inbox_id,
+        sender=excluded.sender,
+        subject=excluded.subject,
+        received_at=excluded.received_at,
+        content_hash=excluded.content_hash,
+        model=excluded.model,
+        payload_json=excluded.payload_json,
+        state=excluded.state,
+        analyzed_at=excluded.analyzed_at
+    `).run(
+      analysis.messageId,
+      analysis.inboxId,
+      analysis.sender,
+      analysis.subject,
+      analysis.receivedAt,
+      analysis.contentHash,
+      analysis.model,
+      JSON.stringify(analysis),
+      analysis.state,
+      analysis.analyzedAt
+    );
+    return analysis;
+  }
+
+  listNewsletterAnalyses(limit = 100): NewsletterAnalysis[] {
+    const safeLimit = Math.max(1, Math.min(500, Math.trunc(limit)));
+    const rows = this.db.prepare(`
+      SELECT payload_json FROM newsletter_analyses
+      ORDER BY received_at DESC, analyzed_at DESC LIMIT ?
+    `).all(safeLimit) as Array<{ payload_json: string }>;
+    return rows.map((row) => JSON.parse(row.payload_json) as NewsletterAnalysis);
   }
 
   assetAccountSources(): Map<string, string> {

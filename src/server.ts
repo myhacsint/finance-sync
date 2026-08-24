@@ -232,6 +232,11 @@ const server = createServer(async (req, res) => {
         await service.getDashboardWealthHistory(url.searchParams.get("refresh") === "1")
       );
     }
+    if (req.method === "GET" && url.pathname === "/api/dashboard/investment-newsletters") {
+      const requested = Number(url.searchParams.get("limit") ?? 100);
+      const limit = Number.isSafeInteger(requested) ? Math.max(1, Math.min(500, requested)) : 100;
+      return json(res, 200, service.getNewsletterAnalyses(limit));
+    }
     if (req.method === "GET" && url.pathname === "/api/dashboard/spending") {
       const requestedMonth = url.searchParams.get("month") ?? undefined;
       const month = requestedMonth && /^\d{4}-(0[1-9]|1[0-2])$/.test(requestedMonth)
