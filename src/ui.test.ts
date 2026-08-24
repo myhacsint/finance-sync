@@ -10,8 +10,9 @@ function renderUi(): string {
 }
 
 test("externes UI-JavaScript ist syntaktisch gültig", () => {
-  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.43\.2" defer><\/script>/);
+  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.43\.3" defer><\/script>/);
   assert.match(clientSource, /match\(\/\^\(\\d\{4\}\)-\(\\d\{2\}\)\$\//);
+  assert.doesNotMatch(clientSource, /match\(\/\^\(\\\\d\{4\}\)-\(\\\\d\{2\}\)\$\//);
   assert.doesNotThrow(() => new Function(clientSource));
 });
 

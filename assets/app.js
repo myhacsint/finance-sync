@@ -138,7 +138,7 @@ function setSpendingOffset(offset){
 }
 function shiftSpending(months){setSpendingOffset(spendingSelection().offset+Number(months))}
 function shiftMonthKey(key,offset){
-  const match=String(key||"").match(/^(\\d{4})-(\\d{2})$/);
+  const match=String(key||"").match(/^(\d{4})-(\d{2})$/);
   if(!match)return "";
   const date=new Date(Date.UTC(Number(match[1]),Number(match[2])-1+Number(offset),1));
   return date.getUTCFullYear()+"-"+String(date.getUTCMonth()+1).padStart(2,"0");
@@ -796,7 +796,7 @@ function analysisYearOptions(years,selected,excluded){
 }
 function analysisEstimate(value){return ''}
 function analysisMonthLabel(value){
-  const match=String(value||"").match(/^(\\d{4})-(\\d{2})$/);
+  const match=String(value||"").match(/^(\d{4})-(\d{2})$/);
   if(!match)return esc(value);
   return new Intl.DateTimeFormat("de-DE",{month:"short",year:"numeric",timeZone:"UTC"}).format(new Date(Date.UTC(Number(match[1]),Number(match[2])-1,1)));
 }
@@ -1370,7 +1370,7 @@ async function continueDkb(id){try{msg("DKB-App-Freigabe wird geprüft …");con
 async function exportNow(){try{await call("/api/export",{method:"POST"});msg("CSV-Dateien wurden aktualisiert.")}catch(error){msg(error.message,true)}}
 async function reconcile(){try{const result=await call("/api/reconcile",{method:"POST"});msg(result.message)}catch(error){msg(error.message,true)}}
 function money(minor,currency="EUR"){return new Intl.NumberFormat("de-DE",{style:"currency",currency}).format(Number(minor)/100)}
-function decimal(atomic,decimals){const raw=String(atomic||"0").padStart(decimals+1,"0");const whole=raw.slice(0,-decimals)||"0";const fraction=decimals?","+raw.slice(-decimals):"";return whole.replace(/\\B(?=(\\d{3})+(?!\\d))/g,".")+fraction}
+function decimal(atomic,decimals){const raw=String(atomic||"0").padStart(decimals+1,"0");const whole=raw.slice(0,-decimals)||"0";const fraction=decimals?","+raw.slice(-decimals):"";return whole.replace(/\B(?=(\d{3})+(?!\d))/g,".")+fraction}
 async function loadManualSources(){
   try{const data=await call("/api/manual-workflow/sources");const section=document.getElementById("manual-section");if(!data.sources.length){section.hidden=true;return}section.hidden=false;document.getElementById("manual-source").innerHTML=data.sources.map(source=>'<option value="'+esc(source.id)+'">'+esc(source.label)+'</option>').join("")}
   catch(error){msg(error.message,true)}
