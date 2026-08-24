@@ -241,19 +241,25 @@ export async function readGhostfolioAssets(
         }>;
       };
       holdingsByAccount[financeAccountId] = Object.values(holdingPayload.holdings ?? {})
-        .map((holding) => ({
-          label: String(holding.assetProfile?.name || holding.assetProfile?.symbol || "Position"),
-          symbol: String(holding.assetProfile?.symbol || ""),
-          quantity: Number(holding.quantity),
-          marketPriceMinor: Math.round(Number(holding.marketPrice) * 100),
-          valueMinor: Math.round(Number(holding.valueInBaseCurrency) * 100),
-          investmentMinor: Math.round(Number(holding.investment) * 100),
-          netPerformanceMinor: Math.round(Number(holding.netPerformance) * 100),
-          netPerformancePercent: Number(holding.netPerformancePercent) * 100,
-          grossPerformanceMinor: Math.round(Number(holding.grossPerformance) * 100),
-          dividendMinor: Math.round(Number(holding.dividend) * 100),
-          currency: String(holding.assetProfile?.currency || "EUR")
-        }))
+        .map((holding) => {
+          const investmentMinor = Math.round(Number(holding.investment) * 100);
+          const netPerformanceMinor = Math.round(Number(holding.netPerformance) * 100);
+          return {
+            label: String(holding.assetProfile?.name || holding.assetProfile?.symbol || "Position"),
+            symbol: String(holding.assetProfile?.symbol || ""),
+            quantity: Number(holding.quantity),
+            marketPriceMinor: Math.round(Number(holding.marketPrice) * 100),
+            valueMinor: Math.round(Number(holding.valueInBaseCurrency) * 100),
+            investmentMinor,
+            netPerformanceMinor,
+            netPerformancePercent: investmentMinor !== 0
+              ? netPerformanceMinor / investmentMinor * 100
+              : Number.NaN,
+            grossPerformanceMinor: Math.round(Number(holding.grossPerformance) * 100),
+            dividendMinor: Math.round(Number(holding.dividend) * 100),
+            currency: String(holding.assetProfile?.currency || "EUR")
+          };
+        })
         .filter((holding) => holding.symbol
           && Number.isFinite(holding.quantity)
           && Number.isFinite(holding.marketPriceMinor)

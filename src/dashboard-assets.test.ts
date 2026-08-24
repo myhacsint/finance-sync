@@ -189,7 +189,7 @@ test("Ghostfolio-Einzelpositionen werden nur für angeforderte Depots geladen", 
     valueMinor: 637_976,
     investmentMinor: 588_856,
     netPerformanceMinor: 36_884,
-    netPerformancePercent: 6.264,
+    netPerformancePercent: 36_884 / 588_856 * 100,
     grossPerformanceMinor: 38_884,
     dividendMinor: 3_500,
     currency: "EUR"
