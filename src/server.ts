@@ -82,7 +82,7 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "GET" && url.pathname === "/") {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8", ...securityHeaders });
-      return res.end(renderUi());
+      return res.end(renderUi(config.publicBaseUrl));
     }
     if (req.method === "GET" && url.pathname === "/assets/app.js") {
       res.writeHead(200, {

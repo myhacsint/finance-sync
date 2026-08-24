@@ -69,9 +69,22 @@ test("Fehler in einer automatischen Quelle wird als Handlungsbedarf gezeigt", ()
 
 test("Freigabeaufgabe ist sichtbar gelb, auch wenn das System gesund ist", () => {
   const waiting = rows.map((row) => row.id === "dkb-depots"
-    ? { ...row, state: "WAITING_FOR_USER" as const, message: "Freigabe erforderlich" }
+    ? { ...row, state: "WAITING_FOR_USER" as const, message: "Freigabe erforderlich", last_success_at: "2026-07-31T10:05:00.000Z" }
     : row);
   const result = buildDashboardStatus(waiting, config, health);
   assert.equal(result.headline, "Eine Quelle wartet auf deine Freigabe");
   assert.equal(result.overall, "warning");
+});
+
+test("offene DKB-Aktualisierung entwertet einen frischen Depotstand nicht", () => {
+  const waiting = rows.map((row) => row.id === "dkb-depots"
+    ? { ...row, state: "WAITING_FOR_USER" as const, message: "Freigabe erforderlich" }
+    : row);
+  const result = buildDashboardStatus(waiting, config, health);
+  const depot = result.automatic.find((source) => source.id === "dkb-depots");
+  assert.equal(result.headline, "Alle automatischen Quellen sind aktuell");
+  assert.equal(result.overall, "ok");
+  assert.equal(depot?.status, "current");
+  assert.equal(depot?.actionPending, true);
+  assert.match(depot?.message ?? "", /nächste Aktualisierung/);
 });

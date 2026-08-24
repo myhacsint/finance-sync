@@ -14,6 +14,14 @@ export type AssetPositionState = "current" | "confirmed" | "stale" | "error" | "
 export interface GhostfolioAssetSnapshot {
   capturedAt?: string;
   valuesByAccount: Record<string, number>;
+  holdingsByAccount?: Record<string, Array<{
+    label: string;
+    symbol: string;
+    quantity: number;
+    marketPriceMinor: number;
+    valueMinor: number;
+    currency: string;
+  }>>;
 }
 
 export interface DashboardAssets {
@@ -53,6 +61,14 @@ export interface DashboardAssets {
     acquisitionCostMinor?: number;
     acquisitionCostEstimated?: boolean;
     valuationSource?: string;
+    holdings?: Array<{
+      label: string;
+      symbol: string;
+      quantity: number;
+      marketPriceMinor: number;
+      valueMinor: number;
+      currency: string;
+    }>;
   }>;
   warnings: string[];
 }
@@ -156,7 +172,7 @@ function weakestState(states: AssetPositionState[]): AssetPositionState {
 
 export async function readGhostfolioAssets(
   config: NonNullable<AppConfig["ghostfolio"]>,
-  options: { fetcher?: typeof fetch; securityToken?: string } = {}
+  options: { fetcher?: typeof fetch; securityToken?: string; holdingAccountIds?: string[] } = {}
 ): Promise<GhostfolioAssetSnapshot> {
   const securityToken = options.securityToken ?? readSecret("ghostfolio-security-token");
   if (!securityToken) throw new Error("Ghostfolio-Zugang ist nicht verfügbar");
@@ -184,7 +200,45 @@ export async function readGhostfolioAssets(
     const value = payload.accounts?.[ghostfolioAccountId]?.valueInBaseCurrency;
     if (Number.isFinite(value)) valuesByAccount[financeAccountId] = Math.round(Number(value) * 100);
   }
-  return { capturedAt: payload.createdAt, valuesByAccount };
+  const holdingsByAccount: NonNullable<GhostfolioAssetSnapshot["holdingsByAccount"]> = {};
+  await Promise.all((options.holdingAccountIds ?? []).map(async (financeAccountId) => {
+    const ghostfolioAccountId = config.accountMap[financeAccountId];
+    if (!ghostfolioAccountId) return;
+    try {
+      const url = new URL("/api/v1/portfolio/details", config.serverUrl);
+      url.searchParams.set("accounts", ghostfolioAccountId);
+      const holdingResponse = await fetcher(url, {
+        headers: { authorization: `Bearer ${auth.authToken}` },
+        signal: AbortSignal.timeout(60_000)
+      });
+      if (!holdingResponse.ok) return;
+      const holdingPayload = await holdingResponse.json() as {
+        holdings?: Record<string, {
+          quantity?: number;
+          marketPrice?: number;
+          valueInBaseCurrency?: number;
+          assetProfile?: { name?: string; symbol?: string; currency?: string };
+        }>;
+      };
+      holdingsByAccount[financeAccountId] = Object.values(holdingPayload.holdings ?? {})
+        .map((holding) => ({
+          label: String(holding.assetProfile?.name || holding.assetProfile?.symbol || "Position"),
+          symbol: String(holding.assetProfile?.symbol || ""),
+          quantity: Number(holding.quantity),
+          marketPriceMinor: Math.round(Number(holding.marketPrice) * 100),
+          valueMinor: Math.round(Number(holding.valueInBaseCurrency) * 100),
+          currency: String(holding.assetProfile?.currency || "EUR")
+        }))
+        .filter((holding) => holding.symbol
+          && Number.isFinite(holding.quantity)
+          && Number.isFinite(holding.marketPriceMinor)
+          && Number.isFinite(holding.valueMinor))
+        .sort((left, right) => right.valueMinor - left.valueMinor);
+    } catch {
+      // The depot total remains useful when only the optional drill-down is unavailable.
+    }
+  }));
+  return { capturedAt: payload.createdAt, valuesByAccount, holdingsByAccount };
 }
 
 export function buildDashboardAssets(
@@ -253,6 +307,9 @@ export function buildDashboardAssets(
             ? pensionMarketValue ? "Ghostfolio-Marktwert" : "Bestätigter Wert"
             : "Ghostfolio",
         status,
+        holdings: area === "depots" && row
+          ? marketData?.holdingsByAccount?.[row.account_id]
+          : undefined,
         confirmedAmountMinor: area === "pensions" && Number.isFinite(cashValue)
           ? Number(cashValue)
           : undefined,

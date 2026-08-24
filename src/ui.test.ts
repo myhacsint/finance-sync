@@ -10,7 +10,7 @@ function renderUi(): string {
 }
 
 test("externes UI-JavaScript ist syntaktisch gültig", () => {
-  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.39\.0" defer><\/script>/);
+  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.41\.0" defer><\/script>/);
   assert.doesNotThrow(() => new Function(clientSource));
 });
 
@@ -119,6 +119,8 @@ test("Vermögensansicht besitzt Aufteilung, Bereichsfilter und mobile Bestände"
   assert.match(html, /Bestände/);
   assert.match(html, /assets-table/);
   assert.match(html, /assets-mobile-list/);
+  assert.match(html, /assetHoldingRows/);
+  assert.match(html, /toggleAssetHoldings/);
   assert.match(html, /Basis: letzte verfügbare Werte/);
   assert.match(html, /Konten, Anlagen und Vorsorge mit nachvollziehbaren Stichtagen/);
 });
@@ -265,6 +267,13 @@ test("Verwaltungstoken bleibt nur für die Browsersitzung gespeichert", () => {
   assert.doesNotMatch(html, /localStorage\.setItem\("financeToken"/);
 });
 
+test("Actual und Ghostfolio sind als sichere Direktlinks erreichbar", () => {
+  const html = renderShell("https://homeserver.example:8080");
+  assert.match(html, /href="https:\/\/homeserver\.example:5006\/"[^>]+target="_blank"[^>]+>Actual Budget<\/a>/);
+  assert.match(html, /href="https:\/\/homeserver\.example:3333\/"[^>]+target="_blank"[^>]+>Ghostfolio<\/a>/);
+  assert.doesNotMatch(html, /Direktlink folgt/);
+});
+
 test("Prüfen und Labor sind eigene Flächen mit einer Taxonomie", () => {
   const html = renderUi();
   assert.match(html, /label:"Prüfen"/);
@@ -274,6 +283,8 @@ test("Prüfen und Labor sind eigene Flächen mit einer Taxonomie", () => {
   assert.match(html, /Eine Taxonomie/);
   assert.match(html, /In Actual speichern/);
   assert.match(html, /Ausgaben ohne Kategorie/);
+  assert.match(html, /review-booking-list/);
+  assert.match(stylesheetSource, /\.review-booking \{[^}]*border:/);
   assert.match(html, /Einnahmen ohne Kategorie/);
   assert.match(html, /Händler bündeln als/);
   assert.match(html, /function renderReview\(/);

@@ -23,6 +23,7 @@ export interface DashboardSource {
   lastSuccessAt?: string;
   nextDueAt?: string;
   supportsDkbApproval: boolean;
+  actionPending: boolean;
 }
 
 export interface DashboardTask extends DashboardSource {
@@ -98,21 +99,34 @@ function defined(value: string | null | undefined): string | undefined {
   return value || undefined;
 }
 
+function hasRecentDkbStand(row: SourceStatusRow, now: Date): boolean {
+  if (row.kind !== "dkb-fints" || row.state !== "WAITING_FOR_USER" || !row.last_success_at) {
+    return false;
+  }
+  const age = now.getTime() - new Date(row.last_success_at).getTime();
+  return Number.isFinite(age) && age >= 0 && age <= 7 * 24 * 60 * 60_000;
+}
+
 function toDashboardSource(
   row: SourceStatusRow,
-  source: SourceConfig | undefined
+  source: SourceConfig | undefined,
+  now: Date
 ): DashboardSource {
+  const recentDkbStand = hasRecentDkbStand(row, now);
   return {
     id: row.id,
     label: sourceLabel(source, row),
     kind: row.kind,
     state: row.state,
-    status: sourceStatus(row.state),
-    message: row.message?.trim() || "Noch kein Abruf ausgeführt",
+    status: recentDkbStand ? "current" : sourceStatus(row.state),
+    message: recentDkbStand
+      ? "Datenstand ist verfügbar; die nächste Aktualisierung wartet auf Freigabe"
+      : row.message?.trim() || "Noch kein Abruf ausgeführt",
     lastAttemptAt: defined(row.last_attempt_at),
     lastSuccessAt: defined(row.last_success_at),
     nextDueAt: defined(row.next_due_at),
-    supportsDkbApproval: row.kind === "dkb-fints"
+    supportsDkbApproval: row.kind === "dkb-fints",
+    actionPending: row.state === "WAITING_FOR_USER"
   };
 }
 
@@ -122,6 +136,7 @@ export function buildDashboardStatus(
   health: HealthReport,
   manualValueDates: Record<string, string | undefined> = {}
 ): DashboardStatus {
+  const now = new Date(health.time);
   const configById = new Map(config.sources.map((source) => [source.id, source]));
   const sourceOrder = new Map(config.sources.map((source, index) => [source.id, index]));
   const enabled = rows
@@ -132,11 +147,11 @@ export function buildDashboardStatus(
     );
   const automatic = enabled
     .filter((row) => row.kind !== "manual")
-    .map((row) => toDashboardSource(row, configById.get(row.id)));
+    .map((row) => toDashboardSource(row, configById.get(row.id), now));
   const manual = enabled
     .filter((row) => row.kind === "manual")
     .map((row) => ({
-      ...toDashboardSource(row, configById.get(row.id)),
+      ...toDashboardSource(row, configById.get(row.id), now),
       valueDate: manualValueDates[row.id]
     }));
   const historicalRows = rows.filter((row) => !Boolean(row.enabled));

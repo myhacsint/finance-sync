@@ -1,4 +1,15 @@
-export function renderUi(): string {
+function connectedAppUrl(publicBaseUrl: string | undefined, port: number): string {
+  const url = new URL(publicBaseUrl || "http://localhost:8080");
+  url.port = String(port);
+  url.pathname = "/";
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
+export function renderUi(publicBaseUrl?: string): string {
+  const actualUrl = connectedAppUrl(publicBaseUrl, 5006);
+  const ghostfolioUrl = connectedAppUrl(publicBaseUrl, 3333);
   return `<!doctype html>
 <html lang="de">
 <head>
@@ -7,7 +18,7 @@ export function renderUi(): string {
   <meta name="theme-color" content="#080d19">
   <link rel="icon" type="image/png" href="/assets/finance-hub-mark.png">
   <title>Übersicht · Finance Hub</title>
-  <link rel="stylesheet" href="/assets/app.css?v=0.39.0">
+  <link rel="stylesheet" href="/assets/app.css?v=0.41.0">
 </head>
 <body>
   <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
@@ -17,8 +28,8 @@ export function renderUi(): string {
       <nav><ul class="nav-list" id="desktop-nav"></ul></nav>
       <div class="nav-spacer"></div>
       <div class="side-links" aria-label="Verbundene Anwendungen">
-        <button class="nav-item" type="button" disabled title="Direktlink folgt in einem späteren Schritt">Actual Budget</button>
-        <button class="nav-item" type="button" disabled title="Direktlink folgt in einem späteren Schritt">Ghostfolio</button>
+        <a class="nav-item" href="${actualUrl}" target="_blank" rel="noopener noreferrer" title="Actual Budget in einem neuen Tab öffnen">Actual Budget</a>
+        <a class="nav-item" href="${ghostfolioUrl}" target="_blank" rel="noopener noreferrer" title="Ghostfolio in einem neuen Tab öffnen">Ghostfolio</a>
       </div>
     </aside>
     <main class="content" id="main-content">
@@ -51,7 +62,7 @@ export function renderUi(): string {
     </main>
     <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile Hauptnavigation"></nav>
   </div>
-<script src="/assets/app.js?v=0.39.0" defer></script>
+<script src="/assets/app.js?v=0.41.0" defer></script>
 </body>
 </html>`;
 }

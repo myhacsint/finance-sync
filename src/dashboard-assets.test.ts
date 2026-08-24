@@ -121,6 +121,50 @@ test("Ghostfolio-Konten werden auf FinanceSync-Konten abgebildet", async () => {
   assert.equal(snapshot.valuesByAccount["depot-private"], 3_500_013);
 });
 
+test("Ghostfolio-Einzelpositionen werden nur für angeforderte Depots geladen", async () => {
+  const requests: string[] = [];
+  const snapshot = await readGhostfolioAssets(config.ghostfolio!, {
+    securityToken: "security-token",
+    holdingAccountIds: ["depot-private"],
+    fetcher: async (input) => {
+      const url = new URL(String(input));
+      requests.push(url.pathname + url.search);
+      if (url.pathname.endsWith("/auth/anonymous")) {
+        return new Response(JSON.stringify({ authToken: "bearer" }), { status: 200 });
+      }
+      if (url.searchParams.has("accounts")) {
+        return new Response(JSON.stringify({
+          holdings: {
+            sap: {
+              quantity: 34,
+              marketPrice: 187.64,
+              valueInBaseCurrency: 6379.76,
+              assetProfile: { name: "SAP SE", symbol: "SAP.DE", currency: "EUR" }
+            }
+          }
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify({
+        createdAt: "2026-08-11T08:30:00Z",
+        accounts: { "gf-depot-private": { valueInBaseCurrency: 6379.76 } }
+      }), { status: 200 });
+    }
+  });
+  assert.deepEqual(requests, [
+    "/api/v1/auth/anonymous",
+    "/api/v1/portfolio/details",
+    "/api/v1/portfolio/details?accounts=gf-depot-private"
+  ]);
+  assert.deepEqual(snapshot.holdingsByAccount?.["depot-private"], [{
+    label: "SAP SE",
+    symbol: "SAP.DE",
+    quantity: 34,
+    marketPriceMinor: 18_764,
+    valueMinor: 637_976,
+    currency: "EUR"
+  }]);
+});
+
 test("physisches Gold wird separat und ohne Ghostfolio-Doppelzählung ausgewiesen", () => {
   const goldConfig: AppConfig = {
     ...config,

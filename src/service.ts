@@ -288,7 +288,11 @@ export class FinanceService {
       const generatedAt = new Date();
       const market = await Promise.allSettled([
         this.config.ghostfolio && Object.keys(this.config.ghostfolio.accountMap).length > 0
-          ? readGhostfolioAssets(this.config.ghostfolio)
+          ? readGhostfolioAssets(this.config.ghostfolio, {
+              holdingAccountIds: this.config.sources
+                .filter((source) => source.enabled && source.kind === "dkb-fints")
+                .flatMap((source) => dkbAccountIds(source))
+            })
           : Promise.reject(new Error("Ghostfolio ist deaktiviert"))
       ]);
       const value = buildDashboardAssets(this.db, this.config, market[0], generatedAt);
