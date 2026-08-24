@@ -1,13 +1,12 @@
 import { pathToFileURL } from "node:url";
 import { AgentMailClient } from "agentmail";
-import OpenAI from "openai";
 import { loadConfig, paths, readSecret } from "./config.js";
 import { FinanceDatabase } from "./database.js";
+import { analyzeNewsletterBatchWithCodex } from "./codex-newsletter-analyzer.js";
+import { newsletterPlainText } from "./newsletter-content.js";
 import {
   buildNewsletterAnalysis,
-  newsletterAnalysisSchema,
   newsletterContentHash,
-  validateNewsletterModelResult,
   type NewsletterMessage
 } from "./newsletter-analysis.js";
 
@@ -15,6 +14,10 @@ interface WorkerOptions {
   inboxId: string;
   senderFilters: string[];
   model: string;
+  fallbackModel?: string;
+  reasoningEffort?: string;
+  searchQuery?: string;
+  after?: string;
   limit?: number;
 }
 
@@ -24,19 +27,32 @@ export async function runNewsletterWorker(options: WorkerOptions): Promise<{
   skipped: number;
 }> {
   const agentMailKey = readSecret("agentmail-api-key");
-  const openAiKey = readSecret("openai-api-key");
   if (!agentMailKey) throw new Error("Agent-Mail-Secret fehlt");
-  if (!openAiKey) throw new Error("OpenAI-Secret fehlt");
 
   const db = new FinanceDatabase(`${paths.data}/finance.sqlite`);
   const mail = new AgentMailClient({ apiKey: agentMailKey });
-  const ai = new OpenAI({ apiKey: openAiKey });
   let inspected = 0;
   let analyzed = 0;
   let skipped = 0;
   try {
-    const listed = await mail.inboxes.messages.list(options.inboxId, { limit: options.limit ?? 50 });
-    for (const item of [...listed.messages].reverse()) {
+    const listedMessages = [];
+    let pageToken: string | undefined;
+    const after = options.after ? new Date(options.after) : undefined;
+    if (after && Number.isNaN(after.getTime())) throw new Error("INVESTMENT_AFTER ist ungültig");
+    do {
+      const page = options.searchQuery
+        ? await mail.inboxes.messages.search(options.inboxId, {
+            q: options.searchQuery, limit: Math.min(options.limit ?? 100, 100),
+            after, pageToken
+          })
+        : await mail.inboxes.messages.list(options.inboxId, {
+            limit: Math.min(options.limit ?? 100, 100), after, pageToken
+          });
+      listedMessages.push(...page.messages);
+      pageToken = page.nextPageToken;
+    } while (pageToken && listedMessages.length < (options.limit ?? 500));
+    const pending: NewsletterMessage[] = [];
+    for (const item of [...listedMessages].reverse()) {
       inspected += 1;
       const sender = String(item.from);
       if (options.senderFilters.length > 0
@@ -44,8 +60,12 @@ export async function runNewsletterWorker(options: WorkerOptions): Promise<{
         skipped += 1;
         continue;
       }
+      if (db.hasNewsletterAnalysis(String(item.messageId), "__message-id-only__")) {
+        skipped += 1;
+        continue;
+      }
       const full = await mail.inboxes.messages.get(options.inboxId, item.messageId);
-      const content = (full.extractedText || full.text || "").trim();
+      const content = newsletterPlainText(full);
       if (!content) {
         skipped += 1;
         continue;
@@ -63,29 +83,22 @@ export async function runNewsletterWorker(options: WorkerOptions): Promise<{
         skipped += 1;
         continue;
       }
-      const response = await ai.responses.create({
-        model: options.model,
-        store: false,
-        instructions: [
-          "Analysiere den Investment-Newsletter ausschließlich anhand des gelieferten Textes.",
-          "Extrahiere Aussagen, keine eigenen Empfehlungen. Erfinde keine Ticker, Preise oder Zeithorizonte.",
-          "Jede konkrete These braucht kurze Belegstellen aus dem Newsletter.",
-          "Unsicherheit und fehlende Angaben müssen ausdrücklich genannt werden.",
-          "Die Ausgabe ist eine KI-Auswertung und keine Anlageberatung."
-        ].join(" "),
-        input: `Absender: ${message.sender}\nBetreff: ${message.subject}\nDatum: ${message.receivedAt}\n\n${message.content}`,
-        text: {
-          format: {
-            type: "json_schema",
-            name: "newsletter_analysis",
-            strict: true,
-            schema: newsletterAnalysisSchema
-          }
-        }
+      pending.push(message);
+    }
+    for (let offset = 0; offset < pending.length; offset += 12) {
+      const batch = pending.slice(offset, offset + 12);
+      const analysis = await analyzeNewsletterBatchWithCodex(batch, {
+        primaryModel: options.model,
+        fallbackModel: options.fallbackModel,
+        reasoningEffort: options.reasoningEffort
       });
-      const parsed = validateNewsletterModelResult(JSON.parse(response.output_text));
-      db.saveNewsletterAnalysis(buildNewsletterAnalysis(message, options.model, parsed));
-      analyzed += 1;
+      const byId = new Map(batch.map((message) => [message.messageId, message]));
+      for (const result of analysis.results) {
+        const message = byId.get(result.messageId);
+        if (!message) throw new Error(`Unbekannte Mail-ID aus Modellantwort: ${result.messageId}`);
+        db.saveNewsletterAnalysis(buildNewsletterAnalysis(message, result.model, result));
+        analyzed += 1;
+      }
     }
     return { inspected, analyzed, skipped };
   } finally {
@@ -101,7 +114,15 @@ async function main(): Promise<void> {
   if (!model) throw new Error("INVESTMENT_MODEL fehlt");
   const senderFilters = (process.env.INVESTMENT_NEWSLETTER_SENDERS ?? "")
     .split(",").map((item) => item.trim()).filter(Boolean);
-  const result = await runNewsletterWorker({ inboxId, model, senderFilters });
+  const result = await runNewsletterWorker({
+    inboxId,
+    model,
+    fallbackModel: process.env.INVESTMENT_FALLBACK_MODEL?.trim() || "gpt-5.6-sol",
+    reasoningEffort: process.env.INVESTMENT_REASONING_EFFORT?.trim() || "medium",
+    searchQuery: process.env.INVESTMENT_NEWSLETTER_QUERY?.trim() || undefined,
+    after: process.env.INVESTMENT_AFTER?.trim() || undefined,
+    senderFilters
+  });
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
 

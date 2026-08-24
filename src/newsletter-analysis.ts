@@ -14,6 +14,8 @@ export interface NewsletterModelResult {
   summary: string;
   theses: NewsletterThesis[];
   uncertainties: string[];
+  requiresEscalation: boolean;
+  escalationReasons: string[];
 }
 
 export function newsletterContentHash(message: NewsletterMessage): string {
@@ -65,7 +67,9 @@ export function validateNewsletterModelResult(value: unknown): NewsletterModelRe
   return {
     summary: boundedText(raw.summary, 4_000),
     theses,
-    uncertainties: stringList(raw.uncertainties, 20, 700)
+    uncertainties: stringList(raw.uncertainties, 20, 700),
+    requiresEscalation: raw.requiresEscalation === true,
+    escalationReasons: stringList(raw.escalationReasons, 10, 500)
   };
 }
 
@@ -94,10 +98,12 @@ export function buildNewsletterAnalysis(
 export const newsletterAnalysisSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["summary", "theses", "uncertainties"],
+  required: ["summary", "theses", "uncertainties", "requiresEscalation", "escalationReasons"],
   properties: {
     summary: { type: "string" },
     uncertainties: { type: "array", items: { type: "string" } },
+    requiresEscalation: { type: "boolean" },
+    escalationReasons: { type: "array", items: { type: "string" } },
     theses: {
       type: "array",
       items: {
