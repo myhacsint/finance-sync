@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readSecret } from "./config.js";
 import type { AppConfig } from "./types.js";
+import { physicalAssetsTotalMinor } from "./physical-assets.js";
 
 interface ActualHistoryApi {
   init(options: { dataDir: string; serverURL: string; password: string }): Promise<unknown>;
@@ -138,12 +139,13 @@ export async function readDashboardWealthHistory(
       const cashMinor = (await Promise.all(accounts.map((account) =>
         actual.getAccountBalance(account.id, cutoff)
       ))).reduce((sum, value) => sum + Math.round(value), 0);
+      const investmentsMinor = investment.valueMinor + physicalAssetsTotalMinor(config, date);
       const complete = date >= cashCompleteFrom && date >= "2026-07-27";
       return {
         date,
         cashMinor,
-        investmentsMinor: investment.valueMinor,
-        totalMinor: cashMinor + investment.valueMinor,
+        investmentsMinor,
+        totalMinor: cashMinor + investmentsMinor,
         quality: date === isoDate(now) ? "measured" : complete ? "reconstructed" : "partial"
       };
     }));
