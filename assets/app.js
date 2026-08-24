@@ -537,7 +537,7 @@ function exportCryptoAnalysisCsv(){
   msg("CSV für die Kryptoanalyse wurde erstellt.");
 }
 function rangeMonth(key,format){
-  const match=String(key||"").match(/^(\\d{4})-(\\d{2})$/);
+  const match=String(key||"").match(/^(\d{4})-(\d{2})$/);
   if(!match)return "";
   return new Intl.DateTimeFormat("de-DE",format).format(new Date(Date.UTC(Number(match[1]),Number(match[2])-1,1)));
 }
