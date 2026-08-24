@@ -606,6 +606,17 @@ function setWealthHistoryRange(range){
 }
 
 function renderOverview(data,history){
+  if(history?.points?.length&&Number.isFinite(data.totalMinor)){
+    history={...history,points:[...history.points]};
+    history.points[history.points.length-1]={
+      ...history.points.at(-1),
+      date:String(data.generatedAt).slice(0,10),
+      totalMinor:Number(data.totalMinor),
+      cashMinor:Number(data.cash.amountMinor),
+      investmentsMinor:Number(data.investments.amountMinor),
+      quality:"measured"
+    };
+  }
   const total=data.totalMinor;
   const totalParts=Number(data.cash.amountMinor||0)+Number(data.investments.amountMinor||0);
   const cashWidth=totalParts>0?Math.max(1,Number(data.cash.amountMinor||0)/totalParts*100):0;
