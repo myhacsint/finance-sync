@@ -75,6 +75,13 @@ export interface DashboardOverview {
     allocation: InvestmentOverviewSnapshot["allocation"];
   };
   comparison: OverviewAssetComparison;
+  wealthBridge?: {
+    month: string;
+    previousTotalMinor: number;
+    cashflowNetMinor: number;
+    valuationAndOtherMinor: number;
+    currentTotalMinor: number;
+  };
   cashflow: {
     state: "current" | "unavailable";
     source: "Actual";
@@ -450,6 +457,21 @@ export function buildDashboardOverview(
     investmentMinor: investmentAmountMinor,
     allocation: investmentAllocation
   }, solPrice, now);
+  const currentCashflow = actualData?.months.find((month) => month.partial)
+    ?? actualData?.months.at(-1);
+  const wealthBridge = comparison.previousTotalMinor !== null
+    && comparison.changeTotalMinor !== null
+    && totalMinor !== null
+    && currentCashflow
+    ? {
+        month: currentCashflow.key,
+        previousTotalMinor: comparison.previousTotalMinor,
+        cashflowNetMinor: currentCashflow.incomeMinor - currentCashflow.spentMinor,
+        valuationAndOtherMinor: comparison.changeTotalMinor
+          - (currentCashflow.incomeMinor - currentCashflow.spentMinor),
+        currentTotalMinor: totalMinor
+      }
+    : undefined;
   return {
     generatedAt: now.toISOString(),
     state: warnings.length ? "partial" : "current",
@@ -462,6 +484,7 @@ export function buildDashboardOverview(
       allocation: investmentAllocation
     },
     comparison,
+    wealthBridge,
     cashflow: {
       state: actualData ? "current" : "unavailable",
       source: "Actual",

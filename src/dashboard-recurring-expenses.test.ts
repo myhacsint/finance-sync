@@ -115,15 +115,21 @@ test("instabile, alte und hart ausgeschlossene Gruppen werden nicht Kandidat", (
   const unstable = dates.map((date, index) => line(`unstable-${index}`, date, (index + 1) * 2_000, {
     merchantKey: "merchant-unstable"
   }));
+  const investing = dates.map((date, index) => line(`investing-${index}`, date, 3_000, {
+    merchantKey: "merchant-investing",
+    categoryKey: "category-investing",
+    categoryLabel: "Sparen & Investieren"
+  }));
   const result = detectRecurringCandidates(snapshot([
-    ...marketplace, ...privateRows, ...uncertain, ...cards, ...unstable
+    ...marketplace, ...privateRows, ...uncertain, ...cards, ...unstable, ...investing
   ]));
   assert.equal(result.candidates.length, 0);
   assert.deepEqual(result.excluded, {
     "marketplace-without-item-evidence": 1,
     "private-or-unusable": 1,
     "uncertain-assignment": 1,
-    "historical-card-aggregate": 1
+    "historical-card-aggregate": 1,
+    "committed-investing": 1
   });
 });
 

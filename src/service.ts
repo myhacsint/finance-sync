@@ -111,9 +111,9 @@ import {
 } from "./dashboard-review.js";
 import { resolveFireAssumptions } from "./fire-assumptions.js";
 import { createNamedScenario } from "./named-scenarios.js";
-import { createLifeEvent, lifeEventMonthlyDelta } from "./life-events.js";
+import { createLifeEvent } from "./life-events.js";
 import { compareNamedScenarios } from "./scenario-compare.js";
-import { previewMilesMore, importMilesMoreStatement } from "./miles-more-import.js";
+import { previewMilesMoreWithActual, importMilesMoreStatement } from "./miles-more-import.js";
 import { DEFAULT_MERCHANT_RULES, merchantRuleBook } from "./merchant-rules.js";
 
 export class FinanceServiceError extends Error {
@@ -426,20 +426,17 @@ export class FinanceService {
       this.db.listRecurringExpenseOptimizations(),
       { stale: recurring.stale }
     );
-    const eventDelta = lifeEventMonthlyDelta(
-      this.db.listLifeEvents(),
-      `${currentYear}-${String(new Date().getMonth() + 1).padStart(2, "0")}`
-    );
     return buildDashboardDecisionLab(
       assets,
       cashflow,
       optimizations,
       analyses,
-      { ...request, monthlyChangeMinor: (request.monthlyChangeMinor ?? 0) + eventDelta },
+      request,
       new Date(),
       resolveFireAssumptions(this.config.analysis?.fire),
       this.db.listMerchantRules(),
-      this.config.analysis?.savingsBaseline?.employeeStockBenefitMonthlyMinor ?? 0
+      this.config.analysis?.savingsBaseline?.employeeStockBenefitMonthlyMinor ?? 0,
+      this.db.listLifeEvents()
     );
   }
 
@@ -644,7 +641,7 @@ export class FinanceService {
     optimizations: DashboardRecurringExpenseOptimizations;
     aliases: Array<{ fromKey: string; toLabel: string }>;
     merchantRules: Array<{ pattern: string; label: string; deletable: boolean }>;
-    monthCloses: Array<{ month: string; note: string; closedAt: string }>;
+    monthCloses: ReturnType<FinanceDatabase["listMonthCloses"]>;
   }> {
     if (!this.config.actual?.enabled) throw new FinanceServiceError("Actual ist deaktiviert", 400);
     const window = reviewWindowSelection(new Date(), this.config.timezone, months);
@@ -810,9 +807,49 @@ export class FinanceService {
     return this.db.listMonthCloses();
   }
 
-  closeReviewMonth(month: string, note = "") {
+  async closeReviewMonth(
+    month: string,
+    note = "",
+    checklist: { payrollReviewed?: boolean; cardReviewed?: boolean } = {}
+  ) {
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new FinanceServiceError("Monat ungültig", 400);
-    return this.db.closeMonth(month, note);
+    if (!checklist.payrollReviewed || !checklist.cardReviewed) {
+      throw new FinanceServiceError("Bitte Gehaltszuordnung und Kreditkartenstand vor dem Abschluss bestätigen", 400);
+    }
+    const baseline = await this.getDashboardSavingsBaseline(true);
+    const actual = baseline.months.find((item) => item.month === month);
+    if (!actual) throw new FinanceServiceError("Monat liegt außerhalb der verfügbaren Sparratenbasis", 400);
+    const [year, monthNumber] = month.split("-").map(Number);
+    const endDay = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+    const reviewSnapshot = await this.withActual(() => readActualSpendingRange(
+      this.config.actual!,
+      `${month}-01`,
+      `${month}-${String(endDay).padStart(2, "0")}`,
+      new Date(),
+      { mode: "review" }
+    ));
+    const model = await this.getDashboardDecisionLab(false, { trendBasis: "current-year" });
+    const expected = model.basis.selectedTrend;
+    const actualIncomeMinor = actual.payrollRegularMinor + actual.payrollVariableMinor
+      + actual.secondIncomeRegularMinor + actual.secondIncomeVariableMinor
+      + actual.otherIncomeRegularMinor + actual.otherIncomeVariableMinor;
+    const actualExpensesMinor = actual.consumptionMinor;
+    const snapshot = {
+      actualIncomeMinor,
+      actualExpensesMinor,
+      actualNetMinor: actualIncomeMinor - actualExpensesMinor,
+      expectedIncomeMinor: expected.monthlyIncomeMinor ?? 0,
+      expectedExpensesMinor: expected.monthlyExpensesMinor ?? 0,
+      expectedNetMinor: expected.averageMonthlyNetMinor ?? 0,
+      committedOutflowMinor: actual.committedOutflowMinor,
+      investmentOutflowMinor: actual.investmentOutflowMinor,
+      unreviewedIncomeMinor: actual.unreviewedIncomeMinor,
+      uncategorizedBookings: reviewSnapshot.lines.length
+    };
+    return this.db.closeMonth(month, note, snapshot, {
+      payrollReviewed: true,
+      cardReviewed: true
+    });
   }
 
   async compareScenarios(leftId: string, rightId: string) {
@@ -850,9 +887,19 @@ export class FinanceService {
     };
   }
 
-  previewMilesMoreStatement(text: string, statementDate: string) {
+  async previewMilesMoreStatement(text: string, statementDate: string) {
+    if (!this.config.actual?.enabled) throw new FinanceServiceError("Actual ist deaktiviert", 400);
+    const password = readSecret("actual-password");
+    if (!password) throw new FinanceServiceError("Actual-Zugang ist nicht verfügbar", 503);
     try {
-      return previewMilesMore(text, statementDate);
+      return await this.withActual(() => previewMilesMoreWithActual({
+        text,
+        statementDate,
+        serverURL: this.config.actual!.serverUrl,
+        budgetId: this.config.actual!.budgetId,
+        password,
+        loadApi: async () => await import("@actual-app/api") as never
+      }));
     } catch (error) {
       throw new FinanceServiceError(error instanceof Error ? error.message : "Abrechnung ungültig", 400);
     }

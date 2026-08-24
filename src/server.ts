@@ -167,8 +167,12 @@ const server = createServer(async (req, res) => {
     if (req.method === "PUT" && url.pathname === "/api/dashboard/review/close") {
       const payload = await body(req, 4096).catch(() => {
         throw new FinanceServiceError("Ungültiger Monatsabschluss", 400);
-      }) as { month?: string; note?: string };
-      return json(res, 200, service.closeReviewMonth(String(payload.month ?? ""), String(payload.note ?? "")));
+      }) as { month?: string; note?: string; payrollReviewed?: boolean; cardReviewed?: boolean };
+      return json(res, 200, await service.closeReviewMonth(
+        String(payload.month ?? ""),
+        String(payload.note ?? ""),
+        { payrollReviewed: payload.payrollReviewed, cardReviewed: payload.cardReviewed }
+      ));
     }
     if (req.method === "GET" && url.pathname === "/api/dashboard/scenarios/compare") {
       return json(res, 200, await service.compareScenarios(
@@ -180,7 +184,7 @@ const server = createServer(async (req, res) => {
       const payload = await body(req, 200_000).catch(() => {
         throw new FinanceServiceError("Ungültige Abrechnung", 400);
       }) as { text?: string; statementDate?: string };
-      return json(res, 200, service.previewMilesMoreStatement(String(payload.text ?? ""), String(payload.statementDate ?? "")));
+      return json(res, 200, await service.previewMilesMoreStatement(String(payload.text ?? ""), String(payload.statementDate ?? "")));
     }
     if (req.method === "POST" && url.pathname === "/api/miles-more/import") {
       const payload = await body(req, 200_000).catch(() => {

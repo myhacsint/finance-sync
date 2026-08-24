@@ -5,6 +5,7 @@ import { buildDashboardFireTracking, type DashboardFireTracking } from "./dashbo
 import type { DashboardRecurringExpenseOptimizations } from "./dashboard-recurring-expenses.js";
 import { explainMonthVariance, type MonthVarianceReason } from "./month-variance.js";
 import { mergeMerchantRules, DEFAULT_MERCHANT_RULES, type MerchantRule } from "./merchant-rules.js";
+import { lifeEventMonthlyDelta, type LifeEvent } from "./life-events.js";
 
 export interface DecisionLabRequest {
   trendBasis?: DecisionTrendBasis;
@@ -416,7 +417,8 @@ function project(
   monthlyCapacityMinor: number,
   realReturnBps: number,
   horizonYears: number,
-  oneTimeMinor = 0
+  oneTimeMinor = 0,
+  monthlyAdjustment: (month: number) => number = () => 0
 ): { values: number[]; depletedAfterMonths: number | null } {
   const monthlyRate = Math.pow(1 + realReturnBps / 10_000, 1 / 12) - 1;
   let value = Math.max(0, startingAssetsMinor + oneTimeMinor);
@@ -425,8 +427,9 @@ function project(
     : null;
   const values = [Math.round(value)];
   for (let month = 1; month <= horizonYears * 12; month += 1) {
-    value = Math.max(0, value * (1 + monthlyRate) + monthlyCapacityMinor);
-    if (depletedAfterMonths === null && value === 0 && monthlyCapacityMinor < 0) {
+    const capacity = monthlyCapacityMinor + monthlyAdjustment(month);
+    value = Math.max(0, value * (1 + monthlyRate) + capacity);
+    if (depletedAfterMonths === null && value === 0 && capacity < 0) {
       depletedAfterMonths = month;
     }
     if (month % 12 === 0) values.push(Math.round(value));
@@ -524,7 +527,8 @@ export function buildDashboardDecisionLab(
   now = new Date(),
   fireAssumptions?: import("./fire-assumptions.js").FireAssumptions,
   merchantRules: MerchantRule[] = DEFAULT_MERCHANT_RULES,
-  employeeStockBenefitMonthlyMinor = 0
+  employeeStockBenefitMonthlyMinor = 0,
+  lifeEvents: LifeEvent[] = []
 ): DashboardDecisionLab {
   const inputs = decisionLabInputs(request);
   const stock = Math.max(0, Math.round(employeeStockBenefitMonthlyMinor || 0));
@@ -622,12 +626,22 @@ export function buildDashboardDecisionLab(
       inputs.realReturnBps,
       inputs.horizonYears
     );
+    const currentMonth = cashflow.window.currentMonthIncluded
+      ? cashflow.months.at(-1)?.month ?? now.toISOString().slice(0, 7)
+      : now.toISOString().slice(0, 7);
+    const eventAdjustment = (monthOffset: number) => {
+      const [year, month] = currentMonth.split("-").map(Number);
+      const date = new Date(Date.UTC(year, month - 1 + monthOffset, 1));
+      const key = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+      return lifeEventMonthlyDelta(lifeEvents, key);
+    };
     const scenario = project(
       startingAssetsMinor,
       projectedMonthlyCapacityMinor + inputs.monthlyChangeMinor,
       inputs.realReturnBps,
       inputs.horizonYears,
-      inputs.oneTimeMinor
+      inputs.oneTimeMinor,
+      eventAdjustment
     );
     series = baseline.values.map((baselineMinor, year) => ({
       year,
@@ -755,6 +769,9 @@ export function buildDashboardDecisionLab(
       "Der Jahresausblick verbindet den tatsächlichen Stand abgeschlossener Monate mit dem typischen Median-Monat; der laufende Monat bleibt ausgeschlossen [SCHÄTZUNG]",
       "Mitarbeiteraktienvorteile sind nur enthalten, wenn sie als eigener Arbeitgeberzufluss gebucht wurden",
       "Offene Kreditkartenstände im laufenden Monat sind gemessen, aber bis zur Abrechnung noch nicht einzeln kategorisiert",
+      lifeEvents.length
+        ? `${lifeEvents.length} gespeicherte Ereignisse wirken ab ihrem jeweiligen Startmonat nur im Szenariopfad [SCHÄTZUNG]`
+        : "Keine gespeicherten Ereignisse im Szenariopfad",
       "Bei aufgebrauchtem Finanzvermögen wird nicht automatisch eine Verschuldung unterstellt"
     ]
   };

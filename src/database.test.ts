@@ -103,6 +103,26 @@ test("Optimierungsmaßnahmen speichern nur abstrakte Entscheidung und Wirkung", 
   db.close();
 });
 
+test("Monatsabschluss friert Plan-vs-Ist und Prüfschritte ein", () => {
+  const root = mkdtempSync(join(tmpdir(), "finance-sync-month-close-"));
+  const db = new FinanceDatabase(join(root, "finance.sqlite"));
+  db.closeMonth(
+    "2026-07",
+    "Karte vollständig",
+    { actualNetMinor: 125_00, expectedNetMinor: -50_00, uncategorizedBookings: 0 },
+    { payrollReviewed: true, cardReviewed: true },
+    new Date("2026-08-24T12:00:00.000Z")
+  );
+  assert.deepEqual(db.listMonthCloses()[0], {
+    month: "2026-07",
+    note: "Karte vollständig",
+    closedAt: "2026-08-24T12:00:00.000Z",
+    snapshot: { actualNetMinor: 125_00, expectedNetMinor: -50_00, uncategorizedBookings: 0 },
+    checklist: { payrollReviewed: true, cardReviewed: true }
+  });
+  db.close();
+});
+
 test("korrigierte Normalisierung aktualisiert denselben Saldo-Snapshot", () => {
   const root = mkdtempSync(join(tmpdir(), "finance-sync-balance-"));
   const db = new FinanceDatabase(join(root, "finance.sqlite"));

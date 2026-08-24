@@ -329,8 +329,11 @@ async function deleteMerchantRule(pattern){
 async function closeReviewMonth(){
   const month=document.getElementById("review-close-month")?.value||"";
   const note=document.getElementById("review-close-note")?.value||"";
+  const payrollReviewed=document.getElementById("review-close-payroll")?.checked===true;
+  const cardReviewed=document.getElementById("review-close-card")?.checked===true;
+  if(!payrollReviewed||!cardReviewed){msg("Bitte Gehaltszuordnung und Kreditkartenstand vor dem Abschluss bestätigen.",true);return;}
   if(!month||!confirm("Monat "+month+" als geprüft markieren? Der Abschluss kann später erneut gespeichert werden."))return;
-  await call("/api/dashboard/review/close",{method:"PUT",body:JSON.stringify({month,note})});msg("Monat abgeschlossen.");refresh(true);
+  await call("/api/dashboard/review/close",{method:"PUT",body:JSON.stringify({month,note,payrollReviewed,cardReviewed})});msg("Monat mit Plan-vs.-Ist-Stand abgeschlossen.");refresh(true);
 }
 async function saveLifeEvent(){
   await call("/api/dashboard/events",{method:"PUT",body:JSON.stringify({name:document.getElementById("event-name")?.value||"",startMonth:document.getElementById("event-start")?.value||"",monthlyChangeMinor:Math.round(Number(document.getElementById("event-amount")?.value||0)*100)})});refresh(true);
@@ -372,7 +375,9 @@ async function previewMilesMore(){
   resetMilesMorePreview();
   const data=await call("/api/miles-more/preview",{method:"POST",body:JSON.stringify(input)});
   currentMilesMorePreview=input;
-  document.getElementById("miles-preview").innerHTML='<p>'+data.bookings+' Umsätze, Saldo '+moneyWhole(data.balanceMinor)+', '+data.categorized+' kategorisiert.</p><label style="display:flex;align-items:center;gap:8px;margin-top:12px"><input id="miles-confirm-check" type="checkbox" onchange="document.getElementById(&quot;miles-import-button&quot;).disabled=!this.checked"> Ich habe Abrechnungsdatum, Saldo und Anzahl geprüft.</label>';
+  const settlement=data.settlement||{};
+  const settlementText=settlement.status==="ready"?'Eindeutiger Giro-Ausgleich: '+esc(settlement.sourceAccountName||'Girokonto')+' · '+esc(formatDate(settlement.date))+' · '+moneyWhole(settlement.amountMinor)+'. Er wird beim Import automatisch als interner Transfer verknüpft.':settlement.status==="already-linked"?'Der Giro-Ausgleich ist bereits als interner Transfer verknüpft.':settlement.status==="ambiguous"?'Mehrere mögliche Giro-Ausgleiche gefunden. Es wird keiner automatisch verknüpft.':'Kein eindeutiger Giro-Ausgleich gefunden. Es wird keiner automatisch verknüpft.';
+  document.getElementById("miles-preview").innerHTML='<p>'+data.bookings+' Umsätze, Saldo '+moneyWhole(data.balanceMinor)+', '+data.categorized+' kategorisiert.</p><p class="'+(settlement.status==="ready"||settlement.status==="already-linked"?'tone-ok':'tone-warning')+'">'+settlementText+'</p><label style="display:flex;align-items:center;gap:8px;margin-top:12px"><input id="miles-confirm-check" type="checkbox" onchange="document.getElementById(&quot;miles-import-button&quot;).disabled=!this.checked"> Ich habe Abrechnungsdatum, Saldo, Anzahl und Ausgleichsvorschau geprüft.</label>';
 }
 async function importMilesMore(){
   const input=milesMoreInput();
@@ -384,7 +389,8 @@ async function importMilesMore(){
     const data=await call("/api/miles-more/import",{method:"POST",body:JSON.stringify(input)});
     document.getElementById("miles-text").value="";
     resetMilesMorePreview();
-    msg("Miles & More importiert: "+(data.added||0)+" Buchungen.");
+    const linked=data.settlement?.status==="ready"?' Giro-Ausgleich wurde verknüpft.':data.settlement?.status==="already-linked"?' Giro-Ausgleich war bereits verknüpft.':' Kein Giro-Ausgleich wurde automatisch verknüpft.';
+    msg("Miles & More importiert: "+(data.added||0)+" Buchungen."+linked);
   }catch(error){msg(error.message,true);if(button)button.disabled=false}
 }
 function setReviewMonths(value){
@@ -587,6 +593,8 @@ function renderOverview(data){
     return '<div class="wealth-comparison-part"><span>'+esc(part.label)+'</span><strong class="wealth-change-'+changeTone+'">'+value+'</strong><small>'+previous+' · '+esc(part.source)+'</small><small>'+esc(dateText)+' · '+valuation+'</small>'+solDetail+staking+'</div>';
   }).join("");
   const comparisonPanel='<section class="wealth-comparison" aria-labelledby="wealth-comparison-title"><div class="wealth-comparison-head"><h2 id="wealth-comparison-title">Monatsvergleich</h2><p>Letztes vollständiges Monatsende · '+esc(formatDate(comparison.effectiveDate))+'</p></div><div class="wealth-comparison-grid">'+comparisonParts+'</div></section>';
+  const bridge=data.wealthBridge;
+  const wealthBridge=bridge?'<details class="wealth-bridge"><summary><span><strong>Vermögensbrücke '+esc(analysisMonthLabel(bridge.month))+'</strong><small>Vom letzten Monatsende zum aktuellen Stand</small></span><strong>'+signedMoneyWhole(bridge.currentTotalMinor-bridge.previousTotalMinor)+'</strong>'+icons.chevron+'</summary><div class="wealth-bridge-flow"><div><span>Start</span><strong>'+moneyWhole(bridge.previousTotalMinor)+'</strong></div><div><span>Cashflow</span><strong class="'+(bridge.cashflowNetMinor<0?'tone-warning':'tone-ok')+'">'+signedMoneyWhole(bridge.cashflowNetMinor)+'</strong></div><div><span>Marktwerte &amp; Stichtage</span><strong class="'+(bridge.valuationAndOtherMinor<0?'tone-warning':'tone-ok')+'">'+signedMoneyWhole(bridge.valuationAndOtherMinor)+' '+analysisEstimate(true)+'</strong></div><div><span>Heute</span><strong>'+moneyWhole(bridge.currentTotalMinor)+'</strong></div></div><p>Die Restkomponente enthält Marktbewegungen sowie Bewertungs- und Stichtagsunterschiede. Sie ist keine behauptete reine Rendite.</p></details>':'';
   const months=data.cashflow.months||[];
   const selection=cashflowSelection();
   const range=data.cashflow.range||{months:months.length||selection.months,offset:selection.offset,start:months.at(0)?.key,end:months.at(-1)?.key,endPartial:Boolean(months.at(-1)?.partial)};
@@ -640,7 +648,7 @@ function renderOverview(data){
     <section class="wealth-overview" aria-label="Vermögensübersicht">\
       <div><span class="wealth-label">Gesamtvermögen</span><strong class="wealth-value">'+moneyWhole(total)+'</strong><p class="wealth-date">Stand '+esc(formatDate(data.generatedAt))+' · Bankkonten und Anlagen</p>'+comparisonSummary+'</div>\
       <div class="wealth-composition"><div class="wealth-health">'+statusIcon(automaticOk?"ok":"warning")+'<span>'+(automaticOk?'Automatische Quellen aktuell':'Quellenstatus mit Hinweisen')+'</span></div>'+composition+'<div class="composition-legend"><span><i class="composition-cash"></i>Liquidität <strong>'+moneyWhole(data.cash.amountMinor)+'</strong></span><span><i class="composition-investments"></i>Anlagen <strong>'+moneyWhole(data.investments.amountMinor)+'</strong></span></div></div>\
-      '+comparisonPanel+'\
+      '+wealthBridge+comparisonPanel+'\
     </section>'+warning+action+'\
     <div class="overview-dashboard-grid">\
       <section class="overview-panel" data-month-count="'+months.length+'" aria-labelledby="cashflow-title"><div class="panel-header cashflow-panel-header"><div><h2 id="cashflow-title">Geldfluss</h2><p class="cashflow-period">'+esc(rangeLabel)+' <span aria-hidden="true">·</span> '+esc(rangeDetail)+'</p></div><div class="period-controls" aria-label="Zeitraum für Geldfluss"><button class="range-previous" type="button" onclick="shiftCashflow(1)" aria-label="Einen Monat zurück" title="Einen Monat zurück">'+icons.chevron+'</button><label class="sr-only" for="cashflow-window">Angezeigter Zeitraum</label><select class="cashflow-window" id="cashflow-window" name="cashflow-window" autocomplete="off" onchange="setCashflowMonths(this.value)"><option value="4"'+(range.months===4?' selected':'')+'>4 Monate</option><option value="6"'+(range.months===6?' selected':'')+'>6 Monate</option><option value="12"'+(range.months===12?' selected':'')+'>12 Monate</option></select><button class="range-next" type="button" onclick="shiftCashflow(-1)" aria-label="Einen Monat vor" title="Einen Monat vor"'+(range.offset===0?' disabled':'')+'>'+icons.chevron+'</button></div></div>'+cashflow+'</section>\
@@ -1087,7 +1095,8 @@ function renderReview(data){
   currentOptimizationData=data.optimizations;
   const months=data.window?.months||6;
   const lastClose=(data.monthCloses&&data.monthCloses[0])?data.monthCloses[0]:null;
-  const closeBar='<section class="analysis-toolbar" aria-label="Monatsabschluss"><label>Monat abschließen<input id="review-close-month" type="month" value="'+(data.window&&data.window.endMonth?data.window.endMonth:"")+'"></label><label>Notiz<input id="review-close-note" maxlength="200" placeholder="optional"></label><button class="button secondary" type="button" onclick="closeReviewMonth()">Monat abschließen</button>'+(lastClose?'<small>Zuletzt '+esc(lastClose.month)+'</small>':'')+'</section>';
+  const closeSnapshot=lastClose?.snapshot?'<div class="month-close-snapshot"><strong>Fixierter Stand '+esc(lastClose.month)+'</strong><span>Ist '+signedMoneyWhole(lastClose.snapshot.actualNetMinor)+' · Plan '+signedMoneyWhole(lastClose.snapshot.expectedNetMinor)+' · Abweichung '+signedMoneyWhole(lastClose.snapshot.actualNetMinor-lastClose.snapshot.expectedNetMinor)+'</span><small>'+lastClose.snapshot.uncategorizedBookings+' offene Buchungen beim Abschluss · '+esc(formatDate(lastClose.closedAt,true))+'</small></div>':'';
+  const closeBar='<section class="month-close"><div class="analysis-toolbar" aria-label="Monatsabschluss"><label>Monat abschließen<input id="review-close-month" type="month" value="'+(data.window&&data.window.endMonth?data.window.endMonth:"")+'"></label><label>Notiz<input id="review-close-note" maxlength="200" placeholder="Offene Punkte, z. B. Kartenstand"></label><label class="check-label"><input id="review-close-payroll" type="checkbox"> Gehaltsmonate geprüft</label><label class="check-label"><input id="review-close-card" type="checkbox"> Kreditkarte geprüft/notiert</label><button class="button secondary" type="button" onclick="closeReviewMonth()">Stand einfrieren</button></div>'+closeSnapshot+'</section>';
   const ruleRows=(data.merchantRules||[]).map(rule=>'<tr><td>'+esc(rule.pattern)+'</td><td>'+esc(rule.label)+'</td><td>'+(rule.deletable?'<button class="button quiet small" type="button" onclick="deleteMerchantRule(&quot;'+esc(rule.pattern)+'&quot;)">Löschen</button>':'<span class="badge">Standard</span>')+'</td></tr>').join('');
   const rulesBox='<section class="analysis-panel" aria-label="Händlerregeln"><div class="analysis-panel-head"><div><h3>Händlerregeln</h3><p>Muster im Namen wird zum Anzeigenamen.</p></div></div><table class="expense-table"><thead><tr><th>Muster</th><th>Name</th><th></th></tr></thead><tbody>'+ruleRows+'</tbody></table><div class="analysis-toolbar"><input id="rule-pattern" placeholder="amazon" maxlength="80"><input id="rule-label" placeholder="Amazon" maxlength="80"><button class="button secondary" type="button" onclick="saveMerchantRule()">Regel speichern</button></div></section>';
   const taxonomy='<p class="review-taxonomy">Eine Taxonomie: Grundbedarf · Gestaltbar · Vermeidbar · Unklar · Kein Kandidat. Maßnahmen gelten nur für gestaltbare, vermeidbare oder unklare bestätigte Ausgaben.</p>';

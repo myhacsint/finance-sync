@@ -183,7 +183,9 @@ export class FinanceDatabase {
       CREATE TABLE IF NOT EXISTS month_closes (
         month TEXT PRIMARY KEY,
         note TEXT NOT NULL,
-        closed_at TEXT NOT NULL
+        closed_at TEXT NOT NULL,
+        snapshot_json TEXT,
+        checklist_json TEXT
       );
       CREATE TABLE IF NOT EXISTS asset_market_snapshots (
         valuation_date TEXT NOT NULL,
@@ -217,6 +219,16 @@ export class FinanceDatabase {
       if (!holdingColumns.has(name)) {
         this.db.exec(`ALTER TABLE holdings ADD COLUMN ${name} ${type}`);
       }
+    }
+    const monthCloseColumns = new Set(
+      (this.db.prepare("PRAGMA table_info(month_closes)").all() as Array<{ name: string }>)
+        .map((column) => column.name)
+    );
+    if (!monthCloseColumns.has("snapshot_json")) {
+      this.db.exec("ALTER TABLE month_closes ADD COLUMN snapshot_json TEXT");
+    }
+    if (!monthCloseColumns.has("checklist_json")) {
+      this.db.exec("ALTER TABLE month_closes ADD COLUMN checklist_json TEXT");
     }
   }
 
@@ -697,20 +709,48 @@ export class FinanceDatabase {
     return this.db.prepare(`DELETE FROM life_events WHERE id = ?`).run(id).changes > 0;
   }
 
-  listMonthCloses(): Array<{ month: string; note: string; closedAt: string }> {
-    return this.db.prepare(`
-      SELECT month, note, closed_at AS closedAt FROM month_closes ORDER BY month DESC
-    `).all() as Array<{ month: string; note: string; closedAt: string }>;
+  listMonthCloses(): Array<{
+    month: string;
+    note: string;
+    closedAt: string;
+    snapshot: Record<string, number> | null;
+    checklist: { payrollReviewed: boolean; cardReviewed: boolean } | null;
+  }> {
+    const rows = this.db.prepare(`
+      SELECT month, note, closed_at AS closedAt, snapshot_json AS snapshotJson,
+        checklist_json AS checklistJson
+      FROM month_closes ORDER BY month DESC
+    `).all() as Array<{
+      month: string;
+      note: string;
+      closedAt: string;
+      snapshotJson: string | null;
+      checklistJson: string | null;
+    }>;
+    return rows.map((row) => ({
+      month: row.month,
+      note: row.note,
+      closedAt: row.closedAt,
+      snapshot: row.snapshotJson ? JSON.parse(row.snapshotJson) as Record<string, number> : null,
+      checklist: row.checklistJson ? JSON.parse(row.checklistJson) as { payrollReviewed: boolean; cardReviewed: boolean } : null
+    }));
   }
 
-  closeMonth(month: string, note = "", now = new Date()): { month: string; note: string; closedAt: string } {
+  closeMonth(
+    month: string,
+    note: string,
+    snapshot: Record<string, number>,
+    checklist: { payrollReviewed: boolean; cardReviewed: boolean },
+    now = new Date()
+  ) {
     const closedAt = now.toISOString();
     this.db.prepare(`
-      INSERT INTO month_closes(month, note, closed_at)
-      VALUES (?, ?, ?)
-      ON CONFLICT(month) DO UPDATE SET note=excluded.note, closed_at=excluded.closed_at
-    `).run(month, note.slice(0, 200), closedAt);
-    return { month, note: note.slice(0, 200), closedAt };
+      INSERT INTO month_closes(month, note, closed_at, snapshot_json, checklist_json)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(month) DO UPDATE SET note=excluded.note, closed_at=excluded.closed_at,
+        snapshot_json=excluded.snapshot_json, checklist_json=excluded.checklist_json
+    `).run(month, note.slice(0, 200), closedAt, JSON.stringify(snapshot), JSON.stringify(checklist));
+    return { month, note: note.slice(0, 200), closedAt, snapshot, checklist };
   }
 
   listNamedScenarios(): NamedScenario[] {

@@ -227,6 +227,9 @@ export function recurringExpenseRange(
 
 function hardExclusion(line: SpendingLine): string | null {
   if (line.categoryLabel === "Kreditkarte historisch") return "historical-card-aggregate";
+  if (["Sparen & Investieren", "Altersvorsorge"].includes(line.categoryLabel)) {
+    return "committed-investing";
+  }
   if (!line.categorized || [
     "Ohne Kategorie", "Sonstige Ausgaben", "Sonstige Einkäufe", "Bargeld"
   ].includes(line.categoryLabel)) return "uncertain-assignment";

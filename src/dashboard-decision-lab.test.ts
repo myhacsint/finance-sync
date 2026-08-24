@@ -396,3 +396,20 @@ test("konfigurierter Mitarbeiteraktienvorteil ist ein eigener monatlicher Zuflus
     (baseline.basis.projectedMonthlyCapacityMinor ?? 0) + 12_000
   );
 });
+
+test("gespeichertes Ereignis verändert den Szenariopfad erst ab seinem Startmonat", () => {
+  const result = buildDashboardDecisionLab(
+    assets,
+    cashflow,
+    optimizations,
+    analyses,
+    { realReturnBps: 0 },
+    new Date("2026-08-22T12:02:00.000Z"),
+    undefined,
+    [],
+    0,
+    [{ id: "event-0123456789abcdef", name: "Krippe endet", startMonth: "2027-01", monthlyChangeMinor: 10_000, createdAt: "2026-08-22T12:00:00.000Z" }]
+  );
+  assert.equal(result.series[1].scenarioMinor - result.series[1].baselineMinor, 80_000);
+  assert.match(result.basisNotes.join(" "), /ab ihrem jeweiligen Startmonat/);
+});

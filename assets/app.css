@@ -362,6 +362,18 @@
     .wealth-change-positive { color: var(--green); }
     .wealth-change-negative { color: var(--orange); }
     .wealth-change-neutral { color: var(--text); }
+    .wealth-bridge { grid-column: 1 / -1; border-top: 1px solid var(--line-soft); padding-top: 14px; }
+    .wealth-bridge > summary { display: grid; grid-template-columns: minmax(0, 1fr) auto 18px; gap: 14px; align-items: center; min-height: 44px; cursor: pointer; list-style: none; }
+    .wealth-bridge > summary::-webkit-details-marker { display: none; }
+    .wealth-bridge > summary span, .wealth-bridge > summary small { display: block; }
+    .wealth-bridge > summary small, .wealth-bridge > p { color: var(--muted); font-size: 12px; }
+    .wealth-bridge > summary > strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+    .wealth-bridge[open] > summary svg { transform: rotate(180deg); }
+    .wealth-bridge-flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+    .wealth-bridge-flow > div { min-width: 0; padding: 12px; border: 1px solid var(--line-soft); border-radius: 9px; background: var(--surface-soft); }
+    .wealth-bridge-flow span { display: block; color: var(--muted); font-size: 11px; }
+    .wealth-bridge-flow strong { display: block; margin-top: 3px; font-variant-numeric: tabular-nums; }
+    .wealth-bridge > p { margin-top: 9px; }
     .wealth-comparison { grid-column: 1 / -1; border-top: 1px solid var(--line-soft); padding-top: 18px; }
     .wealth-comparison-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
     .wealth-comparison-head h2 { font-size: 16px; }
@@ -689,6 +701,12 @@
     .analysis-toolbar label { margin: 0; }
     .analysis-toolbar input, .analysis-toolbar select { width: 100%; min-height: 44px; margin-top: 5px; }
     .analysis-toolbar select { cursor: pointer; }
+    .analysis-toolbar .check-label { display: flex; align-items: center; gap: 8px; min-height: 44px; color: var(--muted); font-size: 12px; }
+    .analysis-toolbar .check-label input { width: 18px; min-height: 18px; margin: 0; }
+    .month-close { display: grid; gap: 10px; }
+    .month-close-snapshot { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 16px; padding: 12px 14px; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--surface-soft); }
+    .month-close-snapshot span { color: var(--text); font-variant-numeric: tabular-nums; }
+    .month-close-snapshot small { grid-column: 1 / -1; color: var(--muted); }
     .analysis-summary {
       display: grid;
       grid-template-columns: minmax(280px, 1.4fr) repeat(2, minmax(170px, .7fr));
@@ -1104,6 +1122,7 @@
       .wealth-composition { margin-top: 2px; }
       .wealth-health { justify-content: flex-start; margin-bottom: 16px; }
       .wealth-comparison-grid { grid-template-columns: 1fr; gap: 12px; }
+      .wealth-bridge-flow { grid-template-columns: 1fr 1fr; }
       .wealth-comparison-head { align-items: flex-start; flex-direction: column; gap: 3px; }
       .overview-action { gap: 10px; padding: 12px 14px; }
       .overview-action .task-mark { width: 36px; height: 36px; }
