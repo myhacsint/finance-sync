@@ -42,6 +42,8 @@ let currentOptimizationData=null;
 let currentCryptoData=null;
 let currentDecisionLabData=null;
 let currentReviewData=null;
+let currentWealthHistory=null;
+let wealthHistoryRange="1y";
 
 function headerAction(){if(activeView()==="analyses"&&analysisSelection().view==="expense-structure")exportAnalysisCsv();else refresh(true)}
 
@@ -567,7 +569,43 @@ function sourceIcon(source){return source.kind==="solana"?icons.wallet:source.ki
 function msg(text,isError=false){const element=document.getElementById("message");element.textContent=text;element.classList.toggle("error",isError)}
 function manualError(text=""){const element=document.getElementById("manual-error");if(element)element.textContent=text}
 
-function renderOverview(data){
+function wealthHistoryPoints(data,range){
+  const points=data?.points||[];
+  if(!points.length||range==="max")return points;
+  const end=new Date(points.at(-1).date+"T12:00:00Z");
+  let start=new Date(end);
+  if(range==="1m")start.setUTCMonth(start.getUTCMonth()-1);
+  else if(range==="ytd")start=new Date(Date.UTC(end.getUTCFullYear(),0,1,12));
+  else start.setUTCFullYear(start.getUTCFullYear()-1);
+  return points.filter(point=>new Date(point.date+"T12:00:00Z")>=start);
+}
+function renderWealthHistory(data){
+  currentWealthHistory=data;
+  const target=document.getElementById("wealth-history-content");
+  if(!target)return;
+  const points=wealthHistoryPoints(data,wealthHistoryRange);
+  if(points.length<2){target.innerHTML='<div class="panel-unavailable"><p>Für diesen Zeitraum sind noch nicht genügend Werte vorhanden.</p></div>';return}
+  const values=points.map(point=>Number(point.totalMinor));
+  const min=Math.min(...values),max=Math.max(...values),span=Math.max(1,max-min);
+  const x=index=>54+index/Math.max(1,points.length-1)*708;
+  const y=value=>224-(value-min)/span*184;
+  const segments=[];let current=[];let lastQuality="";
+  points.forEach((point,index)=>{if(lastQuality&&point.quality!==lastQuality){if(current.length>1)segments.push({quality:lastQuality,points:current});current=[current.at(-1),[x(index),y(point.totalMinor)]]}else current.push([x(index),y(point.totalMinor)]);lastQuality=point.quality});
+  if(current.length>1)segments.push({quality:lastQuality,points:current});
+  const paths=segments.map(segment=>'<path class="wealth-history-line '+esc(segment.quality)+'" d="M'+segment.points.map(pair=>pair.map(value=>value.toFixed(1)).join(" ")).join("L")+'"/>').join("");
+  const first=points[0],last=points.at(-1);
+  const label='Vermögensentwicklung von '+formatDate(first.date)+' bis '+formatDate(last.date)+', von '+moneyWhole(first.totalMinor)+' auf '+moneyWhole(last.totalMinor)+'. Frühere unvollständige Abschnitte sind gestrichelt.';
+  const rows=points.map(point=>'<tr><th>'+formatDate(point.date)+'</th><td>'+moneyWhole(point.totalMinor)+'</td><td>'+moneyWhole(point.cashMinor)+'</td><td>'+moneyWhole(point.investmentsMinor)+'</td><td>'+(point.quality==="measured"?'Gemessen':point.quality==="reconstructed"?'Rekonstruiert [SCHÄTZUNG]':'Unvollständig [SCHÄTZUNG]')+'</td></tr>').join("");
+  target.innerHTML='<div class="wealth-history-summary"><span>'+esc(formatDate(first.date))+'</span><strong>'+moneyWhole(last.totalMinor)+'</strong><span>'+signedMoneyWhole(last.totalMinor-first.totalMinor)+'</span></div><figure class="wealth-history-chart"><svg viewBox="0 0 800 270" role="img" aria-label="'+esc(label)+'"><g class="wealth-history-grid"><path d="M54 40H762M54 132H762M54 224H762"/></g><g class="wealth-history-axis"><text x="46" y="44" text-anchor="end">'+numberWhole(max)+'</text><text x="46" y="136" text-anchor="end">'+numberWhole(Math.round((max+min)/2))+'</text><text x="46" y="228" text-anchor="end">'+numberWhole(min)+'</text><text x="54" y="254">'+esc(formatDate(first.date))+'</text><text x="762" y="254" text-anchor="end">'+esc(formatDate(last.date))+'</text></g>'+paths+'</svg><figcaption>'+esc(data.coverage.note)+' <span class="comparison-estimate">[SCHÄTZUNG]</span></figcaption></figure><div class="wealth-history-legend"><span><i class="measured"></i>Gemessen</span><span><i class="reconstructed"></i>Rekonstruiert</span><span><i class="partial"></i>Unvollständig</span></div><table class="sr-only"><caption>'+esc(label)+'</caption><thead><tr><th>Datum</th><th>Gesamt</th><th>Liquidität</th><th>Anlagen</th><th>Datenqualität</th></tr></thead><tbody>'+rows+'</tbody></table>';
+}
+function setWealthHistoryRange(range){
+  if(!["1m","ytd","1y","max"].includes(range))return;
+  wealthHistoryRange=range;
+  document.querySelectorAll("[data-wealth-range]").forEach(button=>button.setAttribute("aria-pressed",String(button.dataset.wealthRange===range)));
+  renderWealthHistory(currentWealthHistory);
+}
+
+function renderOverview(data,history){
   const total=data.totalMinor;
   const totalParts=Number(data.cash.amountMinor||0)+Number(data.investments.amountMinor||0);
   const cashWidth=totalParts>0?Math.max(1,Number(data.cash.amountMinor||0)/totalParts*100):0;
@@ -597,6 +635,7 @@ function renderOverview(data){
   const comparisonPanel='<details class="wealth-comparison"><summary><span><strong>Vermögensentwicklung im Detail</strong><small>Seit abgeschlossenem Stichtag '+esc(formatDate(comparison.effectiveDate))+'</small></span>'+icons.chevron+'</summary><div class="wealth-comparison-grid">'+comparisonParts+'</div><p class="panel-footer"><a class="panel-link" href="?assetArea=all#/assets">Alle Vermögenspositionen ansehen</a></p></details>';
   const bridge=data.wealthBridge;
   const wealthBridge=bridge?'<details class="wealth-bridge"><summary><span><strong>Vermögensbrücke '+esc(analysisMonthLabel(bridge.month))+'</strong><small>Vom letzten Monatsende zum aktuellen Stand</small></span><strong>'+signedMoneyWhole(bridge.currentTotalMinor-bridge.previousTotalMinor)+'</strong>'+icons.chevron+'</summary><div class="wealth-bridge-flow"><div><span>Start</span><strong>'+moneyWhole(bridge.previousTotalMinor)+'</strong></div><div><span>Cashflow</span><strong class="'+(bridge.cashflowNetMinor<0?'tone-warning':'tone-ok')+'">'+signedMoneyWhole(bridge.cashflowNetMinor)+'</strong></div><div><span>Marktwerte &amp; Stichtage</span><strong class="'+(bridge.valuationAndOtherMinor<0?'tone-warning':'tone-ok')+'">'+signedMoneyWhole(bridge.valuationAndOtherMinor)+' '+analysisEstimate(true)+'</strong></div><div><span>Heute</span><strong>'+moneyWhole(bridge.currentTotalMinor)+'</strong></div></div><p>Die Restkomponente enthält Marktbewegungen sowie Bewertungs- und Stichtagsunterschiede. Sie ist keine behauptete reine Rendite.</p></details>':'';
+  const historyPanel='<details class="wealth-history" open><summary><span><strong>Vermögensverlauf</strong><small>Historie aus Actual, Ghostfolio und FinanceSync</small></span>'+icons.chevron+'</summary><div class="wealth-history-controls" role="group" aria-label="Zeitraum für Vermögensverlauf"><button type="button" data-wealth-range="1m" aria-pressed="false" onclick="setWealthHistoryRange(\'1m\')">1 M.</button><button type="button" data-wealth-range="ytd" aria-pressed="false" onclick="setWealthHistoryRange(\'ytd\')">YTD</button><button type="button" data-wealth-range="1y" aria-pressed="true" onclick="setWealthHistoryRange(\'1y\')">1 J.</button><button type="button" data-wealth-range="max" aria-pressed="false" onclick="setWealthHistoryRange(\'max\')">Max</button></div><div id="wealth-history-content" class="wealth-history-content" aria-live="polite"></div></details>';
   const months=data.cashflow.months||[];
   const selection=cashflowSelection();
   const range=data.cashflow.range||{months:months.length||selection.months,offset:selection.offset,start:months.at(0)?.key,end:months.at(-1)?.key,endPartial:Boolean(months.at(-1)?.partial)};
@@ -651,7 +690,7 @@ function renderOverview(data){
     <section class="wealth-overview" aria-label="Vermögensübersicht">\
       <div><span class="wealth-label">Gesamtvermögen</span><strong class="wealth-value">'+moneyWhole(total)+'</strong><p class="wealth-date">Stand '+esc(formatDate(data.generatedAt))+' · Bankkonten und Anlagen</p>'+comparisonSummary+'</div>\
       <div class="wealth-composition"><div class="wealth-health">'+statusIcon(automaticOk?"ok":"warning")+'<span>'+(automaticOk?'Automatische Quellen aktuell':'Quellenstatus mit Hinweisen')+'</span></div>'+composition+'<div class="composition-legend"><span><i class="composition-cash"></i>Liquidität <strong>'+moneyWhole(data.cash.amountMinor)+'</strong></span><span><i class="composition-investments"></i>Anlagen <strong>'+moneyWhole(data.investments.amountMinor)+'</strong></span></div></div>\
-      '+wealthBridge+comparisonPanel+'\
+      '+historyPanel+wealthBridge+comparisonPanel+'\
     </section>'+warning+action+'\
     <div class="overview-dashboard-grid">\
       <section class="overview-panel" data-month-count="'+months.length+'" aria-labelledby="cashflow-title"><div class="panel-header cashflow-panel-header"><div><h2 id="cashflow-title">Geldfluss</h2><p class="cashflow-period">'+esc(rangeLabel)+' <span aria-hidden="true">·</span> '+esc(rangeDetail)+'</p></div><div class="period-controls" aria-label="Zeitraum für Geldfluss"><button class="range-previous" type="button" onclick="shiftCashflow(1)" aria-label="Einen Monat zurück" title="Einen Monat zurück">'+icons.chevron+'</button><label class="sr-only" for="cashflow-window">Angezeigter Zeitraum</label><select class="cashflow-window" id="cashflow-window" name="cashflow-window" autocomplete="off" onchange="setCashflowMonths(this.value)"><option value="4"'+(range.months===4?' selected':'')+'>4 Monate</option><option value="6"'+(range.months===6?' selected':'')+'>6 Monate</option><option value="12"'+(range.months===12?' selected':'')+'>12 Monate</option></select><button class="range-next" type="button" onclick="shiftCashflow(-1)" aria-label="Einen Monat vor" title="Einen Monat vor"'+(range.offset===0?' disabled':'')+'>'+icons.chevron+'</button></div></div>'+cashflow+'</section>\
@@ -660,6 +699,7 @@ function renderOverview(data){
       <section class="overview-panel" aria-labelledby="freshness-title"><div class="panel-header"><h2 id="freshness-title">Datenbasis</h2></div><div class="freshness-list">'+freshnessRows+'</div><p class="data-checked">Zuletzt geprüft '+esc(formatDate(data.generatedAt,true))+'</p></section>\
     </div>';
   document.getElementById("dashboard").setAttribute("aria-busy","false");
+  renderWealthHistory(history);
 }
 
 function expenseDate(value){
@@ -1286,7 +1326,8 @@ async function refresh(force=false){
       const params=new URLSearchParams({months:String(range.months),offset:String(range.offset)});
       params.set("spendingOffset",String(spendingSelection().offset));
       if(force)params.set("refresh","1");
-      const data=await call("/api/dashboard/overview?"+params.toString());renderOverview(data);
+      const historyParams=force?"?refresh=1":"";
+      const [data,history]=await Promise.all([call("/api/dashboard/overview?"+params.toString()),call("/api/dashboard/wealth-history"+historyParams)]);renderOverview(data,history);
     }else if(view==="spending"){
       const selection=expenseSelection();
       const params=new URLSearchParams();

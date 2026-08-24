@@ -114,6 +114,10 @@ import { createLifeEvent } from "./life-events.js";
 import { compareNamedScenarios } from "./scenario-compare.js";
 import { previewMilesMoreWithActual, importMilesMoreStatement } from "./miles-more-import.js";
 import { DEFAULT_MERCHANT_RULES, merchantRuleBook } from "./merchant-rules.js";
+import {
+  readDashboardWealthHistory,
+  type DashboardWealthHistory
+} from "./dashboard-wealth-history.js";
 
 export class FinanceServiceError extends Error {
   constructor(message: string, readonly status: number) {
@@ -141,6 +145,8 @@ export class FinanceService {
   private recurringLoading?: Promise<ActualSpendingRangeSnapshot>;
   private assetsCache?: { expiresAt: number; value: DashboardAssets };
   private assetsLoading?: Promise<DashboardAssets>;
+  private wealthHistoryCache?: { expiresAt: number; value: DashboardWealthHistory };
+  private wealthHistoryLoading?: Promise<DashboardWealthHistory>;
   private marketArchiveLoading?: Promise<void>;
   private marketArchiveLastFailureAt = 0;
 
@@ -244,6 +250,22 @@ export class FinanceService {
       return await loading;
     } finally {
       this.overviewLoading.delete(cacheKey);
+    }
+  }
+
+  async getDashboardWealthHistory(force = false): Promise<DashboardWealthHistory> {
+    if (!force && this.wealthHistoryCache && this.wealthHistoryCache.expiresAt > Date.now()) {
+      return this.wealthHistoryCache.value;
+    }
+    if (this.wealthHistoryLoading) return this.wealthHistoryLoading;
+    const load = this.withActual(() => readDashboardWealthHistory(this.config));
+    this.wealthHistoryLoading = load;
+    try {
+      const value = await load;
+      this.wealthHistoryCache = { expiresAt: Date.now() + 15 * 60_000, value };
+      return value;
+    } finally {
+      this.wealthHistoryLoading = undefined;
     }
   }
 

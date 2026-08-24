@@ -421,6 +421,32 @@
     .text-action:hover { color: #ffd07d; }
     .text-action svg { width: 16px; height: 16px; transform: rotate(-90deg); }
     .overview-dashboard-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin-top: 14px; }
+    .wealth-history { grid-column: 1 / -1; border-top: 1px solid var(--line-soft); padding-top: 14px; }
+    .wealth-history > summary { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer; list-style: none; }
+    .wealth-history > summary::-webkit-details-marker { display: none; }
+    .wealth-history > summary > span { display: grid; gap: 2px; }
+    .wealth-history > summary small { color: var(--muted); font-size: 12px; font-weight: 400; }
+    .wealth-history > summary svg { width: 18px; height: 18px; transition: transform .2s ease; }
+    .wealth-history[open] > summary svg { transform: rotate(180deg); }
+    .wealth-history-controls { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .wealth-history-controls button { min-width: 52px; min-height: 44px; border: 1px solid var(--line); border-radius: 9px; background: #111c30; color: var(--muted); cursor: pointer; font: inherit; }
+    .wealth-history-controls button[aria-pressed="true"] { border-color: #6f94cf; background: #203453; color: var(--text); font-weight: 700; }
+    .wealth-history-content { min-height: 260px; margin-top: 8px; }
+    .wealth-history-summary { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 13px; }
+    .wealth-history-summary strong { color: var(--text); font-size: 20px; font-variant-numeric: tabular-nums; }
+    .wealth-history-chart { margin: 6px 0 0; }
+    .wealth-history-chart svg { display: block; width: 100%; min-height: 220px; }
+    .wealth-history-grid path { fill: none; stroke: #2b3a52; stroke-width: 1; }
+    .wealth-history-axis { fill: var(--muted); font-size: 11px; }
+    .wealth-history-line { fill: none; stroke: #8eb5f2; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+    .wealth-history-line.reconstructed { stroke: #7fa8e8; stroke-width: 3; }
+    .wealth-history-line.partial { stroke: #c6924e; stroke-width: 3; stroke-dasharray: 8 7; }
+    .wealth-history-chart figcaption { color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .wealth-history-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .wealth-history-legend span { display: inline-flex; align-items: center; gap: 7px; }
+    .wealth-history-legend i { display: block; width: 24px; border-top: 3px solid #8eb5f2; }
+    .wealth-history-legend i.reconstructed { border-color: #7fa8e8; }
+    .wealth-history-legend i.partial { border-color: #c6924e; border-top-style: dashed; }
     .overview-panel { min-width: 0; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); padding: 20px 22px; }
     .panel-header { display: flex; min-height: 28px; align-items: flex-start; justify-content: space-between; gap: 16px; }
     .panel-header h2 { font-size: 19px; }

@@ -225,6 +225,13 @@ const server = createServer(async (req, res) => {
         )
       );
     }
+    if (req.method === "GET" && url.pathname === "/api/dashboard/wealth-history") {
+      return json(
+        res,
+        200,
+        await service.getDashboardWealthHistory(url.searchParams.get("refresh") === "1")
+      );
+    }
     if (req.method === "GET" && url.pathname === "/api/dashboard/spending") {
       const requestedMonth = url.searchParams.get("month") ?? undefined;
       const month = requestedMonth && /^\d{4}-(0[1-9]|1[0-2])$/.test(requestedMonth)
