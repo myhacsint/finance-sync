@@ -54,6 +54,21 @@ test("Vermögen wird ohne Kontonummern aus letzten Beständen und Ghostfolio auf
         "depot-private": 3_500_000,
         wallet: 1_400_000,
         riester: 7_300_000
+      },
+      holdingsByAccount: {
+        "depot-private": [{
+          label: "SAP SE",
+          symbol: "SAP.DE",
+          quantity: 100,
+          marketPriceMinor: 35_000,
+          valueMinor: 3_500_000,
+          investmentMinor: 3_400_000,
+          netPerformanceMinor: 100_000,
+          netPerformancePercent: 2.94,
+          grossPerformanceMinor: 120_000,
+          dividendMinor: 20_000,
+          currency: "EUR"
+        }]
       }
     }
   }, new Date("2026-08-11T09:00:00Z"));
@@ -74,6 +89,12 @@ test("Vermögen wird ohne Kontonummern aus letzten Beständen und Ghostfolio auf
   ]);
   assert.equal(result.positions.some((position) => /cash-shared|depot-private|wallet/.test(position.key)), false);
   assert.equal(result.summary.confirmed, 1);
+  const depot = result.positions.find((position) => position.area === "depots");
+  assert.equal(depot?.investmentMinor, 3_400_000);
+  assert.equal(depot?.netPerformanceMinor, 100_000);
+  assert.equal(depot?.netPerformancePercent, 100_000 / 3_400_000 * 100);
+  assert.equal(depot?.grossPerformanceMinor, 120_000);
+  assert.equal(depot?.dividendMinor, 20_000);
   const pension = result.positions.find((position) => position.area === "pensions");
   assert.equal(pension?.amountMinor, 7_300_000);
   assert.equal(pension?.basis, "Ghostfolio-Marktwert");
@@ -139,6 +160,11 @@ test("Ghostfolio-Einzelpositionen werden nur für angeforderte Depots geladen", 
               quantity: 34,
               marketPrice: 187.64,
               valueInBaseCurrency: 6379.76,
+              investment: 5888.56,
+              netPerformance: 368.84,
+              netPerformancePercent: 0.06264,
+              grossPerformance: 388.84,
+              dividend: 35,
               assetProfile: { name: "SAP SE", symbol: "SAP.DE", currency: "EUR" }
             }
           }
@@ -161,6 +187,11 @@ test("Ghostfolio-Einzelpositionen werden nur für angeforderte Depots geladen", 
     quantity: 34,
     marketPriceMinor: 18_764,
     valueMinor: 637_976,
+    investmentMinor: 588_856,
+    netPerformanceMinor: 36_884,
+    netPerformancePercent: 6.264,
+    grossPerformanceMinor: 38_884,
+    dividendMinor: 3_500,
     currency: "EUR"
   }]);
 });

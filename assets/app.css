@@ -691,7 +691,11 @@
     .asset-holding span { display: grid; min-width: 0; gap: 3px; }
     .asset-holding span strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .asset-holding small, .asset-holding-empty { color: var(--muted); font-size: 11px; }
-    .asset-holding > strong { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .asset-holding-values { justify-items: end; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .asset-performance { font-weight: 650; font-variant-numeric: tabular-nums; }
+    .asset-performance.gain { color: var(--green); }
+    .asset-performance.loss { color: var(--orange); }
+    .asset-performance.flat { color: var(--muted); }
     .asset-holding-empty { padding: 18px 46px; }
     .asset-area-cell { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); }
     .asset-state-text { display: block; color: var(--muted); font-size: 11px; }
@@ -699,7 +703,8 @@
     .assets-mobile-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 12px; min-height: 92px; align-content: center; padding: 13px; }
     .assets-mobile-row + .assets-mobile-row { border-top: 1px solid var(--line-soft); }
     .assets-mobile-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .assets-mobile-row .asset-mobile-value { font-size: 17px; font-variant-numeric: tabular-nums; }
+    .assets-mobile-row .asset-mobile-value { display: grid; justify-items: end; gap: 2px; font-size: 17px; font-variant-numeric: tabular-nums; }
+    .assets-mobile-row .asset-mobile-value .asset-performance { font-size: 11px; }
     .asset-mobile-meta { color: var(--muted); font-size: 12px; }
     details.assets-mobile-row { display: block; padding: 0; }
     .assets-mobile-depot > summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 12px; min-height: 92px; align-content: center; padding: 13px; cursor: pointer; list-style: none; }

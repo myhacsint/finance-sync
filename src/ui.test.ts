@@ -120,6 +120,10 @@ test("Vermögensansicht besitzt Aufteilung, Bereichsfilter und mobile Bestände"
   assert.match(html, /assets-table/);
   assert.match(html, /assets-mobile-list/);
   assert.match(html, /assetHoldingRows/);
+  assert.match(html, /assetPerformanceLabel/);
+  assert.match(html, /Einstand/);
+  assert.match(html, /Dividenden/);
+  assert.match(html, /Brutto/);
   assert.match(html, /toggleAssetHoldings/);
   assert.match(html, /Basis: letzte verfügbare Werte/);
   assert.match(html, /Konten, Anlagen und Vorsorge mit nachvollziehbaren Stichtagen/);

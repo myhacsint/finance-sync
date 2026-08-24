@@ -20,6 +20,11 @@ export interface GhostfolioAssetSnapshot {
     quantity: number;
     marketPriceMinor: number;
     valueMinor: number;
+    investmentMinor: number;
+    netPerformanceMinor: number;
+    netPerformancePercent: number;
+    grossPerformanceMinor: number;
+    dividendMinor: number;
     currency: string;
   }>>;
 }
@@ -61,12 +66,22 @@ export interface DashboardAssets {
     acquisitionCostMinor?: number;
     acquisitionCostEstimated?: boolean;
     valuationSource?: string;
+    investmentMinor?: number;
+    netPerformanceMinor?: number;
+    netPerformancePercent?: number;
+    grossPerformanceMinor?: number;
+    dividendMinor?: number;
     holdings?: Array<{
       label: string;
       symbol: string;
       quantity: number;
       marketPriceMinor: number;
       valueMinor: number;
+      investmentMinor: number;
+      netPerformanceMinor: number;
+      netPerformancePercent: number;
+      grossPerformanceMinor: number;
+      dividendMinor: number;
       currency: string;
     }>;
   }>;
@@ -217,6 +232,11 @@ export async function readGhostfolioAssets(
           quantity?: number;
           marketPrice?: number;
           valueInBaseCurrency?: number;
+          investment?: number;
+          netPerformance?: number;
+          netPerformancePercent?: number;
+          grossPerformance?: number;
+          dividend?: number;
           assetProfile?: { name?: string; symbol?: string; currency?: string };
         }>;
       };
@@ -227,12 +247,22 @@ export async function readGhostfolioAssets(
           quantity: Number(holding.quantity),
           marketPriceMinor: Math.round(Number(holding.marketPrice) * 100),
           valueMinor: Math.round(Number(holding.valueInBaseCurrency) * 100),
+          investmentMinor: Math.round(Number(holding.investment) * 100),
+          netPerformanceMinor: Math.round(Number(holding.netPerformance) * 100),
+          netPerformancePercent: Number(holding.netPerformancePercent) * 100,
+          grossPerformanceMinor: Math.round(Number(holding.grossPerformance) * 100),
+          dividendMinor: Math.round(Number(holding.dividend) * 100),
           currency: String(holding.assetProfile?.currency || "EUR")
         }))
         .filter((holding) => holding.symbol
           && Number.isFinite(holding.quantity)
           && Number.isFinite(holding.marketPriceMinor)
-          && Number.isFinite(holding.valueMinor))
+          && Number.isFinite(holding.valueMinor)
+          && Number.isFinite(holding.investmentMinor)
+          && Number.isFinite(holding.netPerformanceMinor)
+          && Number.isFinite(holding.netPerformancePercent)
+          && Number.isFinite(holding.grossPerformanceMinor)
+          && Number.isFinite(holding.dividendMinor))
         .sort((left, right) => right.valueMinor - left.valueMinor);
     } catch {
       // The depot total remains useful when only the optional drill-down is unavailable.
@@ -284,6 +314,13 @@ export function buildDashboardAssets(
           ? pensionMarketValue ? investmentValue : cashValue
           : investmentValue;
       const capturedAt = pensionMarketValue ? marketData?.capturedAt : row?.captured_at;
+      const holdings = area === "depots" && row
+        ? marketData?.holdingsByAccount?.[row.account_id]
+        : undefined;
+      const investmentMinor = holdings?.reduce((sum, holding) => sum + holding.investmentMinor, 0);
+      const netPerformanceMinor = holdings?.reduce((sum, holding) => sum + holding.netPerformanceMinor, 0);
+      const grossPerformanceMinor = holdings?.reduce((sum, holding) => sum + holding.grossPerformanceMinor, 0);
+      const dividendMinor = holdings?.reduce((sum, holding) => sum + holding.dividendMinor, 0);
       const marketAge = capturedAt ? now.getTime() - new Date(capturedAt).getTime() : Number.NaN;
       const status = pensionMarketValue
         ? Number.isFinite(marketAge) && marketAge <= maximumAgeMs("manual") ? "current" : "stale"
@@ -307,9 +344,14 @@ export function buildDashboardAssets(
             ? pensionMarketValue ? "Ghostfolio-Marktwert" : "Bestätigter Wert"
             : "Ghostfolio",
         status,
-        holdings: area === "depots" && row
-          ? marketData?.holdingsByAccount?.[row.account_id]
+        holdings,
+        investmentMinor,
+        netPerformanceMinor,
+        netPerformancePercent: Number.isFinite(investmentMinor) && investmentMinor !== 0
+          ? Number(netPerformanceMinor) / Number(investmentMinor) * 100
           : undefined,
+        grossPerformanceMinor,
+        dividendMinor,
         confirmedAmountMinor: area === "pensions" && Number.isFinite(cashValue)
           ? Number(cashValue)
           : undefined,
