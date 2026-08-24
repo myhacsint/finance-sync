@@ -3,6 +3,10 @@ export interface MerchantRule {
   label: string;
 }
 
+export interface DisplayMerchantRule extends MerchantRule {
+  deletable: boolean;
+}
+
 export const DEFAULT_MERCHANT_RULES: MerchantRule[] = [
   { pattern: "amazon", label: "Amazon" },
   { pattern: "anthropic", label: "Anthropic Claude Subscription" },
@@ -38,6 +42,19 @@ export function mergeMerchantRules(
     seen.add(key);
     return true;
   });
+}
+
+export function merchantRuleBook(
+  base: MerchantRule[],
+  persisted: MerchantRule[] = []
+): DisplayMerchantRule[] {
+  const persistedKeys = new Set(
+    persisted.map((rule) => `${normalizeMerchantLabel(rule.pattern)}=>${rule.label}`)
+  );
+  return mergeMerchantRules(base, persisted).map((rule) => ({
+    ...rule,
+    deletable: persistedKeys.has(`${normalizeMerchantLabel(rule.pattern)}=>${rule.label}`)
+  }));
 }
 
 export function applyMerchantRules(

@@ -114,7 +114,7 @@ import { createNamedScenario } from "./named-scenarios.js";
 import { createLifeEvent, lifeEventMonthlyDelta } from "./life-events.js";
 import { compareNamedScenarios } from "./scenario-compare.js";
 import { previewMilesMore, importMilesMoreStatement } from "./miles-more-import.js";
-import { DEFAULT_MERCHANT_RULES, mergeMerchantRules } from "./merchant-rules.js";
+import { DEFAULT_MERCHANT_RULES, merchantRuleBook } from "./merchant-rules.js";
 
 export class FinanceServiceError extends Error {
   constructor(message: string, readonly status: number) {
@@ -643,7 +643,7 @@ export class FinanceService {
     recurring: DashboardRecurringExpenses;
     optimizations: DashboardRecurringExpenseOptimizations;
     aliases: Array<{ fromKey: string; toLabel: string }>;
-    merchantRules: Array<{ pattern: string; label: string }>;
+    merchantRules: Array<{ pattern: string; label: string; deletable: boolean }>;
     monthCloses: Array<{ month: string; note: string; closedAt: string }>;
   }> {
     if (!this.config.actual?.enabled) throw new FinanceServiceError("Actual ist deaktiviert", 400);
@@ -773,7 +773,8 @@ export class FinanceService {
   }
 
   listMerchantRuleBook() {
-    return mergeMerchantRules(DEFAULT_MERCHANT_RULES, this.db.listMerchantRules());
+    const persisted = this.db.listMerchantRules();
+    return merchantRuleBook(DEFAULT_MERCHANT_RULES, persisted);
   }
 
   saveMerchantRule(pattern: string, label: string) {

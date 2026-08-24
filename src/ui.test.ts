@@ -9,6 +9,25 @@ test("eingebettetes UI-JavaScript ist syntaktisch gültig", () => {
   for (const script of scripts) assert.doesNotThrow(() => new Function(script));
 });
 
+test("Prüfansicht behält 24 Monate und schützt Schreibaktionen", () => {
+  const html = renderUi();
+  assert.match(html, /\[3,6,12,24\]\.includes\(months\)/);
+  assert.match(html, /id="miles-import-button"[^>]*disabled/);
+  assert.match(html, /id="miles-confirm-check"/);
+  assert.match(html, /currentMilesMorePreview/);
+  assert.match(html, /rule\.deletable/);
+  assert.match(html, />Standard<\/span>/);
+});
+
+test("gespeicherte Szenarien stellen alle FIRE-Hebel vollständig wieder her", () => {
+  const html = renderUi();
+  assert.match(html, /params\.set\("fireActionKeys","none"\)/);
+  assert.match(html, /inputs\.fireCategoryCuts/);
+  assert.match(html, /params\.set\("fireCategoryCuts"/);
+  assert.match(html, /inputs\.fireOneTimeKeys/);
+  assert.match(html, /params\.set\("fireOneTimeKeys"/);
+});
+
 test("Datenstatus enthält responsive Navigation und zugängliche Hauptbereiche", () => {
   const html = renderUi();
   assert.match(html, /<main class="content" id="main-content">/);

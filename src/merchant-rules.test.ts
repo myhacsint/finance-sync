@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   DEFAULT_MERCHANT_RULES,
   applyMerchantRules,
+  merchantRuleBook,
   mergeMerchantRules
 } from "./merchant-rules.js";
 
@@ -33,4 +34,12 @@ test("zusätzliche persistierte Regeln überschreiben die Defaults", () => {
   ]);
   assert.equal(applyMerchantRules("Ginge Technology", rules).label, "Ginge");
   assert.equal(applyMerchantRules("Amazon EU SARL", rules).label, "Amazon");
+});
+
+test("nur persistierte Händlerregeln werden als löschbar ausgewiesen", () => {
+  const rules = merchantRuleBook(DEFAULT_MERCHANT_RULES, [
+    { pattern: "ginge", label: "Ginge" }
+  ]);
+  assert.equal(rules.find((rule) => rule.pattern === "ginge")?.deletable, true);
+  assert.equal(rules.find((rule) => rule.pattern === "amazon")?.deletable, false);
 });
