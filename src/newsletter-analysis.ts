@@ -5,6 +5,7 @@ export interface NewsletterMessage {
   messageId: string;
   inboxId: string;
   sender: string;
+  source?: string;
   subject: string;
   receivedAt: string;
   content: string;
@@ -83,6 +84,7 @@ export function buildNewsletterAnalysis(
     messageId: message.messageId,
     inboxId: message.inboxId,
     sender: message.sender,
+    ...(message.source ? { source: message.source } : {}),
     subject: message.subject,
     receivedAt: message.receivedAt,
     contentHash: newsletterContentHash(message),

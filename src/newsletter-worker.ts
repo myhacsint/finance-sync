@@ -74,6 +74,8 @@ export async function runNewsletterWorker(options: WorkerOptions): Promise<{
         messageId: String(full.messageId),
         inboxId: String(full.inboxId),
         sender,
+        source: /friedrich/i.test(options.searchQuery ?? "") ? "Friedrich Report"
+          : /hkcm/i.test(options.searchQuery ?? "") ? "HKCM" : undefined,
         subject: full.subject ?? "Ohne Betreff",
         receivedAt: new Date(full.timestamp).toISOString(),
         content

@@ -235,7 +235,18 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/api/dashboard/investment-newsletters") {
       const requested = Number(url.searchParams.get("limit") ?? 100);
       const limit = Number.isSafeInteger(requested) ? Math.max(1, Math.min(500, requested)) : 100;
-      return json(res, 200, service.getNewsletterAnalyses(limit));
+      return json(res, 200, await service.getNewsletterAnalyses(limit));
+    }
+    const newsletterState = /^\/api\/dashboard\/investment-newsletters\/([^/]+)\/state$/.exec(url.pathname);
+    if (req.method === "PATCH" && newsletterState) {
+      const payload = await body(req) as { state?: string };
+      if (!new Set(["UNREVIEWED", "REVIEWED", "DISMISSED"]).has(String(payload.state))) {
+        throw new FinanceServiceError("Ungültiger Prüfstatus", 400);
+      }
+      return json(res, 200, service.updateNewsletterAnalysisState(
+        decodeURIComponent(newsletterState[1]),
+        payload.state as "UNREVIEWED" | "REVIEWED" | "DISMISSED"
+      ));
     }
     if (req.method === "GET" && url.pathname === "/api/dashboard/spending") {
       const requestedMonth = url.searchParams.get("month") ?? undefined;

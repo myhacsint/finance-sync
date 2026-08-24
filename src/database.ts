@@ -294,6 +294,17 @@ export class FinanceDatabase {
     return rows.map((row) => JSON.parse(row.payload_json) as NewsletterAnalysis);
   }
 
+  updateNewsletterAnalysisState(messageId: string, state: "UNREVIEWED" | "REVIEWED" | "DISMISSED"): NewsletterAnalysis | null {
+    const row = this.db.prepare("SELECT payload_json FROM newsletter_analyses WHERE message_id = ?")
+      .get(messageId) as { payload_json: string } | undefined;
+    if (!row) return null;
+    const analysis = JSON.parse(row.payload_json) as NewsletterAnalysis;
+    const updated = { ...analysis, state };
+    this.db.prepare("UPDATE newsletter_analyses SET state = ?, payload_json = ? WHERE message_id = ?")
+      .run(state, JSON.stringify(updated), messageId);
+    return updated;
+  }
+
   assetAccountSources(): Map<string, string> {
     const rows = this.db.prepare(`
       SELECT account_id, min(source_id) AS source_id

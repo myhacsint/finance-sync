@@ -44,6 +44,7 @@ let currentDecisionLabData=null;
 let currentReviewData=null;
 let currentWealthHistory=null;
 let wealthHistoryRange="1y";
+let currentNewsletterData=null;
 
 function headerAction(){if(activeView()==="analyses"&&analysisSelection().view==="expense-structure")exportAnalysisCsv();else refresh(true)}
 
@@ -279,7 +280,7 @@ function analysisSelection(){
   const comparison=Number(params.get("analysisComparison")||0);
   const boundedParam=(name,fallback,min,max)=>{if(!params.has(name))return fallback;const value=Number(params.get(name));return Number.isFinite(value)?Math.max(min,Math.min(max,value)):fallback};
   return {
-    view:params.get("analysisView")==="crypto-origin-tax"?"crypto-origin-tax":"expense-structure",
+    view:["crypto-origin-tax","investment-newsletters"].includes(params.get("analysisView"))?params.get("analysisView"):"expense-structure",
     period:Number.isInteger(period)&&period>0?period:0,
     comparison:Number.isInteger(comparison)&&comparison>0?comparison:0,
     expanded:params.get("analysisCategoriesExpanded")==="1",
@@ -316,7 +317,7 @@ function setAnalysisView(value){
     history.pushState(null,"",(params.toString()?"?"+params:"")+ "#/review");
     refresh();return;
   }
-  if(value==="crypto-origin-tax")params.set("analysisView",value);else params.delete("analysisView");
+  if(value==="crypto-origin-tax"||value==="investment-newsletters")params.set("analysisView",value);else params.delete("analysisView");
   params.delete("analysisPosition");params.delete("recurringCandidate");
   const query=params.toString();history.pushState(null,"",(query?"?"+query:location.pathname)+location.hash);refresh();
 }
@@ -842,6 +843,43 @@ function renderAnalysesError(error){
   document.getElementById("dashboard").setAttribute("aria-busy","false");
   msg(error?.message||"Die Analyse konnte nicht geladen werden.",true);
 }
+function newsletterSource(item){return item.source||(/hkcm|hopf|klinkm/i.test(item.subject+" "+item.sender)?"HKCM":/friedrich/i.test(item.subject+" "+item.sender)?"Friedrich Report":"Newsletter")}
+function newsletterGroups(data){
+  const normalized=value=>String(value||"").toLocaleUpperCase("de-DE").replace(/[^A-Z0-9ÄÖÜ]/g,"");
+  const prices=new Map((data.prices||[]).flatMap(price=>[[normalized(price.symbol),price],[normalized(price.name),price]]));
+  const groups=new Map();
+  (data.items||[]).forEach(item=>(item.theses||[]).forEach(thesis=>{
+    const key=(thesis.ticker||thesis.instrument).trim().toLocaleUpperCase("de-DE");
+    const group=groups.get(key)||{key,instrument:thesis.instrument,ticker:thesis.ticker,assetClass:thesis.assetClass,items:[],theses:[],sources:new Set(),evidence:[],risks:[],catalysts:[]};
+    group.items.push(item);group.theses.push(thesis);group.sources.add(newsletterSource(item));
+    group.evidence.push(...(thesis.evidence||[]).map(text=>({text,item})));group.risks.push(...(thesis.risks||[]));group.catalysts.push(...(thesis.catalysts||[]));
+    groups.set(key,group);
+  }));
+  return [...groups.values()].map(group=>{
+    group.items.sort((a,b)=>String(b.receivedAt).localeCompare(String(a.receivedAt)));
+    const latest=group.items[0];const thesis=group.theses[0];
+    group.latest=latest;group.thesis=thesis;group.price=prices.get(normalized(group.ticker))||prices.get(normalized(group.instrument))||null;
+    group.state=group.items.every(item=>item.state==="REVIEWED")?"REVIEWED":group.items.every(item=>item.state==="DISMISSED")?"DISMISSED":"UNREVIEWED";
+    return group;
+  }).sort((a,b)=>String(b.latest.receivedAt).localeCompare(String(a.latest.receivedAt)));
+}
+function newsletterStance(value){return {BULLISH:"Bullisch",BEARISH:"Bärisch",NEUTRAL:"Neutral",MIXED:"Widersprüchlich"}[value]||value}
+function newsletterState(value){return {UNREVIEWED:"Ungeprüft",REVIEWED:"Geprüft",DISMISSED:"Ausgeblendet"}[value]||value}
+function newsletterSelection(){const params=new URLSearchParams(location.search);return {source:params.get("newsletterSource")||"all",state:params.get("newsletterState")||"UNREVIEWED",search:(params.get("newsletterSearch")||"").slice(0,80),open:params.get("newsletterOpen")||""}}
+function setNewsletterFilters(changes){const params=new URLSearchParams(location.search);const names={source:"newsletterSource",state:"newsletterState",search:"newsletterSearch",open:"newsletterOpen"};Object.entries(changes).forEach(([key,value])=>{const name=names[key],text=String(value||"").trim();if(!text||text==="all"||(key==="state"&&text==="UNREVIEWED"))params.delete(name);else params.set(name,text)});history.pushState(null,"",(params.toString()?"?"+params:location.pathname)+location.hash);renderInvestmentNewsletters(currentNewsletterData)}
+function toggleNewsletter(key){const state=newsletterSelection();setNewsletterFilters({open:state.open===key?"":key})}
+async function setNewsletterGroupState(key,state){const group=newsletterGroups(currentNewsletterData).find(item=>item.key===key);if(!group)return;await Promise.all(group.items.map(item=>call("/api/dashboard/investment-newsletters/"+encodeURIComponent(item.messageId)+"/state",{method:"PATCH",body:JSON.stringify({state})})));msg(state==="REVIEWED"?"Auswertung als geprüft markiert.":"Auswertung ausgeblendet.");const data=await call("/api/dashboard/investment-newsletters?limit=500");renderInvestmentNewsletters(data)}
+function renderInvestmentNewsletters(data){
+  currentNewsletterData=data;const selection=newsletterSelection();let groups=newsletterGroups(data);
+  groups=groups.filter(group=>(selection.source==="all"||group.sources.has(selection.source))&&(selection.state==="all"||group.state===selection.state)&&(!selection.search||(group.instrument+" "+(group.ticker||"")+" "+group.assetClass).toLocaleLowerCase("de-DE").includes(selection.search.toLocaleLowerCase("de-DE"))));
+  const toolbar='<section class="newsletter-toolbar" aria-label="Investment-Cockpit Filter"><label>Ansicht<select onchange="setAnalysisView(this.value)"><option value="expense-structure">Ausgabenstruktur</option><option value="investment-newsletters" selected>Investment-Cockpit</option><option value="crypto-origin-tax">Krypto · Herkunft &amp; Steuerstatus</option></select></label><label>Quelle<select onchange="setNewsletterFilters({source:this.value})"><option value="all">Alle</option><option value="HKCM"'+(selection.source==="HKCM"?' selected':'')+'>HKCM</option><option value="Friedrich Report"'+(selection.source==="Friedrich Report"?' selected':'')+'>Friedrich Report</option></select></label><label>Status<select onchange="setNewsletterFilters({state:this.value})"><option value="UNREVIEWED"'+(selection.state==="UNREVIEWED"?' selected':'')+'>Ungeprüft</option><option value="REVIEWED"'+(selection.state==="REVIEWED"?' selected':'')+'>Geprüft</option><option value="DISMISSED"'+(selection.state==="DISMISSED"?' selected':'')+'>Ausgeblendet</option><option value="all"'+(selection.state==="all"?' selected':'')+'>Alle</option></select></label><label>Suche<input type="search" value="'+esc(selection.search)+'" placeholder="Titel, Instrument, Thema" onsearch="setNewsletterFilters({search:this.value})" onblur="setNewsletterFilters({search:this.value})"></label></section>';
+  const totalTheses=(data.items||[]).reduce((sum,item)=>sum+(item.theses||[]).length,0);
+  const meta='<div class="newsletter-meta"><strong>'+(data.items||[]).length+' Auswertungen</strong><span>'+totalTheses+' Thesen</span><span>Stand '+esc(formatDate(data.generatedAt,true))+'</span><span>[KI-AUSWERTUNG]</span></div>';
+  const totalGroups=groups.length;groups=groups.slice(0,20);
+  const rows=groups.map(group=>{const open=selection.open===group.key,thesis=group.thesis,price=group.price;const current=price?money(price.priceMinor,price.currency):'Nicht verfügbar';const target=thesis.targetZone||'Nicht genannt';const sources=[...group.sources].join(' · ');const evidence=group.evidence.slice(0,8).map(entry=>'<blockquote><strong>'+esc(newsletterSource(entry.item))+' · '+esc(formatDate(entry.item.receivedAt))+'</strong><span>'+esc(entry.item.subject)+'</span><p>'+esc(entry.text)+'</p></blockquote>').join('');const detail='<div class="newsletter-detail"><section><h3>Synthese <small>[KI-AUSWERTUNG]</small></h3><p>'+esc(group.latest.summary)+'</p><dl><div><dt>Aktueller Kurs</dt><dd>'+esc(current)+(price?' · '+esc(formatDate(price.capturedAt)):'')+'</dd></div><div><dt>Zielkurs / Zielzone</dt><dd>'+esc(target)+'</dd></div><div><dt>Einstiegszone</dt><dd>'+esc(thesis.entryZone||'Nicht genannt')+'</dd></div><div><dt>Invalidierung</dt><dd>'+esc(thesis.invalidation||'Nicht genannt')+'</dd></div></dl></section><section><h3>Chancen und Risiken</h3><strong>Katalysatoren</strong><ul>'+[...new Set(group.catalysts)].slice(0,6).map(value=>'<li>'+esc(value)+'</li>').join('')+'</ul><strong>Unsicherheiten</strong><ul>'+[...new Set([...group.risks,...group.items.flatMap(item=>item.uncertainties||[])])].slice(0,8).map(value=>'<li>'+esc(value)+'</li>').join('')+'</ul></section><section><details><summary>Belege aus '+group.items.length+' Newslettern'+icons.chevron+'</summary>'+evidence+'</details></section><div class="newsletter-actions"><button class="button" type="button" onclick="setNewsletterGroupState(&quot;'+esc(group.key)+'&quot;,&quot;REVIEWED&quot;)">Prüfen</button><button class="button secondary" type="button" onclick="setNewsletterGroupState(&quot;'+esc(group.key)+'&quot;,&quot;DISMISSED&quot;)">Ausblenden</button></div></div>';return '<article class="newsletter-row'+(open?' is-open':'')+'"><button type="button" class="newsletter-row-toggle" aria-expanded="'+open+'" onclick="toggleNewsletter(&quot;'+esc(group.key)+'&quot;)"><span><strong>'+esc(group.instrument)+'</strong><small>'+esc(group.ticker||group.assetClass)+'</small></span><span><small>Quelle</small>'+esc(sources)+'</span><span class="stance-'+String(thesis.stance).toLowerCase()+'"><small>Einschätzung</small>'+esc(newsletterStance(thesis.stance))+'</span><span><small>Aktueller Kurs</small>'+esc(current)+'</span><span><small>Zielkurs</small>'+esc(target)+'</span><span><small>Horizont</small>'+esc(thesis.horizon||'Nicht genannt')+'</span><span><small>Unterstützt von</small>'+group.items.length+' Newsletter</span><span><small>Status</small>'+esc(newsletterState(group.state))+'</span>'+icons.chevron+'</button>'+(open?detail:'')+'</article>'}).join('');
+  const remainder=totalGroups>groups.length?'<p class="newsletter-remainder">20 von '+totalGroups+' Thesengruppen sichtbar · Suche oder Filter nutzen, um weitere gezielt aufzurufen.</p>':'';
+  document.getElementById("dashboard").innerHTML=toolbar+meta+(rows?'<section class="newsletter-list" aria-label="Newsletter-Thesen">'+rows+'</section>'+remainder:expenseState("Keine Treffer","Für diese Filter liegen keine Investment-Thesen vor.","setNewsletterFilters({source:&quot;all&quot;,state:&quot;all&quot;,search:&quot;&quot;})","Alle anzeigen","warning"));document.getElementById("dashboard").setAttribute("aria-busy","false");
+}
 function analysisYearOptions(years,selected,excluded){
   return years.map(year=>'<option value="'+year+'"'+(year===selected?' selected':'')+(year===excluded?' disabled':'')+'>'+year+'</option>').join("");
 }
@@ -856,7 +894,7 @@ function renderAnalyses(data){
   const state=analysisSelection();
   const periodOptions=analysisYearOptions(data.availableYears,data.selection.periodYear,0);
   const comparisonOptions=analysisYearOptions(data.availableYears,data.selection.comparisonYear,data.selection.periodYear);
-  const toolbar='<section class="analysis-toolbar" aria-label="Analysefilter"><label>Ansicht<select name="analysis-view" onchange="setAnalysisView(this.value)"><option value="expense-structure" selected>Ausgabenstruktur</option><option value="crypto-origin-tax">Krypto · Herkunft &amp; Steuerstatus</option></select></label><label>Zeitraum<select id="analysis-period" name="analysis-period" autocomplete="off">'+periodOptions+'</select></label><label>Vergleich<select id="analysis-comparison" name="analysis-comparison" autocomplete="off">'+comparisonOptions+'</select></label><button class="button" type="button" onclick="applyAnalysisFilters()">Anwenden</button></section>';
+  const toolbar='<section class="analysis-toolbar" aria-label="Analysefilter"><label>Ansicht<select name="analysis-view" onchange="setAnalysisView(this.value)"><option value="expense-structure" selected>Ausgabenstruktur</option><option value="investment-newsletters">Investment-Cockpit</option><option value="crypto-origin-tax">Krypto · Herkunft &amp; Steuerstatus</option></select></label><label>Zeitraum<select id="analysis-period" name="analysis-period" autocomplete="off">'+periodOptions+'</select></label><label>Vergleich<select id="analysis-comparison" name="analysis-comparison" autocomplete="off">'+comparisonOptions+'</select></label><button class="button" type="button" onclick="applyAnalysisFilters()">Anwenden</button></section>';
   const change=data.changePercent===null?'–':new Intl.NumberFormat("de-DE",{signDisplay:"always",maximumFractionDigits:1}).format(data.changePercent)+' %';
   const changeTone=data.changePercent===null?'':data.changePercent<=0?' tone-ok':' tone-warning';
   const summary='<section class="analysis-summary" aria-label="Zusammenfassung Ausgabenstruktur"><div><span>Wirtschaftliche Ausgaben '+esc(data.period.label)+'</span><strong class="analysis-total">'+(data.state==="empty"?'–':moneyWhole(data.period.totalMinor))+'</strong><p class="analysis-basis">Gebucht, Zusatzwerte einbezogen, interne Überträge ausgeschlossen '+analysisEstimate(data.period.estimate)+'</p></div><div><span>Veränderung zu '+esc(data.comparison.label)+' '+analysisEstimate(data.comparison.estimate)+'</span><strong class="'+changeTone+'">'+change+'</strong></div><div><span>Nicht zuordenbar</span><strong>'+new Intl.NumberFormat("de-DE",{maximumFractionDigits:1}).format(data.unknownPercent)+' %</strong><p class="analysis-basis">'+moneyWhole(data.unknownMinor)+'</p></div></section>';
@@ -905,7 +943,7 @@ function renderCryptoError(error){
 }
 function renderCryptoAnalysis(data){
   currentCryptoData=data;
-  const toolbar='<section class="analysis-toolbar crypto-toolbar" aria-label="Auswahl und Datenstand der Kryptoanalyse"><label>Ansicht<select name="analysis-view" autocomplete="off" onchange="setAnalysisView(this.value)"><option value="expense-structure">Ausgabenstruktur</option><option value="crypto-origin-tax" selected>Krypto · Herkunft &amp; Steuerstatus</option></select></label><div class="crypto-toolbar-meta"><span>Prüfumfang</span><strong>Ab '+data.selection.scopeStartYear+'</strong></div><div class="crypto-toolbar-meta"><span>Rekonstruktionsstand</span><strong>'+esc(formatDate(data.capturedAt,true))+'</strong></div></section>';
+  const toolbar='<section class="analysis-toolbar crypto-toolbar" aria-label="Auswahl und Datenstand der Kryptoanalyse"><label>Ansicht<select name="analysis-view" autocomplete="off" onchange="setAnalysisView(this.value)"><option value="expense-structure">Ausgabenstruktur</option><option value="investment-newsletters">Investment-Cockpit</option><option value="crypto-origin-tax" selected>Krypto · Herkunft &amp; Steuerstatus</option></select></label><div class="crypto-toolbar-meta"><span>Prüfumfang</span><strong>Ab '+data.selection.scopeStartYear+'</strong></div><div class="crypto-toolbar-meta"><span>Rekonstruktionsstand</span><strong>'+esc(formatDate(data.capturedAt,true))+'</strong></div></section>';
   const summary='<section class="analysis-summary crypto-summary" aria-label="Zusammenfassung der Solana-Position"><div><span>Aktueller Gesamtbestand zum Rekonstruktionsstand</span><strong class="analysis-total">'+solAmount(data.holdings.totalSol)+' SOL</strong><p class="analysis-basis">Quelle: '+esc(data.source)+' · Stake ist kein Abfluss</p></div><div><span>Davon Staking Rewards</span><strong>'+solAmount(data.holdings.rewardsSol)+' SOL</strong><p class="analysis-basis">'+new Intl.NumberFormat("de-DE",{maximumFractionDigits:2}).format(data.holdings.rewardsPercent)+' % des Bestands</p></div><div><span>In Stake-Accounts</span><strong>'+solAmount(data.holdings.stakeTotalSol)+' SOL</strong><p class="analysis-basis">Deaktiviert: '+solAmount(data.holdings.inactiveStakeSol)+' SOL</p></div></section>';
   const investment='<section class="analysis-panel" aria-labelledby="crypto-investment-title"><div class="analysis-panel-head"><div><h2 id="crypto-investment-title">Investmentbasis</h2><p>Ökonomische Average-Cost-Sicht, getrennt von der Steuerbasis</p></div></div><div class="crypto-basis-list"><div class="crypto-basis-row"><div><strong>A. Übergang ETH → SOL</strong><span>Marktwert beim Übergang / erhaltene SOL '+analysisEstimate(true)+'</span></div><strong>'+perSol(data.transition.conversionBasisEurPerSol)+'<small>'+perSol(data.transition.conversionBasisUsdPerSol,"USD")+'</small></strong></div><div class="crypto-basis-row"><div><strong>B. Effektiv inklusive Staking</strong><span>Fortgeführte Kapitalbasis / heutiger Bestand '+analysisEstimate(true)+'</span></div><strong>'+perSol(data.investment.effectiveBasisEurPerSol)+'<small>'+perSol(data.investment.effectiveBasisUsdPerSol,"USD")+'</small></strong></div><div class="crypto-basis-row"><div><strong>C. Netto-Fiatkapital</strong><span>Einzahlungen abzüglich bestätigter Fiat-Auszahlungen · keine steuerliche Cost Basis</span></div><strong>'+money(data.investment.netFiatCapitalEurMinor)+'<small>'+perSol(data.investment.netFiatPerCurrentSolEur)+'</small></strong></div></div><div class="crypto-break-even"><span>Break-even der heutigen Position vor Steuern und Verkaufskosten '+analysisEstimate(true)+'</span><strong>'+perSol(data.investment.breakEvenEurPerSol)+'</strong></div></section>';
   const holdings='<section class="analysis-panel" aria-labelledby="crypto-holdings-title"><div class="analysis-panel-head"><div><h2 id="crypto-holdings-title">Bestandszusammensetzung</h2><p>Mengen sind nicht mit Anschaffungskosten gleichzusetzen</p></div></div><div class="crypto-holdings-list"><div class="crypto-holding-row"><div><strong>Liquide</strong><span>Hauptwallet</span></div><strong>'+solAmount(data.holdings.liquidSol)+' SOL</strong></div><div class="crypto-holding-row"><div><strong>Aktiv delegiert</strong><span>Native Stake-Delegation</span></div><strong>'+solAmount(data.holdings.delegatedSol)+' SOL</strong></div><div class="crypto-holding-row"><div><strong>Noch nicht delegiert</strong><span>Jito-Tips im Stake-Account</span></div><strong>'+solAmount(data.holdings.undelegatedStakeSol)+' SOL</strong></div><div class="crypto-holding-row"><div><strong>Rent-Reserve</strong><span>Grundsätzlich bei Kontoschließung rückholbar</span></div><strong>'+solAmount(data.holdings.rentReserveSol)+' SOL</strong></div><div class="crypto-holding-row"><div><strong>Gekauft oder konvertiert</strong><span>Heutiger Bestand vor Rewards</span></div><strong>'+solAmount(data.holdings.acquiredOrConvertedSol)+' SOL</strong></div></div></section>';
@@ -1301,6 +1339,7 @@ function renderHeader(view){
     status:{title:"Datenstatus",subtitle:"Aktualität, offene Aufgaben und Systemzustand auf einen Blick."}
   }[view];
   if(view==="analyses"&&analysisSelection().view==="crypto-origin-tax")content.subtitle="Krypto-Herkunft, Investmentbasis und Steuerstatus nachvollziehen.";
+  if(view==="analyses"&&analysisSelection().view==="investment-newsletters")content.subtitle="Newsletter-Signale prüfen, einordnen und nachvollziehen.";
   document.title=content.title+" · Finance Hub";
   const eyebrow=document.getElementById("page-eyebrow");
   eyebrow.hidden=view!=="status";
@@ -1390,6 +1429,8 @@ async function refresh(force=false){
         if(selection.fireOneTimeKeys.length)params.set("fireOneTimeKeys",selection.fireOneTimeKeys.join(","));
         if(force)params.set("refresh","1");
         const data=await call("/api/dashboard/analyses/decision-lab?"+params.toString());renderDecisionLab(data);
+      }else if(selection.view==="investment-newsletters"){
+        const data=await call("/api/dashboard/investment-newsletters?limit=500");renderInvestmentNewsletters(data);
       }else if(selection.view==="crypto-origin-tax"){
         const data=await call("/api/dashboard/analyses/crypto-position");renderCryptoAnalysis(data);
       }else if(selection.view==="expense-optimizations"){
@@ -1413,7 +1454,7 @@ async function refresh(force=false){
     }
     msg("");
   }
-  catch(error){if(view==="spending")renderSpendingError(error);else if(view==="assets")renderAssetsError(error);else if(view==="review")renderReviewError(error);else if(view==="lab")renderDecisionLabError(error);else if(view==="analyses"&&analysisSelection().view==="crypto-origin-tax")renderCryptoError(error);else if(view==="analyses")renderAnalysesError(error);else{msg(error.message,true);document.getElementById("dashboard").setAttribute("aria-busy","false")}}
+  catch(error){if(view==="spending")renderSpendingError(error);else if(view==="assets")renderAssetsError(error);else if(view==="review")renderReviewError(error);else if(view==="lab")renderDecisionLabError(error);else if(view==="analyses"&&analysisSelection().view==="crypto-origin-tax")renderCryptoError(error);else if(view==="analyses"&&analysisSelection().view==="investment-newsletters"){document.getElementById("dashboard").innerHTML=expenseState("Nicht verfügbar","Das Investment-Cockpit konnte nicht geladen werden.","refresh(true)","Erneut versuchen");msg(error.message,true)}else if(view==="analyses")renderAnalysesError(error);else{msg(error.message,true);document.getElementById("dashboard").setAttribute("aria-busy","false")}}
   finally{button.disabled=false}
 }
 async function syncSource(id){try{msg("Abruf läuft …");const result=await call("/api/sync/"+id,{method:"POST"});msg(result.message);await refresh()}catch(error){msg(error.message,true)}}

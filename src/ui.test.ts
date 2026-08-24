@@ -10,7 +10,7 @@ function renderUi(): string {
 }
 
 test("externes UI-JavaScript ist syntaktisch gültig", () => {
-  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.43\.3" defer><\/script>/);
+  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.45\.0" defer><\/script>/);
   assert.match(clientSource, /match\(\/\^\(\\d\{4\}\)-\(\\d\{2\}\)\$\//);
   assert.doesNotMatch(clientSource, /match\(\/\^\(\\\\d\{4\}\)-\(\\\\d\{2\}\)\$\//);
   assert.doesNotThrow(() => new Function(clientSource));
@@ -147,6 +147,19 @@ test("Analysenansicht besitzt Jahresvergleich, Schätzungsmarker, Drilldown und 
   assert.match(html, /\[SCHÄTZUNG\]/);
   assert.match(html, /CSV exportieren/);
   assert.match(html, /analysis-mobile-positions/);
+});
+
+test("Investment-Cockpit zeigt belegte Zielzonen, Kurse und prüfbare Quellen", () => {
+  const html = renderUi();
+  assert.match(html, /Investment-Cockpit/);
+  assert.match(html, /\/api\/dashboard\/investment-newsletters/);
+  assert.match(html, /Aktueller Kurs/);
+  assert.match(html, /Zielkurs \/ Zielzone/);
+  assert.match(html, /Nicht genannt/);
+  assert.match(html, /\[KI-AUSWERTUNG\]/);
+  assert.match(html, /Belege aus/);
+  assert.match(html, /setNewsletterGroupState/);
+  assert.match(html, /newsletter-row-toggle/);
 });
 
 test("Analysenansicht besitzt regelmäßige Ausgaben mit Filtern, Detail und Nutzerentscheidung", () => {

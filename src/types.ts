@@ -34,6 +34,7 @@ export interface NewsletterAnalysis {
   messageId: string;
   inboxId: string;
   sender: string;
+  source?: string;
   subject: string;
   receivedAt: string;
   contentHash: string;

@@ -162,17 +162,42 @@ export class FinanceService {
     return this.config.sources.find((source) => source.id === id);
   }
 
-  getNewsletterAnalyses(limit = 100): {
+  async getNewsletterAnalyses(limit = 100): Promise<{
     generatedAt: string;
     state: "empty" | "ready";
     items: NewsletterAnalysis[];
-  } {
+    prices: Array<{ symbol: string; name: string; priceMinor: number; currency: string; capturedAt?: string }>;
+  }> {
     const items = this.db.listNewsletterAnalyses(limit);
+    let prices: Array<{ symbol: string; name: string; priceMinor: number; currency: string; capturedAt?: string }> = [];
+    if (this.config.ghostfolio) {
+      try {
+        const snapshot = await readGhostfolioAssets(this.config.ghostfolio, {
+          holdingAccountIds: Object.keys(this.config.ghostfolio.accountMap)
+        });
+        prices = Object.values(snapshot.holdingsByAccount ?? {}).flat().map((holding) => ({
+          symbol: holding.symbol,
+          name: holding.label,
+          priceMinor: holding.marketPriceMinor,
+          currency: holding.currency,
+          capturedAt: snapshot.capturedAt
+        }));
+      } catch {
+        // The analysis remains usable when optional live quote context is unavailable.
+      }
+    }
     return {
       generatedAt: new Date().toISOString(),
       state: items.length === 0 ? "empty" : "ready",
-      items
+      items,
+      prices
     };
+  }
+
+  updateNewsletterAnalysisState(messageId: string, state: "UNREVIEWED" | "REVIEWED" | "DISMISSED"): NewsletterAnalysis {
+    const updated = this.db.updateNewsletterAnalysisState(messageId, state);
+    if (!updated) throw new FinanceServiceError("Newsletter-Auswertung nicht gefunden", 404);
+    return updated;
   }
 
   private async withActual<T>(operation: () => Promise<T>): Promise<T> {

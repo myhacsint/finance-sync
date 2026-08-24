@@ -34,6 +34,8 @@ test("validiert und persistiert eine nachvollziehbare Newsletteranalyse", () => 
   db.saveNewsletterAnalysis(analysis);
   assert.equal(db.hasNewsletterAnalysis(message.messageId, newsletterContentHash(message)), true);
   assert.deepEqual(db.listNewsletterAnalyses(), [analysis]);
+  assert.equal(db.updateNewsletterAnalysisState(message.messageId, "REVIEWED")?.state, "REVIEWED");
+  assert.equal(db.listNewsletterAnalyses()[0]?.state, "REVIEWED");
   db.close();
 });
 
