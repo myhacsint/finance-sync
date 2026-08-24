@@ -1427,7 +1427,10 @@
     .newsletter-detail dl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
     .newsletter-detail dl div { border-top: 1px solid var(--line-soft); padding-top: 9px; }
     .newsletter-detail dt { color: var(--muted); font-size: 10px; } .newsletter-detail dd { margin: 4px 0 0; font-size: 12px; }
-    .newsletter-detail details summary { min-height: 44px; cursor: pointer; }
+    .newsletter-detail details summary { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; list-style: none; }
+    .newsletter-detail details summary::-webkit-details-marker { display: none; }
+    .newsletter-detail details summary > svg { width: 18px; height: 18px; flex: 0 0 18px; color: var(--muted); transition: transform .16s ease; }
+    .newsletter-detail details[open] summary > svg { transform: rotate(180deg); }
     .newsletter-detail blockquote { margin: 8px 0; padding: 10px; border: 1px solid var(--line-soft); border-left: 3px solid var(--blue); border-radius: 7px; }
     .newsletter-detail blockquote strong, .newsletter-detail blockquote span { display: block; font-size: 11px; }
     .newsletter-detail blockquote span { margin: 3px 0; color: var(--muted); }

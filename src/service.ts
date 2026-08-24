@@ -150,6 +150,7 @@ export class FinanceService {
   private wealthHistoryLoading?: Promise<DashboardWealthHistory>;
   private marketArchiveLoading?: Promise<void>;
   private marketArchiveLastFailureAt = 0;
+  private newsletterPriceCache?: { expiresAt: number; value: Array<{ symbol: string; name: string; priceMinor: number; currency: string; capturedAt?: string; source?: string }> };
 
   constructor(readonly db: FinanceDatabase, readonly config: AppConfig) {
     for (const source of config.sources) {
@@ -169,7 +170,7 @@ export class FinanceService {
     prices: Array<{ symbol: string; name: string; priceMinor: number; currency: string; capturedAt?: string }>;
   }> {
     const items = this.db.listNewsletterAnalyses(limit);
-    let prices: Array<{ symbol: string; name: string; priceMinor: number; currency: string; capturedAt?: string }> = [];
+    let prices: Array<{ symbol: string; name: string; priceMinor: number; currency: string; capturedAt?: string; source?: string }> = [];
     if (this.config.ghostfolio) {
       try {
         const snapshot = await readGhostfolioAssets(this.config.ghostfolio, {
@@ -180,8 +181,15 @@ export class FinanceService {
           name: holding.label,
           priceMinor: holding.marketPriceMinor,
           currency: holding.currency,
-          capturedAt: snapshot.capturedAt
+          capturedAt: snapshot.capturedAt,
+          source: "Ghostfolio"
         }));
+        if (!this.newsletterPriceCache || this.newsletterPriceCache.expiresAt < Date.now()) {
+          const { readGhostfolioNewsletterQuotes } = await import("./newsletter-quotes.js");
+          const quotes = await readGhostfolioNewsletterQuotes(this.config.ghostfolio, items);
+          this.newsletterPriceCache = { expiresAt: Date.now() + 15 * 60_000, value: quotes };
+        }
+        prices.push(...this.newsletterPriceCache.value);
       } catch {
         // The analysis remains usable when optional live quote context is unavailable.
       }
