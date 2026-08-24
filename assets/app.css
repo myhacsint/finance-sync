@@ -368,6 +368,7 @@
     .wealth-bridge > summary span, .wealth-bridge > summary small { display: block; }
     .wealth-bridge > summary small, .wealth-bridge > p { color: var(--muted); font-size: 12px; }
     .wealth-bridge > summary > strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+    .wealth-bridge > summary > svg, .wealth-comparison > summary > svg { width: 18px; height: 18px; flex: 0 0 auto; color: var(--muted); transition: transform .16s ease; }
     .wealth-bridge[open] > summary svg { transform: rotate(180deg); }
     .wealth-bridge-flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
     .wealth-bridge-flow > div { min-width: 0; padding: 12px; border: 1px solid var(--line-soft); border-radius: 9px; background: var(--surface-soft); }
@@ -379,6 +380,7 @@
     .wealth-comparison > summary::-webkit-details-marker { display: none; }
     .wealth-comparison > summary span { display: grid; gap: 3px; }
     .wealth-comparison > summary small { color: var(--muted); font-size: 12px; font-weight: 500; }
+    .wealth-comparison[open] > summary svg { transform: rotate(180deg); }
     .wealth-comparison[open] > summary { margin-bottom: 16px; }
     .wealth-comparison-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
     .wealth-comparison-head h2 { font-size: 16px; }

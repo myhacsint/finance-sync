@@ -10,7 +10,7 @@ function renderUi(): string {
 }
 
 test("externes UI-JavaScript ist syntaktisch gültig", () => {
-  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.43\.1" defer><\/script>/);
+  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.43\.2" defer><\/script>/);
   assert.match(clientSource, /match\(\/\^\(\\d\{4\}\)-\(\\d\{2\}\)\$\//);
   assert.doesNotThrow(() => new Function(clientSource));
 });
@@ -81,6 +81,7 @@ test("Übersicht und Datenstatus sind als tiefe Links erreichbar", () => {
   assert.match(html, /window\.addEventListener\("popstate"/);
   assert.match(html, /href="#\/data-status"/);
   assert.match(html, /href="\?expenseMonth=.*#\/spending">.*im Detail ansehen/);
+  assert.match(stylesheetSource, /\.wealth-comparison > summary > svg \{ width: 18px; height: 18px;/);
 });
 
 test("Ausgabenansicht besitzt Navigation, Filter, Pagination und mobile Buchungen", () => {
