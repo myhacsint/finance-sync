@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
-import { renderUi } from "./ui.js";
+import { renderUi as renderShell } from "./ui.js";
 
-test("eingebettetes UI-JavaScript ist syntaktisch gültig", () => {
-  const html = renderUi();
-  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
-  assert.ok(scripts.length > 0);
-  for (const script of scripts) assert.doesNotThrow(() => new Function(script));
+const clientSource = readFileSync(new URL("../assets/app.js", import.meta.url), "utf8");
+const stylesheetSource = readFileSync(new URL("../assets/app.css", import.meta.url), "utf8");
+function renderUi(): string {
+  return `${renderShell()}\n${clientSource}\n${stylesheetSource}`;
+}
+
+test("externes UI-JavaScript ist syntaktisch gültig", () => {
+  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.39\.0" defer><\/script>/);
+  assert.doesNotThrow(() => new Function(clientSource));
 });
 
 test("Prüfansicht behält 24 Monate und schützt Schreibaktionen", () => {
@@ -263,7 +268,7 @@ test("Verwaltungstoken bleibt nur für die Browsersitzung gespeichert", () => {
 test("Prüfen und Labor sind eigene Flächen mit einer Taxonomie", () => {
   const html = renderUi();
   assert.match(html, /label:"Prüfen"/);
-  assert.match(html, /label:"Labor"/);
+  assert.match(html, /label:"Planen"/);
   assert.match(html, /\/api\/dashboard\/review/);
   assert.match(html, /\/api\/dashboard\/review\/transaction/);
   assert.match(html, /Eine Taxonomie/);

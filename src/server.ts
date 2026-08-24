@@ -29,6 +29,16 @@ const service = new FinanceService(db, config);
 const scheduler = service.startScheduler();
 const manualPreviews = new ManualPreviewStore();
 const financeHubMark = readFileSync(new URL("../assets/finance-hub-mark.png", import.meta.url));
+const financeHubClient = readFileSync(new URL("../assets/app.js", import.meta.url));
+const financeHubStyles = readFileSync(new URL("../assets/app.css", import.meta.url));
+
+const securityHeaders = {
+  "cache-control": "no-store",
+  "content-security-policy": "default-src 'self'; img-src 'self' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+  "referrer-policy": "no-referrer",
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "DENY"
+};
 
 function json(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
@@ -71,8 +81,24 @@ const server = createServer(async (req, res) => {
       return res.end("<!doctype html><meta charset=utf-8><title>FinanceSync</title><p>Bankverbindung wurde bestätigt. Dieses Fenster kann geschlossen werden.</p>");
     }
     if (req.method === "GET" && url.pathname === "/") {
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8", ...securityHeaders });
       return res.end(renderUi());
+    }
+    if (req.method === "GET" && url.pathname === "/assets/app.js") {
+      res.writeHead(200, {
+        "content-type": "text/javascript; charset=utf-8",
+        "cache-control": "public, max-age=31536000, immutable",
+        "x-content-type-options": "nosniff"
+      });
+      return res.end(financeHubClient);
+    }
+    if (req.method === "GET" && url.pathname === "/assets/app.css") {
+      res.writeHead(200, {
+        "content-type": "text/css; charset=utf-8",
+        "cache-control": "public, max-age=31536000, immutable",
+        "x-content-type-options": "nosniff"
+      });
+      return res.end(financeHubStyles);
     }
     if (req.method === "GET" && url.pathname === "/assets/finance-hub-mark.png") {
       res.writeHead(200, {
@@ -145,7 +171,7 @@ const server = createServer(async (req, res) => {
       return json(res, 200, service.closeReviewMonth(String(payload.month ?? ""), String(payload.note ?? "")));
     }
     if (req.method === "GET" && url.pathname === "/api/dashboard/scenarios/compare") {
-      return json(res, 200, service.compareScenarios(
+      return json(res, 200, await service.compareScenarios(
         String(url.searchParams.get("left") ?? ""),
         String(url.searchParams.get("right") ?? "")
       ));

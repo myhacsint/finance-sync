@@ -1,6 +1,3 @@
-import { uiStyles } from "./ui/styles.js";
-import { uiClient } from "./ui/client.js";
-
 export function renderUi(): string {
   return `<!doctype html>
 <html lang="de">
@@ -10,9 +7,7 @@ export function renderUi(): string {
   <meta name="theme-color" content="#080d19">
   <link rel="icon" type="image/png" href="/assets/finance-hub-mark.png">
   <title>Übersicht · Finance Hub</title>
-  <style>
-${uiStyles()}
-  </style>
+  <link rel="stylesheet" href="/assets/app.css?v=0.39.0">
 </head>
 <body>
   <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
@@ -56,9 +51,7 @@ ${uiStyles()}
     </main>
     <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile Hauptnavigation"></nav>
   </div>
-<script>
-${uiClient()}
-</script>
+<script src="/assets/app.js?v=0.39.0" defer></script>
 </body>
 </html>`;
 }

@@ -150,6 +150,11 @@ export function buildDashboardStatus(
   const automaticAction = automatic.some((source) => source.status === "action");
   const automaticRunning = automatic.some((source) => source.status === "running");
   const tasks = manual.length;
+  const overall: DashboardStatus["overall"] = health.status === "critical" || automaticError
+    ? "critical"
+    : health.status === "warning" || automaticAction || automaticRunning || automaticCurrent < automatic.length
+      ? "warning"
+      : "ok";
 
   let headline = "Alle automatischen Quellen sind aktuell";
   if (health.status === "critical" || automaticError) {
@@ -166,7 +171,7 @@ export function buildDashboardStatus(
 
   return {
     generatedAt: health.time,
-    overall: health.status,
+    overall,
     headline,
     summary: {
       automaticCurrent,

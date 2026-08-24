@@ -815,11 +815,39 @@ export class FinanceService {
     return this.db.closeMonth(month, note);
   }
 
-  compareScenarios(leftId: string, rightId: string) {
+  async compareScenarios(leftId: string, rightId: string) {
     const left = this.db.listNamedScenarios().find((item) => item.id === leftId);
     const right = this.db.listNamedScenarios().find((item) => item.id === rightId);
     if (!left || !right) throw new FinanceServiceError("Szenario nicht gefunden", 404);
-    return compareNamedScenarios(left, right);
+    const basic = compareNamedScenarios(left, right);
+    const [leftModel, rightModel] = await Promise.all([
+      this.getDashboardDecisionLab(false, left.inputs),
+      this.getDashboardDecisionLab(false, right.inputs)
+    ]);
+    const outcome = (model: Awaited<ReturnType<FinanceService["getDashboardDecisionLab"]>>) => ({
+      exitAge: model.fire.central.scenarioExitAge,
+      projectedCapitalAtTargetMinor: model.fire.central.targetCapitalGoal.projectedCapitalMinor,
+      requiredCapitalAtTargetMinor: model.fire.central.targetCapitalGoal.requiredCapitalMinor,
+      capitalGapAtTargetMinor: model.fire.central.targetCapitalGoal.differenceMinor,
+      annualGapToTargetMinor: model.fire.central.annualGapToTargetMinor,
+      trajectoryAfter20YearsMinor: model.series.at(-1)?.scenarioMinor ?? null
+    });
+    const leftOutcome = outcome(leftModel);
+    const rightOutcome = outcome(rightModel);
+    const delta = (rightValue: number | null, leftValue: number | null) =>
+      rightValue === null || leftValue === null ? null : rightValue - leftValue;
+    return {
+      ...basic,
+      outcomes: { left: leftOutcome, right: rightOutcome },
+      outcomeDelta: {
+        exitAge: delta(rightOutcome.exitAge, leftOutcome.exitAge),
+        projectedCapitalAtTargetMinor: delta(rightOutcome.projectedCapitalAtTargetMinor, leftOutcome.projectedCapitalAtTargetMinor),
+        requiredCapitalAtTargetMinor: delta(rightOutcome.requiredCapitalAtTargetMinor, leftOutcome.requiredCapitalAtTargetMinor),
+        capitalGapAtTargetMinor: delta(rightOutcome.capitalGapAtTargetMinor, leftOutcome.capitalGapAtTargetMinor),
+        annualGapToTargetMinor: delta(rightOutcome.annualGapToTargetMinor, leftOutcome.annualGapToTargetMinor),
+        trajectoryAfter20YearsMinor: delta(rightOutcome.trajectoryAfter20YearsMinor, leftOutcome.trajectoryAfter20YearsMinor)
+      }
+    };
   }
 
   previewMilesMoreStatement(text: string, statementDate: string) {

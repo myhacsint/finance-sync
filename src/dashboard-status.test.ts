@@ -66,3 +66,12 @@ test("Fehler in einer automatischen Quelle wird als Handlungsbedarf gezeigt", ()
   assert.equal(result.summary.tasks, 1);
   assert.equal(result.automatic[1].status, "error");
 });
+
+test("Freigabeaufgabe ist sichtbar gelb, auch wenn das System gesund ist", () => {
+  const waiting = rows.map((row) => row.id === "dkb-depots"
+    ? { ...row, state: "WAITING_FOR_USER" as const, message: "Freigabe erforderlich" }
+    : row);
+  const result = buildDashboardStatus(waiting, config, health);
+  assert.equal(result.headline, "Eine Quelle wartet auf deine Freigabe");
+  assert.equal(result.overall, "warning");
+});
