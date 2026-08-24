@@ -43,7 +43,6 @@ import { linkActualTransfers } from "./sinks/actual-transfers.js";
 import {
   buildDashboardOverview,
   readActualOverview,
-  readInvestmentOverview,
   type DashboardOverview
 } from "./dashboard-overview.js";
 import {
@@ -203,7 +202,7 @@ export class FinanceService {
     const load = async (): Promise<DashboardOverview> => {
       const generatedAt = new Date();
       const comparisonDate = lastCompletedMonthEnd(generatedAt, this.config.timezone).effectiveDate;
-      const [actual, investments, solPrice] = await Promise.allSettled([
+      const [actual, wealth, solPrice] = await Promise.allSettled([
         this.config.actual?.enabled
           ? this.withActual(() => readActualOverview(
               this.config.actual!,
@@ -216,20 +215,22 @@ export class FinanceService {
               }
             ))
           : Promise.reject(new Error("Actual ist deaktiviert")),
-        this.config.ghostfolio?.enabled
-          ? readInvestmentOverview(this.config, this.db)
-          : Promise.reject(new Error("Ghostfolio ist deaktiviert")),
+        this.getDashboardAssets(force),
         this.config.sources.some((source) => source.enabled && source.kind === "solana")
           ? readCoinGeckoSolPrice(comparisonDate)
           : Promise.reject(new Error("Solana ist deaktiviert"))
       ]);
+      const generatedForOverview = wealth.status === "fulfilled"
+        ? new Date(wealth.value.generatedAt)
+        : generatedAt;
       const value = buildDashboardOverview(
         this.db,
         this.config,
         actual,
-        investments,
-        generatedAt,
-        solPrice
+        { status: "rejected", reason: new Error("Vermögensansicht nicht verfügbar") },
+        generatedForOverview,
+        solPrice,
+        wealth.status === "fulfilled" ? wealth.value : undefined
       );
       this.overviewCache.set(cacheKey, {
         expiresAt: Date.now() + 5 * 60_000,
@@ -280,6 +281,7 @@ export class FinanceService {
 
   async getDashboardAssets(force = false): Promise<DashboardAssets> {
     const now = Date.now();
+    if (force) this.overviewCache.clear();
     if (!force && this.assetsCache && this.assetsCache.expiresAt > now) {
       return this.assetsCache.value;
     }

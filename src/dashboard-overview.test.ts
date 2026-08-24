@@ -13,6 +13,7 @@ import {
   type ActualOverviewSnapshot,
   type InvestmentOverviewSnapshot
 } from "./dashboard-overview.js";
+import type { DashboardAssets } from "./dashboard-assets.js";
 
 const config: AppConfig = {
   port: 8080,
@@ -132,6 +133,49 @@ test("Fehlende Spezialansicht wird nicht durch null Euro ersetzt", () => {
     assert.equal(result.investments.amountMinor, null);
     assert.equal(result.state, "partial");
     assert.match(result.warnings.join(" "), /Ghostfolio/);
+  } finally {
+    db.close();
+  }
+});
+
+test("Übersicht übernimmt Gesamtwert und Aufteilung aus demselben Vermögens-Snapshot", () => {
+  const db = database();
+  const wealth: DashboardAssets = {
+    generatedAt: "2026-08-10T21:00:00.000Z",
+    state: "current",
+    totalMinor: 18_100_000,
+    basis: "latest-available",
+    marketHistory: { status: "current", latestDate: "2026-08-10" },
+    summary: { automaticCurrent: 4, automaticTotal: 4, confirmed: 1 },
+    areas: [
+      { key: "cash", label: "Liquidität", amountMinor: 1_825_900, percent: 10.09, positions: 2, status: "current" },
+      { key: "depots", label: "Depots", amountMinor: 3_500_000, percent: 19.34, positions: 1, status: "current" },
+      { key: "pensions", label: "Vorsorge", amountMinor: 11_300_000, percent: 62.43, positions: 1, status: "current" },
+      { key: "crypto", label: "Krypto", amountMinor: 1_474_100, percent: 8.14, positions: 1, status: "current" }
+    ],
+    positions: [
+      { key: "cash", label: "Giro", area: "cash", areaLabel: "Liquidität", amountMinor: 1_825_900, capturedAt: "2026-08-10T20:55:00Z", basis: "FinanceSync", status: "current" }
+    ],
+    warnings: []
+  };
+  try {
+    const result = buildDashboardOverview(
+      db,
+      config,
+      { status: "fulfilled", value: actual },
+      { status: "fulfilled", value: investments },
+      new Date(wealth.generatedAt),
+      { status: "rejected", reason: new Error("unused") },
+      wealth
+    );
+    assert.equal(result.totalMinor, wealth.totalMinor);
+    assert.equal(result.cash.amountMinor, 1_825_900);
+    assert.equal(result.investments.amountMinor, 16_274_100);
+    assert.deepEqual(result.investments.allocation.map((row) => [row.key, row.amountMinor]), [
+      ["pensions", 11_300_000],
+      ["depots", 3_500_000],
+      ["solana", 1_474_100]
+    ]);
   } finally {
     db.close();
   }

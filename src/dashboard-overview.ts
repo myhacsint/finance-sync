@@ -10,6 +10,7 @@ import {
   type OverviewAssetComparison
 } from "./dashboard-asset-comparison.js";
 import { physicalAssetsTotalMinor } from "./physical-assets.js";
+import type { DashboardAssets } from "./dashboard-assets.js";
 
 export interface OverviewMonth {
   key: string;
@@ -404,12 +405,37 @@ export function buildDashboardOverview(
   solPrice: PromiseSettledResult<CoinGeckoSolPrice> = {
     status: "rejected",
     reason: new Error("CoinGecko-Tageskurs nicht geladen")
-  }
+  },
+  wealth?: DashboardAssets
 ): DashboardOverview {
   const rows = db.listSources() as unknown as SourceRow[];
   const cash = cashSnapshot(db, config);
-  const investment = investments.status === "fulfilled" ? investments.value : undefined;
-  const physicalAssetsMinor = physicalAssetsTotalMinor(config);
+  const legacyInvestment = investments.status === "fulfilled" ? investments.value : undefined;
+  const wealthAreas = new Map((wealth?.areas ?? []).map((area) => [area.key, area]));
+  const wealthCash = wealthAreas.get("cash")?.amountMinor;
+  const wealthAllocation: InvestmentOverviewSnapshot["allocation"] = [
+    { key: "pensions", label: "Vorsorge", amountMinor: wealthAreas.get("pensions")?.amountMinor },
+    { key: "depots", label: "Depots", amountMinor: wealthAreas.get("depots")?.amountMinor },
+    { key: "solana", label: "Solana", amountMinor: wealthAreas.get("crypto")?.amountMinor },
+    { key: "gold", label: "Physisches Gold", amountMinor: wealthAreas.get("precious-metals")?.amountMinor }
+  ].filter((item): item is InvestmentOverviewSnapshot["allocation"][number] =>
+    Number.isFinite(item.amountMinor)
+  );
+  const wealthInvestmentMinor = wealth && wealth.totalMinor !== null && Number.isFinite(wealthCash)
+    ? wealth.totalMinor - Number(wealthCash)
+    : null;
+  const investment = wealth
+    ? wealthInvestmentMinor !== null
+      ? {
+          amountMinor: wealthInvestmentMinor,
+          capturedAt: wealth.generatedAt,
+          allocation: wealthAllocation
+        }
+      : undefined
+    : legacyInvestment;
+  // The shared wealth snapshot already includes physical assets. Keep the
+  // legacy addition only for callers that still provide the investment view.
+  const physicalAssetsMinor = wealth ? 0 : physicalAssetsTotalMinor(config);
   const actualData = actual.status === "fulfilled" ? actual.value : undefined;
   const manualActions = config.sources
     .filter((source) => source.enabled && source.kind === "manual")
@@ -436,7 +462,10 @@ export function buildDashboardOverview(
   const warnings: string[] = [];
   if (!actualData) warnings.push("Actual-Daten sind vorübergehend nicht verfügbar");
   if (!investment) warnings.push("Ghostfolio-Daten sind vorübergehend nicht verfügbar");
-  if (cash.amountMinor === null) warnings.push("Aktuelle Bankstände sind nicht verfügbar");
+  if (wealth ? !Number.isFinite(wealthCash) : cash.amountMinor === null) {
+    warnings.push("Aktuelle Bankstände sind nicht verfügbar");
+  }
+  if (wealth?.warnings.length) warnings.push(...wealth.warnings);
   const investmentAmountMinor = investment
     ? investment.amountMinor + physicalAssetsMinor
     : null;
@@ -448,12 +477,13 @@ export function buildDashboardOverview(
           : [])
       ]
     : [];
-  const totalMinor = cash.amountMinor !== null && investmentAmountMinor !== null
-    ? cash.amountMinor + investmentAmountMinor
-    : null;
+  const currentCashMinor = wealth ? Number.isFinite(wealthCash) ? Number(wealthCash) : null : cash.amountMinor;
+  const totalMinor = wealth?.totalMinor ?? (currentCashMinor !== null && investmentAmountMinor !== null
+    ? currentCashMinor + investmentAmountMinor
+    : null);
   const comparison = buildOverviewAssetComparison(db, config, {
     totalMinor,
-    cashMinor: cash.amountMinor,
+    cashMinor: currentCashMinor,
     investmentMinor: investmentAmountMinor,
     allocation: investmentAllocation
   }, solPrice, now);
@@ -476,7 +506,15 @@ export function buildDashboardOverview(
     generatedAt: now.toISOString(),
     state: warnings.length ? "partial" : "current",
     totalMinor,
-    cash: { ...cash, source: "FinanceSync" },
+    cash: {
+      amountMinor: currentCashMinor,
+      capturedAt: wealth?.positions
+        .filter((position) => position.area === "cash" && position.capturedAt)
+        .map((position) => position.capturedAt!)
+        .sort()
+        .at(0) ?? cash.capturedAt,
+      source: "FinanceSync"
+    },
     investments: {
       amountMinor: investmentAmountMinor,
       capturedAt: investment?.capturedAt,

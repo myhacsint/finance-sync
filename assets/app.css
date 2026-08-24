@@ -375,6 +375,11 @@
     .wealth-bridge-flow strong { display: block; margin-top: 3px; font-variant-numeric: tabular-nums; }
     .wealth-bridge > p { margin-top: 9px; }
     .wealth-comparison { grid-column: 1 / -1; border-top: 1px solid var(--line-soft); padding-top: 18px; }
+    .wealth-comparison > summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer; list-style: none; }
+    .wealth-comparison > summary::-webkit-details-marker { display: none; }
+    .wealth-comparison > summary span { display: grid; gap: 3px; }
+    .wealth-comparison > summary small { color: var(--muted); font-size: 12px; font-weight: 500; }
+    .wealth-comparison[open] > summary { margin-bottom: 16px; }
     .wealth-comparison-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
     .wealth-comparison-head h2 { font-size: 16px; }
     .wealth-comparison-head p { color: var(--muted); font-size: 12px; }
@@ -418,6 +423,9 @@
     .panel-header { display: flex; min-height: 28px; align-items: flex-start; justify-content: space-between; gap: 16px; }
     .panel-header h2 { font-size: 19px; }
     .panel-meta, .panel-link { color: #7fb0ff; font-size: 13px; }
+    .freshness-ok { display: flex; align-items: center; gap: 9px; color: var(--muted); }
+    .freshness-ok svg { color: var(--green); }
+    .analysis-category-label small { display: block; margin-top: 2px; font-size: 11px; font-variant-numeric: tabular-nums; }
     .panel-link[aria-disabled="true"] { cursor: not-allowed; opacity: .75; }
     .cashflow-panel-header { align-items: center; }
     .cashflow-period { margin-top: 4px; color: var(--muted); font-size: 13px; }

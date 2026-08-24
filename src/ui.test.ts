@@ -10,7 +10,7 @@ function renderUi(): string {
 }
 
 test("externes UI-JavaScript ist syntaktisch gültig", () => {
-  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.41\.0" defer><\/script>/);
+  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.43\.0" defer><\/script>/);
   assert.doesNotThrow(() => new Function(clientSource));
 });
 
@@ -79,7 +79,7 @@ test("Übersicht und Datenstatus sind als tiefe Links erreichbar", () => {
   assert.match(html, /window\.addEventListener\("hashchange"/);
   assert.match(html, /window\.addEventListener\("popstate"/);
   assert.match(html, /href="#\/data-status"/);
-  assert.match(html, /href="#\/spending">Alle Ausgaben ansehen/);
+  assert.match(html, /href="\?expenseMonth=.*#\/spending">.*im Detail ansehen/);
 });
 
 test("Ausgabenansicht besitzt Navigation, Filter, Pagination und mobile Buchungen", () => {
@@ -138,7 +138,7 @@ test("Analysenansicht besitzt Jahresvergleich, Schätzungsmarker, Drilldown und 
   assert.match(html, /analysisPeriod/);
   assert.match(html, /analysisComparison/);
   assert.match(html, /analysisPosition/);
-  assert.match(html, /Ausgaben nach Kategorie/);
+  assert.match(html, /Größte Veränderungen nach Kategorie/);
   assert.match(html, /Ausgabenklassen/);
   assert.match(html, /Größte Positionen/);
   assert.match(html, /\[SCHÄTZUNG\]/);
