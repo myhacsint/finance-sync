@@ -261,10 +261,10 @@ function toggleExpenseCategories(button){
 }
 function assetSelection(){
   const requested=new URLSearchParams(location.search).get("assetArea")||"all";
-  return ["all","cash","depots","pensions","crypto"].includes(requested)?requested:"all";
+  return ["all","cash","depots","pensions","crypto","precious-metals"].includes(requested)?requested:"all";
 }
 function setAssetArea(value){
-  const area=["cash","depots","pensions","crypto"].includes(String(value))?String(value):"all";
+  const area=["cash","depots","pensions","crypto","precious-metals"].includes(String(value))?String(value):"all";
   const params=new URLSearchParams(location.search);
   if(area==="all")params.delete("assetArea");else params.set("assetArea",area);
   const query=params.toString();
@@ -765,7 +765,7 @@ function renderAssets(data){
   const summary='<section class="assets-summary" aria-label="Vermögensübersicht"><div class="assets-total"><span>Gesamtvermögen</span><strong>'+(data.totalMinor===null?'–':moneyWhole(data.totalMinor))+'</strong><small>Basis: letzte verfügbare Werte · '+esc(historyDetail)+'</small></div><div class="assets-allocation"><p class="assets-status-line">'+summaryStatus+'</p><div class="assets-bar" role="img" aria-label="'+esc(allocationLabel)+'">'+segments+'</div><div class="assets-legend">'+legend+'</div></div></section>';
   const areaButtons=data.areas.map(area=>{
     const active=area.key===selection;
-    return '<button class="asset-area-button area-'+area.key+'" type="button" aria-current="'+String(active)+'" onclick="setAssetArea(&quot;'+(active?'all':area.key)+'&quot;)"><span class="asset-area-title"><i class="asset-area-dot" aria-hidden="true"></i>'+esc(area.label)+'</span><span class="asset-area-value"><strong>'+(area.amountMinor===null?'–':moneyWhole(area.amountMinor))+'</strong><span>'+(area.percent===null?'–':new Intl.NumberFormat("de-DE",{maximumFractionDigits:1}).format(area.percent)+' %')+'</span></span><span class="asset-area-meta">'+area.positions+' '+(area.positions===1?'Position':'Positionen')+' · '+esc(assetAreaStatusLabel(area.status))+'</span></button>';
+    return '<button class="asset-area-button area-'+area.key+'" type="button" aria-current="'+String(active)+'" onclick="setAssetArea(&quot;'+area.key+'&quot;)"><span class="asset-area-title"><i class="asset-area-dot" aria-hidden="true"></i>'+esc(area.label)+'</span><span class="asset-area-value"><strong>'+(area.amountMinor===null?'–':moneyWhole(area.amountMinor))+'</strong><span>'+(area.percent===null?'–':new Intl.NumberFormat("de-DE",{maximumFractionDigits:1}).format(area.percent)+' %')+'</span></span><span class="asset-area-meta">'+area.positions+' '+(area.positions===1?'Position':'Positionen')+' · '+esc(assetAreaStatusLabel(area.status))+'</span></button>';
   }).join("");
   const options='<option value="all"'+(selection==="all"?' selected':'')+'>Alle Bereiche</option>'+data.areas.map(area=>'<option value="'+area.key+'"'+(selection===area.key?' selected':'')+'>'+esc(area.label)+'</option>').join("");
   const confirmedDates=data.positions.filter(position=>position.area==="pensions"&&(position.confirmedAt||position.capturedAt)).map(position=>position.confirmedAt||position.capturedAt).sort();

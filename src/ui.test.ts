@@ -115,6 +115,8 @@ test("Vermögensansicht besitzt Aufteilung, Bereichsfilter und mobile Bestände"
   assert.match(html, /assets-summary/);
   assert.match(html, /assets-bar/);
   assert.match(html, /assetArea/);
+  assert.match(html, /"precious-metals"/);
+  assert.doesNotMatch(html, /active\?'all':area\.key/);
   assert.match(html, /Vermögensbereiche/);
   assert.match(html, /Bestände/);
   assert.match(html, /assets-table/);
