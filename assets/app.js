@@ -1457,7 +1457,17 @@ async function refresh(force=false){
   catch(error){if(view==="spending")renderSpendingError(error);else if(view==="assets")renderAssetsError(error);else if(view==="review")renderReviewError(error);else if(view==="lab")renderDecisionLabError(error);else if(view==="analyses"&&analysisSelection().view==="crypto-origin-tax")renderCryptoError(error);else if(view==="analyses"&&analysisSelection().view==="investment-newsletters"){document.getElementById("dashboard").innerHTML=expenseState("Nicht verfügbar","Das Investment-Cockpit konnte nicht geladen werden.","refresh(true)","Erneut versuchen");msg(error.message,true)}else if(view==="analyses")renderAnalysesError(error);else{msg(error.message,true);document.getElementById("dashboard").setAttribute("aria-busy","false")}}
   finally{button.disabled=false}
 }
-async function syncSource(id){try{msg("Abruf läuft …");const result=await call("/api/sync/"+id,{method:"POST"});msg(result.message);await refresh()}catch(error){msg(error.message,true)}}
+async function wait(ms){return new Promise(resolve=>setTimeout(resolve,ms))}
+async function finishDkbApproval(id){
+  for(let attempt=1;attempt<=24;attempt+=1){
+    msg("Bitte in der DKB-App freigeben · automatische Prüfung "+attempt+"/24 …");
+    await wait(attempt===1?4000:5000);
+    const result=await call("/api/dkb-fints/continue/"+id,{method:"POST",body:"{}"});
+    if(result.state!=="WAITING_FOR_USER")return result;
+  }
+  throw new Error("Die DKB-Freigabe wurde nach zwei Minuten noch nicht bestätigt. Der offene Vorgang kann später mit ‚App-Freigabe prüfen‘ fortgesetzt werden.");
+}
+async function syncSource(id){try{msg("Abruf läuft …");let result=await call("/api/sync/"+id,{method:"POST"});if(result.state==="WAITING_FOR_USER"&&result.decoupled)result=await finishDkbApproval(id);msg(result.message);await refresh(true)}catch(error){msg(error.message,true);await refresh()}}
 async function preflightDkb(id){try{msg("FinTS-Konfiguration wird geprüft …");const result=await call("/api/dkb-fints/preflight/"+id,{method:"POST"});msg(result.message);await refresh()}catch(error){msg(error.message,true)}}
 async function continueDkb(id){try{msg("DKB-App-Freigabe wird geprüft …");const result=await call("/api/dkb-fints/continue/"+id,{method:"POST",body:"{}"});msg(result.message);await refresh()}catch(error){msg(error.message,true)}}
 async function exportNow(){try{await call("/api/export",{method:"POST"});msg("CSV-Dateien wurden aktualisiert.")}catch(error){msg(error.message,true)}}

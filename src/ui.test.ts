@@ -10,10 +10,17 @@ function renderUi(): string {
 }
 
 test("externes UI-JavaScript ist syntaktisch gültig", () => {
-  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.45\.1" defer><\/script>/);
+  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.46\.2" defer><\/script>/);
   assert.match(clientSource, /match\(\/\^\(\\d\{4\}\)-\(\\d\{2\}\)\$\//);
   assert.doesNotMatch(clientSource, /match\(\/\^\(\\\\d\{4\}\)-\(\\\\d\{2\}\)\$\//);
   assert.doesNotThrow(() => new Function(clientSource));
+});
+
+test("DKB-Abruf führt die App-Freigabe ohne zweiten Klick zu Ende", () => {
+  assert.match(clientSource, /async function finishDkbApproval/);
+  assert.match(clientSource, /result\.state==="WAITING_FOR_USER"&&result\.decoupled/);
+  assert.match(clientSource, /\/api\/dkb-fints\/continue\//);
+  assert.match(clientSource, /attempt<=24/);
 });
 
 test("Prüfansicht behält 24 Monate und schützt Schreibaktionen", () => {
