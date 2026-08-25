@@ -17,6 +17,7 @@ import { snapshotSqlite } from "./backup.js";
 import { renderUi } from "./ui.js";
 import { buildHealth } from "./health.js";
 import { buildCouncilInvestmentSnapshot } from "./council-investment.js";
+import { buildCouncilPortfolioSnapshot } from "./council-portfolio.js";
 import { ManualPreviewStore } from "./manual-workflow.js";
 import { buildDashboardStatus, type SourceStatusRow } from "./dashboard-status.js";
 import type { DecisionLabRequest } from "./dashboard-decision-lab.js";
@@ -77,6 +78,13 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/api/v1/council/investment-cockpit") {
       res.setHeader("cache-control", "no-store");
       return json(res, 200, buildCouncilInvestmentSnapshot(await service.getNewsletterAnalyses(500)));
+    }
+    if (req.method === "GET" && url.pathname === "/api/v1/council/portfolio") {
+      res.setHeader("cache-control", "no-store");
+      return json(res, 200, buildCouncilPortfolioSnapshot(
+        await service.getDashboardAssets(false),
+        service.getDashboardCryptoAnalysis()
+      ));
     }
     if (req.method === "GET" && url.pathname === "/callbacks/enable-banking") {
       const code = url.searchParams.get("code") ?? "";
