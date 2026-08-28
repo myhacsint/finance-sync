@@ -31,6 +31,19 @@ export async function receivePensionUpload(req: IncomingMessage): Promise<Pensio
   try {
     const result = await new Promise<void>((resolve, reject) => {
       let busboy: Busboy.Busboy;
+      let parserFinished = false;
+      let writerFinished = false;
+      let promiseFinished = false;
+      const fail = (error: Error) => {
+        if (promiseFinished) return;
+        promiseFinished = true;
+        reject(error);
+      };
+      const finish = () => {
+        if (promiseFinished || !parserFinished || !writerFinished) return;
+        promiseFinished = true;
+        truncated ? reject(new Error("UPLOAD_TOO_LARGE")) : resolve();
+      };
       try {
         busboy = Busboy({
           headers: req.headers,
@@ -39,13 +52,13 @@ export async function receivePensionUpload(req: IncomingMessage): Promise<Pensio
           limits: { files: 1, fields: 0, parts: 2, fileSize: MAX_PENSION_UPLOAD_BYTES }
         });
       } catch {
-        reject(new Error("UPLOAD_MULTIPART_REQUIRED"));
+        fail(new Error("UPLOAD_MULTIPART_REQUIRED"));
         return;
       }
       busboy.on("file", (name, stream, info) => {
         if (name !== "document" || fileSeen) {
           stream.resume();
-          reject(new Error("UPLOAD_FILE_INVALID"));
+          fail(new Error("UPLOAD_FILE_INVALID"));
           return;
         }
         fileSeen = true;
@@ -56,20 +69,18 @@ export async function receivePensionUpload(req: IncomingMessage): Promise<Pensio
           sizeBytes += chunk.length;
           hash.update(chunk);
         });
-        stream.on("error", reject);
-        output.on("error", reject);
-        output.on("close", () => {
-          if (truncated) reject(new Error("UPLOAD_TOO_LARGE"));
-        });
+        stream.on("error", (error) => fail(error));
+        output.on("error", (error) => fail(error));
+        output.on("finish", () => { writerFinished = true; finish(); });
         stream.pipe(output);
       });
-      busboy.on("filesLimit", () => reject(new Error("UPLOAD_TOO_MANY_FILES")));
-      busboy.on("fieldsLimit", () => reject(new Error("UPLOAD_FIELDS_NOT_ALLOWED")));
-      busboy.on("partsLimit", () => reject(new Error("UPLOAD_TOO_MANY_PARTS")));
-      busboy.on("error", reject);
+      busboy.on("filesLimit", () => fail(new Error("UPLOAD_TOO_MANY_FILES")));
+      busboy.on("fieldsLimit", () => fail(new Error("UPLOAD_FIELDS_NOT_ALLOWED")));
+      busboy.on("partsLimit", () => fail(new Error("UPLOAD_TOO_MANY_PARTS")));
+      busboy.on("error", (error) => fail(error instanceof Error ? error : new Error("UPLOAD_MULTIPART_INVALID")));
       busboy.on("finish", () => {
-        if (!fileSeen) reject(new Error("UPLOAD_FILE_MISSING"));
-        else if (!truncated) resolve();
+        if (!fileSeen) fail(new Error("UPLOAD_FILE_MISSING"));
+        else { parserFinished = true; finish(); }
       });
       req.pipe(busboy);
     });
