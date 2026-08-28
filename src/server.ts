@@ -22,10 +22,12 @@ import { ManualPreviewStore } from "./manual-workflow.js";
 import { buildDashboardStatus, type SourceStatusRow } from "./dashboard-status.js";
 import type { DecisionLabRequest } from "./dashboard-decision-lab.js";
 import { receivePensionUpload } from "./pension-upload.js";
-import { extractPensionDocument } from "./pension-extractor.js";
+import { extractPensionDocument, extractSutorPdfDocument } from "./pension-extractor.js";
 import { parseDrvPensionPages } from "./drv-pension-parser.js";
 import { PensionPreviewStore } from "./pension-preview-store.js";
 import type { PensionFieldKey } from "./pension-document-types.js";
+import { parseSutorStatementPages } from "./sutor-statement-parser.js";
+import { buildSutorSnapshot, SutorPreviewStore, sutorWorkflowSettings } from "./sutor-preview-store.js";
 
 mkdirSync(paths.data, { recursive: true });
 mkdirSync(paths.archive, { recursive: true });
@@ -36,6 +38,7 @@ const service = new FinanceService(db, config);
 const scheduler = service.startScheduler();
 const manualPreviews = new ManualPreviewStore();
 const pensionPreviews = new PensionPreviewStore();
+const sutorPreviews = new SutorPreviewStore();
 let pensionParserBusy = false;
 const pensionUploadAttempts = new Map<string, number[]>();
 const financeHubMark = readFileSync(new URL("../assets/finance-hub-mark.png", import.meta.url));
@@ -100,6 +103,37 @@ function pensionFailure(error: unknown): FinanceServiceError {
   };
   const match = messages[code];
   return new FinanceServiceError(match?.[0] ?? "Die Datei konnte sicher nicht verarbeitet werden", match?.[1] ?? 400);
+}
+
+function sutorFailure(error: unknown): FinanceServiceError {
+  const code = error instanceof Error ? error.message : String(error);
+  const messages: Record<string, [string, number]> = {
+    UPLOAD_MULTIPART_REQUIRED: ["Bitte eine Sutor-PDF auswählen", 400],
+    UPLOAD_TOO_LARGE: ["Die PDF ist größer als 12 MB", 413],
+    UPLOAD_MEDIA_TYPE_NOT_ALLOWED: ["Für Sutor wird ausschließlich eine PDF verarbeitet", 400],
+    UPLOAD_MIME_MISMATCH: ["Dateiformat und Dateiinhalt stimmen nicht überein", 400],
+    UPLOAD_FILE_EMPTY: ["Die Datei ist leer", 400],
+    UPLOAD_FILE_MISSING: ["Es wurde keine Datei übertragen", 400],
+    PDF_TOO_MANY_PAGES: ["Die Sutor-PDF hat mehr als 12 Seiten", 400],
+    PDF_ENCRYPTED: ["Die PDF ist mit einem echten Passwort geschützt oder nicht sicher druckbar", 400],
+    PDF_ACTIVE_CONTENT: ["Die PDF enthält nicht zulässige aktive Inhalte", 400],
+    SECURITY_MALWARE_DETECTED: ["Die Sicherheitsprüfung hat die Datei abgelehnt", 400],
+    SECURITY_SIGNATURES_STALE: ["Die Sicherheitsprüfung ist nicht aktuell; Upload wurde sicher abgebrochen", 503],
+    SECURITY_SCANNER_UNAVAILABLE: ["Die Sicherheitsprüfung ist nicht verfügbar; Upload wurde sicher abgebrochen", 503],
+    SECURITY_SCAN_FAILED: ["Die Sicherheitsprüfung konnte nicht abgeschlossen werden", 503],
+    SUTOR_HOLDINGS_TABLE_MISSING: ["Keine Sutor-Bestandstabelle erkannt. Für ältere Depotbestände bitte die manuelle Texteingabe verwenden", 400],
+    SUTOR_STATEMENT_DATES_MISSING: ["Die beiden Sutor-Stichtage wurden nicht vollständig erkannt", 400],
+    SUTOR_STATEMENT_DATES_CONFLICT: ["Die Sutor-Stichtage im Anschreiben und Bestand stimmen nicht überein", 400],
+    SUTOR_POSITIONS_MISSING: ["Keine gültigen ISIN-Positionen in der Bestandstabelle erkannt", 400],
+    SUTOR_ISIN_DUPLICATE: ["Eine ISIN kommt in der Bestandstabelle mehrfach vor", 400],
+    SUTOR_TOTAL_MISSING: ["Der Kurswert Gesamt wurde nicht erkannt", 400],
+    SUTOR_CASH_MISSING: ["Der Geldsaldo wurde nicht erkannt", 400],
+    SUTOR_POSITION_SUM_MISMATCH: ["Die Positionswerte stimmen nicht mit dem Kurswert Gesamt überein", 400],
+    SUTOR_CONTRACT_VALUE_INVALID: ["Der abgeleitete Vertragswert ist ungültig", 400],
+    PREVIEW_EXPIRED: ["Die Vorschau ist abgelaufen; bitte PDF erneut prüfen", 410]
+  };
+  const match = messages[code];
+  return new FinanceServiceError(match?.[0] ?? "Die Sutor-PDF konnte sicher nicht verarbeitet werden", match?.[1] ?? 400);
 }
 
 function authorized(req: IncomingMessage): boolean {
@@ -176,6 +210,67 @@ const server = createServer(async (req, res) => {
       return res.end(financeHubMark);
     }
     if (!authorized(req)) return json(res, 401, { error: "Nicht autorisiert" });
+    if (req.method === "GET" && url.pathname === "/api/sutor-documents/revisions") {
+      return json(res, 200, { revisions: service.listSutorRevisions() });
+    }
+    if (req.method === "POST" && url.pathname === "/api/sutor-documents/previews") {
+      if (!sameOriginMutation(req)) return json(res, 403, { error: "Ungültiger Anfrageursprung" });
+      if (!consumePensionRate(req)) return json(res, 429, { error: "Zu viele Uploadversuche; bitte später erneut versuchen" });
+      if (pensionParserBusy) return json(res, 429, { error: "Eine Dokumentprüfung läuft bereits" });
+      pensionParserBusy = true;
+      let uploaded: Awaited<ReturnType<typeof receivePensionUpload>> | undefined;
+      try {
+        const source = service.getSutorSource();
+        if (!source) throw new FinanceServiceError("Sutor-Quelle ist nicht konfiguriert", 503);
+        uploaded = await receivePensionUpload(req, {
+          tempPrefix: "finance-sutor",
+          allowedMediaTypes: ["application/pdf"]
+        });
+        const extracted = await extractSutorPdfDocument(uploaded.path, uploaded.workDir);
+        const statement = parseSutorStatementPages(extracted.pages);
+        const settings = sutorWorkflowSettings(source);
+        const snapshot = buildSutorSnapshot(source, statement, uploaded.hash);
+        const snapshotState = db.manualSnapshotState(source.id, manualSnapshotBundle(source, snapshot));
+        const duplicate = db.sutorRevisionByHash(uploaded.hash);
+        return json(res, 200, sutorPreviews.create({
+          documentHash: uploaded.hash,
+          pageCount: extracted.pageCount,
+          sizeBytes: uploaded.sizeBytes,
+          statement,
+          source,
+          config,
+          previous: db.latestSutorStand(source.id, settings.accountId),
+          snapshotState,
+          duplicate: duplicate ? { confirmedAt: duplicate.confirmedAt } : null
+        }));
+      } catch (error) {
+        if (error instanceof FinanceServiceError) throw error;
+        throw sutorFailure(error);
+      } finally {
+        uploaded?.cleanup();
+        pensionParserBusy = false;
+      }
+    }
+    const sutorPreview = /^\/api\/sutor-documents\/previews\/([0-9a-f-]{36})$/.exec(url.pathname);
+    if (req.method === "GET" && sutorPreview) {
+      try { return json(res, 200, sutorPreviews.get(sutorPreview[1])); }
+      catch (error) { throw sutorFailure(error); }
+    }
+    const sutorConfirm = /^\/api\/sutor-documents\/previews\/([0-9a-f-]{36})\/confirm$/.exec(url.pathname);
+    if (req.method === "POST" && sutorConfirm) {
+      if (!sameOriginMutation(req)) return json(res, 403, { error: "Ungültiger Anfrageursprung" });
+      const payload = await body(req, 1024).catch(() => ({})) as { confirmed?: boolean };
+      if (payload.confirmed !== true) return json(res, 409, { error: "Explizite Bestätigung fehlt" });
+      const stored = sutorPreviews.take(sutorConfirm[1]);
+      const result = await service.confirmSutorPreview(stored);
+      if (result.created || result.snapshotState === "equivalent") sutorPreviews.consume(sutorConfirm[1]);
+      return json(res, result.created ? 201 : 200, result);
+    }
+    if (req.method === "DELETE" && sutorPreview) {
+      if (!sameOriginMutation(req)) return json(res, 403, { error: "Ungültiger Anfrageursprung" });
+      sutorPreviews.consume(sutorPreview[1]);
+      return json(res, 200, { ok: true });
+    }
     if (req.method === "GET" && url.pathname === "/api/pension-documents/revisions") {
       return json(res, 200, { revisions: service.listPensionRevisions() });
     }

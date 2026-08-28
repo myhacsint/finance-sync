@@ -25,3 +25,14 @@ test("declared MIME must match magic bytes", async () => {
   const content = Buffer.from(`%PDF-1.7\n${"synthetic ".repeat(8)}`);
   await assert.rejects(() => receivePensionUpload(multipart(content, "image/jpeg")), /UPLOAD_MIME_MISMATCH/);
 });
+
+test("Sutor upload accepts PDF only", async () => {
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(64, 0x20)]);
+  await assert.rejects(
+    () => receivePensionUpload(multipart(jpeg, "image/jpeg"), {
+      tempPrefix: "finance-sutor-test",
+      allowedMediaTypes: ["application/pdf"]
+    }),
+    /UPLOAD_MEDIA_TYPE_NOT_ALLOWED/
+  );
+});

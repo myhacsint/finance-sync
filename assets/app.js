@@ -22,9 +22,9 @@ const navItems=[
   {label:"Analysen",icon:"analysis",view:"analyses"},
   {label:"Status",icon:"status",view:"status"}
 ];
-function activeView(){const hash=location.hash;return hash==="#/pension-documents"?"pension":hash==="#/data-status"?"status":hash==="#/spending"?"spending":hash==="#/assets"?"assets":hash==="#/review"?"review":hash==="#/decision-lab"?"lab":hash==="#/analyses"?"analyses":"overview"}
+function activeView(){const hash=location.hash;return hash==="#/sutor-riester"?"sutor":hash==="#/pension-documents"?"pension":hash==="#/data-status"?"status":hash==="#/spending"?"spending":hash==="#/assets"?"assets":hash==="#/review"?"review":hash==="#/decision-lab"?"lab":hash==="#/analyses"?"analyses":"overview"}
 function viewHref(view){return view==="status"?"#/data-status":view==="spending"?"#/spending":view==="assets"?"#/assets":view==="review"?"#/review":view==="lab"?"#/decision-lab":view==="analyses"?"#/analyses":"#/overview"}
-function navMarkup(compact=false){const current=activeView();const navCurrent=current==="pension"?"status":current;const compactViews=current==="pension"||current==="status"?["overview","spending","assets","lab","status"]:["overview","spending","assets","review","lab"];const items=compact?navItems.filter(item=>compactViews.includes(item.view)):navItems;return items.map(item=>item.view?'<a class="nav-item" href="'+viewHref(item.view)+'"'+(item.view===navCurrent?' aria-current="page"':'')+'>'+icons[item.icon]+'<span>'+item.label+'</span></a>':'<button class="nav-item" type="button" disabled title="Folgt in einem späteren Schritt">'+icons[item.icon]+'<span>'+item.label+'</span></button>').join("")}
+function navMarkup(compact=false){const current=activeView();const navCurrent=current==="pension"||current==="sutor"?"status":current;const compactViews=current==="pension"||current==="sutor"||current==="status"?["overview","spending","assets","lab","status"]:["overview","spending","assets","review","lab"];const items=compact?navItems.filter(item=>compactViews.includes(item.view)):navItems;return items.map(item=>item.view?'<a class="nav-item" href="'+viewHref(item.view)+'"'+(item.view===navCurrent?' aria-current="page"':'')+'>'+icons[item.icon]+'<span>'+item.label+'</span></a>':'<button class="nav-item" type="button" disabled title="Folgt in einem späteren Schritt">'+icons[item.icon]+'<span>'+item.label+'</span></button>').join("")}
 function renderNavigation(){document.getElementById("desktop-nav").innerHTML=navMarkup();document.getElementById("mobile-nav").innerHTML=navMarkup(true)}
 renderNavigation();
 
@@ -48,6 +48,8 @@ let currentNewsletterData=null;
 let currentPensionPreview=null;
 let currentPensionImpact=null;
 let currentPensionFileName="";
+let currentSutorPreview=null;
+let currentSutorRevisions=[];
 
 function headerAction(){if(activeView()==="analyses"&&analysisSelection().view==="expense-structure")exportAnalysisCsv();else refresh(true)}
 
@@ -1314,7 +1316,7 @@ const pensionValidationLabels={
   POINTS_VALUE_MISMATCH:"Entgeltpunkte × Rentenwert weichen von der erworbenen Rente ab",
   FORECAST_BELOW_EARNED:"Prognose liegt unter der bereits erworbenen Rente"
 };
-function pensionStep(active){return '<ol class="pension-steps" aria-label="Fortschritt"><li class="'+(active>=1?'done ':'')+(active===1?'active':'')+'"><span>1</span>Hochladen</li><li class="'+(active>=2?'done ':'')+(active===2?'active':'')+'"><span>2</span>Erkennen</li><li class="'+(active>=3?'done ':'')+(active===3?'active':'')+'"><span>3</span>Prüfen</li><li class="'+(active>=4?'done ':'')+(active===4?'active':'')+'"><span>4</span>Übernehmen</li></ol>'}
+function pensionStep(active){const item=(number,label)=>'<li class="'+(active>=number?'done ':'')+(active===number?'active':'')+'"'+(active===number?' aria-current="step"':'')+'><span>'+number+'</span>'+label+'</li>';return '<ol class="pension-steps" aria-label="Fortschritt">'+item(1,'Hochladen')+item(2,'Erkennen')+item(3,'Prüfen')+item(4,'Übernehmen')+'</ol>'}
 function pensionHistory(revisions){
   if(!revisions?.length)return '<div class="pension-history-empty">Noch keine bestätigte Renteninformation vorhanden.</div>';
   return '<div class="pension-history-list">'+revisions.map(revision=>{const documentDate=revision.fields?.find(field=>field.key==="documentDate")?.value;return '<article><div><strong>Renteninformation '+esc(documentDate?formatDate(documentDate):"")+'</strong><span>Bestätigt '+esc(formatDate(revision.confirmedAt,true))+' · '+esc(revision.extractionVersion)+'</span></div><span class="state-label tone-ok"><span class="state-dot"></span>Bestätigt</span></article>'}).join("")+'</div>';
@@ -1381,6 +1383,73 @@ async function discardPension(){
   const id=currentPensionPreview?.id;currentPensionPreview=null;currentPensionImpact=null;if(id){try{await call("/api/pension-documents/previews/"+id,{method:"DELETE",body:"{}"})}catch{}}
   await refresh();
 }
+const sutorValidationLabels={
+  OCR_REVIEW_REQUIRED:"Die Tabelle wurde per OCR erkannt und kann in diesem MVP nicht automatisch bestätigt werden. Bitte eine maschinenlesbare PDF verwenden oder den manuellen Textimport nutzen.",
+  ISIN_INVALID:"Die ISIN-Prüfziffer ist ungültig.",QUANTITY_INVALID:"Die Stückzahl ist ungültig.",PRICE_INVALID:"Der Kurs ist ungültig.",
+  MARKET_VALUE_INVALID:"Der Positionswert ist ungültig.",FX_MISSING:"Für einen USD-Kurs fehlt der EUR/USD-Kurs.",
+  POSITION_VALUE_MISMATCH:"Stückzahl, Kurs und EUR-Wert stimmen nicht centgenau überein.",
+  GHOSTFOLIO_TARGET_MISSING:"Das Ghostfolio-Zielkonto ist noch nicht konfiguriert.",
+  GHOSTFOLIO_MAPPING_MISSING:"Mindestens eine ISIN benötigt zuerst eine bestätigte Ghostfolio-Zuordnung.",
+  SNAPSHOT_EQUIVALENT:"Dieser Stand ist bereits vollständig vorhanden.",SNAPSHOT_CONFLICT:"Zu diesem Stichtag gibt es bereits abweichende Daten."
+};
+function sutorHistory(revisions){
+  if(!revisions?.length)return '<div class="pension-history-empty">Noch kein per PDF bestätigter Sutor-Stand vorhanden.</div>';
+  return '<div class="pension-history-list">'+revisions.map(revision=>'<article><div><strong>Sutor-Stand '+esc(formatDate(revision.statementDate))+'</strong><span>'+revision.positionCount+' Positionen · bestätigt '+esc(formatDate(revision.confirmedAt,true))+' · '+esc(revision.extractionVersion)+'</span></div><span class="state-label tone-ok"><span class="state-dot"></span>Bestätigt</span></article>').join("")+'</div>';
+}
+function renderSutorHome(revisions=[]){
+  currentSutorPreview=null;currentSutorRevisions=revisions;
+  document.getElementById("dashboard").innerHTML=pensionStep(1)+'<section class="pension-security-note" role="note">'+icons.check+'<div><strong>Privat verarbeitet</strong><span>PDF und Volltext werden nach der lokalen Erkennung gelöscht. Gespeichert werden nur bestätigte strukturierte Werte.</span></div></section><section class="pension-upload-panel" aria-labelledby="sutor-upload-title"><div class="pension-upload-copy"><span class="pension-document-icon">'+icons.manual+'</span><div><h2 id="sutor-upload-title">Monatlichen Sutor-Depotauszug prüfen</h2><p>PDF · maximal 12 MB · maximal 12 Seiten</p></div></div><form id="sutor-upload-form" onsubmit="uploadSutor(event)"><label class="pension-file-control" for="sutor-document"><span>PDF auswählen</span><input id="sutor-document" name="document" type="file" accept="application/pdf" required onchange="sutorFileSelected(this)"></label><span id="sutor-selected-file" class="pension-selected-file">Noch keine PDF ausgewählt</span><button class="button" type="submit">Sicher prüfen</button></form><ul class="pension-privacy-list"><li>Name, Adresse, Depotnummer, IBAN und Umsatzseiten gelangen nicht in die Oberfläche.</li><li>Positionen werden dynamisch über gültige ISIN erkannt; neue ISIN werden niemals still zugeordnet.</li><li>Der bestätigte Sutor-Stand ist Referenz und Zeitreihe. Der aktuelle Vermögenswert kommt aus Ghostfolio; beide Werte werden nicht addiert.</li></ul></section><section class="pension-history" aria-labelledby="sutor-history-title"><div class="section-heading"><div><h2 id="sutor-history-title">Bestätigte PDF-Stände</h2><p>Der bisherige manuelle Textimport bleibt als Fallback unter Datenstatus erhalten.</p></div></div>'+sutorHistory(revisions)+'</section>';
+  document.getElementById("dashboard").setAttribute("aria-busy","false");
+}
+function sutorFileSelected(input){const label=document.getElementById("sutor-selected-file");if(label)label.textContent=input.files?.[0]?"PDF ausgewählt":"Noch keine PDF ausgewählt"}
+function renderSutorProcessing(){
+  document.getElementById("dashboard").innerHTML=pensionStep(2)+'<section class="pension-processing" role="status" aria-live="polite"><div class="pension-spinner" aria-hidden="true"></div><h2>Sutor-PDF wird sicher geprüft …</h2><p>Format, Schadcode, aktive Inhalte, Seiten und Bestandstabelle werden ausschließlich lokal geprüft.</p></section>';
+  document.getElementById("dashboard").setAttribute("aria-busy","true");
+}
+async function uploadSutor(event){
+  event.preventDefault();const file=document.getElementById("sutor-document")?.files?.[0];if(!file)return;
+  if(file.size>12*1024*1024){msg("Die PDF ist größer als 12 MB.",true);return}
+  renderSutorProcessing();msg("Sutor-PDF wird lokal geprüft …");
+  try{const form=new FormData();form.append("document",file);currentSutorPreview=await call("/api/sutor-documents/previews",{method:"POST",body:form});renderSutorReview();msg("")}
+  catch(error){renderSutorHome(currentSutorRevisions);msg(error.message,true)}
+}
+function sutorSignedMoney(minor){const value=Number(minor);return (value>0?"+":"")+money(value)}
+function sutorPositionRow(position){
+  const warnings=[...(position.validatorCodes||[])];if(!position.ghostfolioMapped)warnings.push("GHOSTFOLIO_MAPPING_MISSING");
+  const warning=warnings.length?'<div class="sutor-row-warning" role="alert">'+warnings.map(code=>esc(sutorValidationLabels[code]||"Bitte Position prüfen")).join(" · ")+'</div>':'';
+  const state=position.ghostfolioMapped?'Zugeordnet':'Zuordnung erforderlich';
+  return '<tr class="'+(warnings.length?'needs-review':'')+'"><td><strong>'+esc(position.fundName)+'</strong><code>'+esc(position.isin)+'</code>'+warning+'</td><td><span class="tone-'+(position.ghostfolioMapped?'ok':'warning')+'">'+state+'</span></td><td>'+decimal(position.quantityAtomic,position.quantityDecimals)+'</td><td>'+decimal(position.priceAtomic,position.priceDecimals)+' '+esc(position.priceCurrency)+'</td><td>'+money(position.marketValueMinor)+'</td><td>Seite '+position.provenance.page+' · '+(position.provenance.method==="native"?'Text':'OCR')+'</td></tr>';
+}
+function sutorPositionCard(position){
+  const warnings=[...(position.validatorCodes||[])];if(!position.ghostfolioMapped)warnings.push("GHOSTFOLIO_MAPPING_MISSING");
+  return '<article class="sutor-position-card '+(warnings.length?'needs-review':'')+'"><h3>'+esc(position.fundName)+'</h3><code>'+esc(position.isin)+'</code><dl><div><dt>Anteile</dt><dd>'+decimal(position.quantityAtomic,position.quantityDecimals)+'</dd></div><div><dt>Kurs</dt><dd>'+decimal(position.priceAtomic,position.priceDecimals)+' '+esc(position.priceCurrency)+'</dd></div><div><dt>Wert</dt><dd>'+money(position.marketValueMinor)+'</dd></div><div><dt>Quelle</dt><dd>Seite '+position.provenance.page+'</dd></div></dl><p class="tone-'+(position.ghostfolioMapped?'ok':'warning')+'">'+(position.ghostfolioMapped?'Ghostfolio zugeordnet':'Ghostfolio-Zuordnung erforderlich')+'</p>'+(warnings.length?'<div class="sutor-row-warning" role="alert">'+warnings.map(code=>esc(sutorValidationLabels[code]||"Bitte Position prüfen")).join(" · ")+'</div>':'')+'</article>';
+}
+function renderSutorReview(){
+  const preview=currentSutorPreview;if(!preview)return;
+  if(preview.duplicate||preview.snapshotState==="equivalent"){
+    document.getElementById("dashboard").innerHTML=pensionStep(3)+'<section class="pension-duplicate" role="status" aria-live="polite">'+icons.warning+'<h2>Stand bereits vorhanden</h2><p>Der Dokumenthash oder der vollständige Stand ist bereits bestätigt beziehungsweise im Archiv vorhanden. Es wurde nichts verändert.</p><button class="button secondary" type="button" onclick="discardSutor()">Zur Übersicht</button></section>';document.getElementById("dashboard").setAttribute("aria-busy","false");return
+  }
+  if(preview.snapshotState==="conflict"){
+    document.getElementById("dashboard").innerHTML=pensionStep(3)+'<section class="pension-duplicate" role="status" aria-live="polite">'+icons.warning+'<h2>Abweichender Stand am selben Stichtag</h2><p>Für '+esc(formatDate(preview.statementDate))+' existieren bereits andere Werte. Eine Übernahme ist gesperrt.</p><button class="button secondary" type="button" onclick="discardSutor()">Zur Übersicht</button></section>';document.getElementById("dashboard").setAttribute("aria-busy","false");return
+  }
+  const rows=preview.positions.map(sutorPositionRow).join("");const cards=preview.positions.map(sutorPositionCard).join("");
+  const warnings=preview.warnings.map(code=>'<div class="pension-field-warning" role="alert">'+icons.warning+'<span>'+esc(sutorValidationLabels[code]||"Bitte Sutor-Stand prüfen")+'</span></div>').join("");
+  const previous=preview.previous?money(preview.previous.contractValueMinor)+' · '+formatDate(preview.previous.statementDate):"Noch kein vorheriger Stand";
+  const delta=preview.deltaMinor===null?"–":sutorSignedMoney(preview.deltaMinor);
+  const action='<label class="pension-confirm-check"><input id="sutor-confirm-check" type="checkbox" onchange="document.getElementById(&quot;sutor-confirm-button&quot;).disabled=!this.checked||!currentSutorPreview.canConfirm"><span>Ich habe Stichtag, Summen, Positionen und Zuordnungen geprüft.</span></label><button class="button" id="sutor-confirm-button" type="button" onclick="confirmSutor()" disabled>Stand bestätigen und übernehmen</button>';
+  document.getElementById("dashboard").innerHTML=pensionStep(3)+'<section class="pension-security-note" role="note">'+icons.check+'<div><strong>Privat verarbeitet · Original gelöscht</strong><span>Im Browser stehen nur die abgeleiteten Bestandswerte und ihre Seitenherkunft.</span></div></section><div class="pension-review-layout sutor-review-layout"><div><section class="pension-document-summary"><span class="pension-document-icon">'+icons.manual+'</span><div><h2>Sutor-Depotauszug</h2><p>'+preview.pageCount+' Seiten · Stichtag '+esc(formatDate(preview.statementDate))+'</p><span>'+preview.positions.length+' ISIN-Positionen · '+(preview.extractionMethod==="native"?'Maschinenlesbarer Text':'OCR · Prüfung erforderlich')+'</span></div></section><section class="sutor-position-panel" aria-labelledby="sutor-positions-title"><div class="pension-fields-summary"><h2 id="sutor-positions-title">Erkannte Positionen</h2><p>Bestandstabelle; Umsatzseiten wurden nicht importiert.</p></div><div class="sutor-position-table-wrap"><table><thead><tr><th>Position</th><th>Ghostfolio</th><th>Anteile</th><th>Kurs</th><th>EUR-Wert</th><th>Quelle</th></tr></thead><tbody>'+rows+'</tbody></table></div><div class="sutor-position-cards">'+cards+'</div></section></div><aside><section class="sutor-delta"><h2>Stand &amp; Delta</h2><dl><div><dt>Kurswert gesamt</dt><dd>'+money(preview.totalMarketValueMinor)+'</dd></div><div><dt>Geldsaldo</dt><dd>'+money(preview.cashMinor)+'</dd></div><div><dt>Vertragswert</dt><dd>'+money(preview.contractValueMinor)+'</dd></div><div><dt>Vorheriger Stand</dt><dd>'+esc(previous)+'</dd></div><div><dt>Delta</dt><dd>'+esc(delta)+'</dd></div></dl><p>Referenz/Zeitreihe. Der Ghostfolio-Marktwert bleibt der einzige aktuelle Vermögenswert.</p></section><section class="pension-confirm"><h2>Prüfen &amp; übernehmen</h2>'+warnings+action+'<button class="button secondary" type="button" onclick="discardSutor()">Abbrechen</button></section></aside></div>';
+  document.getElementById("dashboard").setAttribute("aria-busy","false");
+}
+async function confirmSutor(){
+  if(!currentSutorPreview||!document.getElementById("sutor-confirm-check")?.checked||!currentSutorPreview.canConfirm)return;
+  const button=document.getElementById("sutor-confirm-button");button.disabled=true;msg("Bestätigter Sutor-Stand wird übernommen …");
+  try{const result=await call("/api/sutor-documents/previews/"+currentSutorPreview.id+"/confirm",{method:"POST",body:JSON.stringify({confirmed:true})});currentSutorPreview=null;document.getElementById("dashboard").innerHTML=pensionStep(4)+'<section class="pension-success" role="status" aria-live="polite">'+icons.check+'<h2>Sutor-Stand übernommen</h2><p>'+esc(result.message||"Der bestätigte Stand ist versioniert und mit USER_CONFIRMED protokolliert.")+'</p><a class="button secondary" href="#/assets">Vermögen öffnen</a></section>';msg("Sutor-Stand wurde bestätigt.")}
+  catch(error){msg(error.message,true);button.disabled=false}
+}
+async function discardSutor(){
+  const id=currentSutorPreview?.id;currentSutorPreview=null;if(id){try{await call("/api/sutor-documents/previews/"+id,{method:"DELETE",body:"{}"})}catch{}}
+  await refresh();
+}
 function renderSource(source){
   const info=stateInfo(source);
   const approval=source.supportsDkbApproval&&source.actionPending?'<button class="button small" type="button" onclick="continueDkb(&quot;'+encoded(source.id)+'&quot;)">App-Freigabe prüfen</button>':'';
@@ -1404,11 +1473,12 @@ function renderDashboard(data){
       <div class="overview-stats"><div class="stat"><strong>'+data.summary.automaticCurrent+'<span class="tone-'+(data.summary.automaticCurrent===data.summary.automaticTotal?'ok':'warning')+'"> / '+data.summary.automaticTotal+'</span></strong><span>Automatisch aktuell</span></div><div class="stat"><strong>'+data.summary.tasks+'</strong><span>Aufgaben</span></div><div class="stat"><strong>'+data.summary.historicalImports+'</strong><span>Historische Importe</span></div></div>\
     </section>\
     <section class="section" aria-labelledby="pension-documents-title"><div class="section-heading"><div><h2 id="pension-documents-title">Renteninformationen</h2><p>DRV-Werte sicher erkennen, prüfen und als FIRE-Annahme bestätigen.</p></div><a class="button secondary" href="#/pension-documents">Renteninformation prüfen</a></div></section>\
+    <section class="section" aria-labelledby="sutor-documents-title"><div class="section-heading"><div><h2 id="sutor-documents-title">Sutor Riester</h2><p>Monatlichen Depotauszug sicher als PDF prüfen und bestätigen.</p></div><a class="button secondary" href="#/sutor-riester">Sutor-PDF prüfen</a></div></section>\
     <section class="section" aria-labelledby="tasks-title"><div class="section-heading"><div><h2 id="tasks-title">Offene Aufgaben</h2><p>Vertragswerte, die bewusst bestätigt werden müssen.</p></div></div><div class="task-list">'+tasks+'</div></section>\
     <section class="section" aria-labelledby="sources-title"><div class="section-heading"><div><h2 id="sources-title">Automatische Quellen</h2><p>Banken, Depots und Wallets mit geplantem Abruf.</p></div></div><div class="source-list">'+sources+'</div></section>\
     <section class="section" aria-labelledby="history-title"><div class="section-heading"><div><h2 id="history-title">Historische Daten</h2></div></div><details class="historical"><summary><strong>'+icons.archive+'Historische CSV-Importe</strong><span class="details-label">'+data.historical.count+' Quellen '+icons.chevron+'</span></summary><p>'+data.historical.count+' deaktivierte Importquellen bleiben im lückenlosen Archiv erhalten.'+(data.historical.lastSuccessAt?' Letzter Import: '+esc(formatDate(data.historical.lastSuccessAt))+'.':'')+'</p></details></section>\
     <section class="section" aria-labelledby="system-title"><div class="section-heading"><div><h2 id="system-title">Systemzustand</h2></div></div><div class="system-band">'+systemItem("FinanceSync",data.system.financeSync)+systemItem("Datenbank",data.system.database)+systemItem("Backup",data.system.backup,backupDetail)+systemItem("Archivspeicher",data.system.archive,archiveDetail)+'</div></section>\
-    <section class="section"><details class="management" id="management"><summary>Verwaltung und manuelle Eingabe</summary><div class="management-body"><div class="management-tools"><button class="button secondary" type="button" onclick="exportNow()">CSV neu erzeugen</button><button class="button secondary" type="button" onclick="reconcile()">Interne Überträge abgleichen</button></div><section class="manual-workflow" id="miles-section"><h2>Miles &amp; More Abrechnung</h2><p>Text der Kreditkartenabrechnung einfügen, wie bei Sutor. Vorschau ändert noch nichts.</p><div class="manual-grid"><div><label for="miles-date">Abrechnungsdatum</label><input id="miles-date" type="date" oninput="resetMilesMorePreview()"></div><div><label for="miles-text">Abrechnungstext</label><textarea id="miles-text" oninput="resetMilesMorePreview()" placeholder="Hier die Umsätze inkl. Saldo einfügen …"></textarea></div></div><div class="actions" style="margin-top:12px"><button class="button" type="button" onclick="previewMilesMore()">Vorschau prüfen</button><button class="button secondary" id="miles-import-button" type="button" onclick="importMilesMore()" disabled>In Actual importieren</button></div><div id="miles-preview" class="preview"></div></section><section class="manual-workflow" id="manual-section" hidden><h2>Vorsorge aktualisieren</h2><p>Text aus der Depot- oder Vertragsansicht einfügen. Die Vorschau verändert noch keine Daten.</p><div class="manual-grid"><div><label for="manual-source">Vertrag</label><select id="manual-source" name="manual-source" autocomplete="off"></select></div><div><label for="manual-text">Kopierter Text</label><textarea id="manual-text" name="manual-text" autocomplete="off" spellcheck="false" placeholder="Hier den vollständigen Text einfügen …"></textarea></div></div><div class="actions" style="margin-top:12px"><button class="button" id="preview-button" type="button" onclick="previewManual()">Vorschau prüfen</button><span style="color:var(--muted)">Noch kein Import</span></div><div id="manual-error" class="notice error" role="status" aria-live="polite"></div><div id="manual-preview" class="preview"></div></section></div></details></section>';
+    <section class="section"><details class="management" id="management"><summary>Verwaltung und manuelle Eingabe</summary><div class="management-body"><div class="management-tools"><button class="button secondary" type="button" onclick="exportNow()">CSV neu erzeugen</button><button class="button secondary" type="button" onclick="reconcile()">Interne Überträge abgleichen</button></div><section class="manual-workflow" id="miles-section"><h2>Miles &amp; More Abrechnung</h2><p>Text der Kreditkartenabrechnung einfügen. Vorschau ändert noch nichts.</p><div class="manual-grid"><div><label for="miles-date">Abrechnungsdatum</label><input id="miles-date" type="date" oninput="resetMilesMorePreview()"></div><div><label for="miles-text">Abrechnungstext</label><textarea id="miles-text" oninput="resetMilesMorePreview()" placeholder="Hier die Umsätze inkl. Saldo einfügen …"></textarea></div></div><div class="actions" style="margin-top:12px"><button class="button" type="button" onclick="previewMilesMore()">Vorschau prüfen</button><button class="button secondary" id="miles-import-button" type="button" onclick="importMilesMore()" disabled>In Actual importieren</button></div><div id="miles-preview" class="preview"></div></section><section class="manual-workflow" id="manual-section" hidden><h2>Manuelle Vorsorge-Eingabe (Fallback)</h2><p>Für Sutor ist der sichere PDF-Import der bevorzugte Weg. Diese Texteingabe bleibt für ältere ISIN-lose Depotbestände und Alte Leipziger erhalten.</p><div class="manual-grid"><div><label for="manual-source">Vertrag</label><select id="manual-source" name="manual-source" autocomplete="off"></select></div><div><label for="manual-text">Kopierter Text</label><textarea id="manual-text" name="manual-text" autocomplete="off" spellcheck="false" placeholder="Hier den vollständigen Text einfügen …"></textarea></div></div><div class="actions" style="margin-top:12px"><button class="button" id="preview-button" type="button" onclick="previewManual()">Vorschau prüfen</button><span style="color:var(--muted)">Noch kein Import</span></div><div id="manual-error" class="notice error" role="status" aria-live="polite"></div><div id="manual-preview" class="preview"></div></section></div></details></section>';
   document.getElementById("dashboard").setAttribute("aria-busy","false");
 }
 
@@ -1422,17 +1492,18 @@ function renderHeader(view){
     analyses:{title:"Analysen",subtitle:"Ausgaben verstehen und Veränderungen nachvollziehen."},
     status:{title:"Datenstatus",subtitle:"Aktualität, offene Aufgaben und Systemzustand auf einen Blick."}
     ,pension:{title:"Renteninformation prüfen",subtitle:"DRV-Werte lokal erkennen, nachvollziehen und bewusst übernehmen."}
+    ,sutor:{title:"Sutor Riester prüfen",subtitle:"Monatlichen Depotauszug lokal erkennen, nachvollziehen und bewusst übernehmen."}
   }[view];
   if(view==="analyses"&&analysisSelection().view==="crypto-origin-tax")content.subtitle="Krypto-Herkunft, Investmentbasis und Steuerstatus nachvollziehen.";
   if(view==="analyses"&&analysisSelection().view==="investment-newsletters")content.subtitle="Newsletter-Signale prüfen, einordnen und nachvollziehen.";
   document.title=content.title+" · Finance Hub";
   const eyebrow=document.getElementById("page-eyebrow");
-  eyebrow.hidden=view!=="status"&&view!=="pension";
+  eyebrow.hidden=view!=="status"&&view!=="pension"&&view!=="sutor";
   document.getElementById("page-title").textContent=content.title;
   document.getElementById("page-subtitle").textContent=content.subtitle;
   const action=document.getElementById("refresh-button");
   const analysisExport=view==="analyses"&&analysisSelection().view==="expense-structure";
-  action.hidden=view==="pension";
+  action.hidden=view==="pension"||view==="sutor";
   action.setAttribute("aria-label",analysisExport?"Aktuelle Analyse als CSV exportieren":content.title+" aktualisieren");
   action.querySelector("[aria-hidden]").textContent=analysisExport?"↓":"↻";
   action.querySelector(".desktop-label").textContent=analysisExport?"CSV exportieren":"Aktualisieren";
@@ -1454,7 +1525,7 @@ async function refresh(force=false){
   const view=activeView();
   const button=document.getElementById("refresh-button");
   renderHeader(view);renderNavigation();renderLoading(view);
-  const loadingLabel=view==="overview"?"Übersicht":view==="spending"?"Ausgaben":view==="assets"?"Vermögen":view==="review"?"Prüfen":view==="lab"?"Planung":view==="analyses"?"Analyse":view==="pension"?"Renteninformationen":"Datenstatus";
+  const loadingLabel=view==="overview"?"Übersicht":view==="spending"?"Ausgaben":view==="assets"?"Vermögen":view==="review"?"Prüfen":view==="lab"?"Planung":view==="analyses"?"Analyse":view==="pension"?"Renteninformationen":view==="sutor"?"Sutor Riester":"Datenstatus";
   button.disabled=true;msg(loadingLabel+" wird aktualisiert …");
   try{
     if(view==="overview"){
@@ -1502,6 +1573,8 @@ async function refresh(force=false){
       const data=await call("/api/dashboard/analyses/decision-lab?"+params.toString());renderDecisionLab(data);
     }else if(view==="pension"){
       if(currentPensionPreview)renderPensionReview();else{const data=await call("/api/pension-documents/revisions");renderPensionHome(data.revisions||[])}
+    }else if(view==="sutor"){
+      if(currentSutorPreview)renderSutorReview();else{const data=await call("/api/sutor-documents/revisions");renderSutorHome(data.revisions||[])}
     }else if(view==="analyses"){
       const selection=analysisSelection();
       const params=new URLSearchParams();

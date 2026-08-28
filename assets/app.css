@@ -24,6 +24,7 @@
       --shadow: 0 18px 48px rgba(0, 0, 0, .2);
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: rgba(59, 130, 246, .18); }
+    [hidden] { display: none !important; }
     html { scroll-behavior: smooth; }
     body {
       margin: 0;
@@ -1452,7 +1453,7 @@
     .pension-upload-copy p { margin-top: 6px; color: var(--muted); }
     .pension-document-icon { display: grid; width: 54px; height: 64px; flex: 0 0 auto; place-items: center; border: 1px solid #3c5374; border-radius: 8px; background: var(--surface-2); color: #82b4ff; }
     .pension-document-icon svg { width: 28px; height: 28px; }
-    #pension-upload-form { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 12px; align-items: center; margin-top: 24px; }
+    #pension-upload-form, #sutor-upload-form { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 12px; align-items: center; margin-top: 24px; }
     .pension-file-control { display: inline-flex; min-height: 44px; align-items: center; border: 1px solid var(--line); border-radius: 11px; padding: 0 15px; background: var(--surface-2); font-weight: 700; cursor: pointer; }
     .pension-file-control:hover { border-color: #3b4d6a; }
     .pension-file-control input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -1518,6 +1519,23 @@
     .pension-confirm > .button { width: 100%; margin-top: 10px; }
     .pension-confirm-check { display: flex; min-height: 44px; align-items: center; gap: 10px; cursor: pointer; }
     .pension-confirm-check input { width: 20px; height: 20px; flex: 0 0 auto; accent-color: var(--blue); }
+    .sutor-position-panel, .sutor-delta { margin-top: 16px; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+    .sutor-position-table-wrap { overflow-x: auto; }
+    .sutor-position-table-wrap table { width: 100%; border-collapse: collapse; }
+    .sutor-position-table-wrap th, .sutor-position-table-wrap td { padding: 12px 10px; border-top: 1px solid var(--line-soft); text-align: left; vertical-align: top; font-size: 12px; }
+    .sutor-position-table-wrap th { border-top: 0; color: var(--muted); font-size: 11px; }
+    .sutor-position-table-wrap strong, .sutor-position-table-wrap code { display: block; max-width: 280px; overflow-wrap: anywhere; }
+    .sutor-position-table-wrap code { margin-top: 4px; color: #8ebcff; }
+    .sutor-position-table-wrap tr.needs-review { background: var(--amber-soft); }
+    .sutor-row-warning { margin-top: 7px; color: var(--amber); font-size: 11px; line-height: 1.45; }
+    .sutor-position-cards { display: none; }
+    .sutor-delta { margin-top: 0; padding: 18px; }
+    .sutor-delta h2 { font-size: 18px; }
+    .sutor-delta dl { margin-top: 12px; }
+    .sutor-delta dl div { display: flex; min-height: 40px; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px solid var(--line-soft); }
+    .sutor-delta dt { color: var(--muted); font-size: 12px; }
+    .sutor-delta dd { margin: 0; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .sutor-delta p { margin-top: 13px; color: var(--muted); font-size: 12px; line-height: 1.5; }
     .fire-pension-link { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 18px; padding: 14px 16px; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--surface-2); }
     .fire-pension-link strong, .fire-pension-link span { display: block; }
     .fire-pension-link span { margin-top: 3px; color: var(--muted); font-size: 12px; }
@@ -1536,8 +1554,17 @@
       .pension-security-note { justify-content: flex-start; padding: 11px 13px; }
       .pension-review-layout { grid-template-columns: 1fr; }
       .pension-confirm { position: static; }
-      #pension-upload-form { grid-template-columns: 1fr; }
-      .pension-file-control, #pension-upload-form .button { width: 100%; }
+      #pension-upload-form, #sutor-upload-form { grid-template-columns: 1fr; }
+      .pension-file-control, #pension-upload-form .button, #sutor-upload-form .button { width: 100%; }
+      .sutor-position-table-wrap { display: none; }
+      .sutor-position-cards { display: grid; gap: 12px; padding: 12px; }
+      .sutor-position-card { min-width: 0; border: 1px solid var(--line-soft); border-left: 3px solid var(--green); border-radius: 10px; padding: 14px; background: var(--surface-2); }
+      .sutor-position-card.needs-review { border-left-color: var(--amber); }
+      .sutor-position-card h3, .sutor-position-card code { overflow-wrap: anywhere; }
+      .sutor-position-card code { display: block; margin-top: 5px; color: #8ebcff; }
+      .sutor-position-card dl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 13px 0; }
+      .sutor-position-card dt { color: var(--muted); font-size: 11px; }
+      .sutor-position-card dd { margin: 3px 0 0; font-size: 13px; font-weight: 700; }
       .fire-pension-link { align-items: stretch; flex-direction: column; }
     }
     @media (max-width: 420px) {

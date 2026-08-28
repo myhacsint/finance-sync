@@ -20,6 +20,7 @@ import type {
 import type { ConfirmedPensionRevision } from "./pension-revisions.js";
 import type { FireAssumptions } from "./fire-assumptions.js";
 import type { PensionPreviewSummary } from "./pension-document-types.js";
+import type { ConfirmedSutorRevision, StoredSutorPreview, SutorPreviousStand } from "./sutor-document-types.js";
 
 export class FinanceDatabase {
   readonly db: DatabaseSync;
@@ -240,6 +241,35 @@ export class FinanceDatabase {
         occurred_at TEXT NOT NULL,
         extraction_version TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS sutor_document_receipts (
+        id TEXT PRIMARY KEY,
+        document_hash TEXT NOT NULL UNIQUE,
+        media_type TEXT NOT NULL CHECK(media_type='application/pdf'),
+        page_count INTEGER NOT NULL,
+        size_bytes INTEGER NOT NULL,
+        received_at TEXT NOT NULL,
+        extraction_version TEXT NOT NULL,
+        retention_mode TEXT NOT NULL CHECK(retention_mode='derived-only'),
+        security_status TEXT NOT NULL CHECK(security_status='PASSED')
+      );
+      CREATE TABLE IF NOT EXISTS sutor_revisions (
+        revision_id TEXT PRIMARY KEY,
+        receipt_id TEXT NOT NULL UNIQUE REFERENCES sutor_document_receipts(id),
+        statement_date TEXT NOT NULL UNIQUE,
+        confirmed_at TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status='USER_CONFIRMED'),
+        derived_json TEXT NOT NULL,
+        provenance_json TEXT NOT NULL,
+        before_after_json TEXT NOT NULL,
+        reconciliation_status TEXT NOT NULL CHECK(reconciliation_status IN ('SYNCED','PENDING'))
+      );
+      CREATE TABLE IF NOT EXISTS sutor_audit_events (
+        id INTEGER PRIMARY KEY,
+        revision_id TEXT NOT NULL REFERENCES sutor_revisions(revision_id),
+        event TEXT NOT NULL CHECK(event='USER_CONFIRMED'),
+        occurred_at TEXT NOT NULL,
+        extraction_version TEXT NOT NULL
+      );
       CREATE UNIQUE INDEX IF NOT EXISTS idx_newsletter_analyses_content_hash
         ON newsletter_analyses(content_hash);
       CREATE INDEX IF NOT EXISTS idx_transactions_account_date
@@ -359,6 +389,113 @@ export class FinanceDatabase {
         const revisionRow = this.listPensionRevisions().find((item) => item.revisionId === raced.revisionId)!;
         return { revision: revisionRow, created: false };
       }
+      throw error;
+    }
+  }
+
+  sutorRevisionByHash(documentHash: string): { revisionId: string; confirmedAt: string } | null {
+    const row = this.db.prepare(`
+      SELECT r.revision_id, r.confirmed_at
+      FROM sutor_revisions r JOIN sutor_document_receipts d ON d.id=r.receipt_id
+      WHERE d.document_hash=? LIMIT 1
+    `).get(documentHash) as { revision_id: string; confirmed_at: string } | undefined;
+    return row ? { revisionId: row.revision_id, confirmedAt: row.confirmed_at } : null;
+  }
+
+  latestSutorStand(sourceId: string, accountId: string): SutorPreviousStand | null {
+    const row = this.db.prepare(`
+      SELECT captured_at, amount_minor FROM balances
+      WHERE source_id=? AND account_id=?
+      ORDER BY captured_at DESC LIMIT 1
+    `).get(sourceId, accountId) as { captured_at: string; amount_minor: number | bigint } | undefined;
+    return row ? {
+      statementDate: row.captured_at.slice(0, 10),
+      contractValueMinor: String(row.amount_minor)
+    } : null;
+  }
+
+  listSutorRevisions(): ConfirmedSutorRevision[] {
+    const rows = this.db.prepare(`
+      SELECT r.revision_id, d.document_hash, r.confirmed_at, d.extraction_version,
+             r.statement_date, r.derived_json, r.provenance_json,
+             r.before_after_json, r.reconciliation_status, r.status
+      FROM sutor_revisions r JOIN sutor_document_receipts d ON d.id=r.receipt_id
+      ORDER BY r.statement_date DESC, r.confirmed_at DESC
+    `).all() as Array<Record<string, string>>;
+    return rows.map((row) => {
+      const derived = JSON.parse(row.derived_json) as Pick<ConfirmedSutorRevision,
+        "documentType" | "positionCount" | "totalMarketValueMinor" | "cashMinor" | "contractValueMinor">;
+      const beforeAfter = JSON.parse(row.before_after_json) as Pick<ConfirmedSutorRevision, "previous" | "deltaMinor">;
+      return {
+        revisionId: row.revision_id,
+        documentHash: row.document_hash,
+        confirmedAt: row.confirmed_at,
+        extractionVersion: row.extraction_version,
+        statementDate: row.statement_date,
+        ...derived,
+        ...beforeAfter,
+        provenance: JSON.parse(row.provenance_json),
+        reconciliation: row.reconciliation_status as "SYNCED" | "PENDING",
+        status: row.status as "USER_CONFIRMED"
+      };
+    });
+  }
+
+  confirmSutorRevision(preview: StoredSutorPreview, revision: ConfirmedSutorRevision): {
+    revision: ConfirmedSutorRevision;
+    created: boolean;
+  } {
+    const byHash = this.sutorRevisionByHash(preview.documentHash);
+    if (byHash) {
+      return { revision: this.listSutorRevisions().find((item) => item.revisionId === byHash.revisionId)!, created: false };
+    }
+    const sameDate = this.listSutorRevisions().find((item) => item.statementDate === revision.statementDate);
+    if (sameDate) {
+      if (sameDate.contractValueMinor === revision.contractValueMinor
+        && sameDate.positionCount === revision.positionCount) return { revision: sameDate, created: false };
+      throw new Error("SUTOR_SAME_DATE_CONFLICT");
+    }
+    const receiptId = `sutor-receipt-${revision.revisionId.slice(-36)}`;
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.db.prepare(`
+        INSERT INTO sutor_document_receipts(
+          id, document_hash, media_type, page_count, size_bytes, received_at,
+          extraction_version, retention_mode, security_status
+        ) VALUES (?, ?, 'application/pdf', ?, ?, ?, ?, 'derived-only', 'PASSED')
+      `).run(receiptId, preview.documentHash, preview.pageCount, preview.sizeBytes,
+        preview.createdAt, preview.extractionVersion);
+      this.db.prepare(`
+        INSERT INTO sutor_revisions(
+          revision_id, receipt_id, statement_date, confirmed_at, status,
+          derived_json, provenance_json, before_after_json, reconciliation_status
+        ) VALUES (?, ?, ?, ?, 'USER_CONFIRMED', ?, ?, ?, ?)
+      `).run(
+        revision.revisionId, receiptId, revision.statementDate, revision.confirmedAt,
+        JSON.stringify({
+          documentType: revision.documentType,
+          positionCount: revision.positionCount,
+          totalMarketValueMinor: revision.totalMarketValueMinor,
+          cashMinor: revision.cashMinor,
+          contractValueMinor: revision.contractValueMinor
+        }),
+        JSON.stringify(revision.provenance),
+        JSON.stringify({ previous: revision.previous, deltaMinor: revision.deltaMinor }),
+        revision.reconciliation
+      );
+      this.db.prepare(`
+        INSERT INTO sutor_audit_events(revision_id,event,occurred_at,extraction_version)
+        VALUES (?,'USER_CONFIRMED',?,?)
+      `).run(revision.revisionId, revision.confirmedAt, revision.extractionVersion);
+      this.db.exec("COMMIT");
+      return { revision, created: true };
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      const raced = this.sutorRevisionByHash(preview.documentHash);
+      if (raced) return {
+        revision: this.listSutorRevisions().find((item) => item.revisionId === raced.revisionId)!,
+        created: false
+      };
       throw error;
     }
   }

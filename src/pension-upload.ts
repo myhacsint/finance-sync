@@ -17,8 +17,17 @@ export interface PensionUploadedFile {
   cleanup(): void;
 }
 
-export async function receivePensionUpload(req: IncomingMessage): Promise<PensionUploadedFile> {
-  const workDir = join(tmpdir(), `finance-pension-${randomUUID()}`);
+export interface DocumentUploadOptions {
+  tempPrefix?: string;
+  allowedMediaTypes?: PensionUploadedFile["mediaType"][];
+}
+
+export async function receivePensionUpload(
+  req: IncomingMessage,
+  options: DocumentUploadOptions = {}
+): Promise<PensionUploadedFile> {
+  const tempPrefix = options.tempPrefix ?? "finance-pension";
+  const workDir = join(tmpdir(), `${tempPrefix}-${randomUUID()}`);
   mkdirSync(workDir, { recursive: false, mode: 0o700 });
   const path = join(workDir, "document.bin");
   let settled = false;
@@ -87,10 +96,13 @@ export async function receivePensionUpload(req: IncomingMessage): Promise<Pensio
     void result;
     if (sizeBytes < 32) throw new Error("UPLOAD_FILE_EMPTY");
     const descriptor = openSync(path, "r");
-    const prefix = Buffer.alloc(16);
-    try { readSync(descriptor, prefix, 0, prefix.length, 0); } finally { closeSync(descriptor); }
-    const mediaType = magicMediaType(prefix);
+    const header = Buffer.alloc(16);
+    try { readSync(descriptor, header, 0, header.length, 0); } finally { closeSync(descriptor); }
+    const mediaType = magicMediaType(header);
     if (!mediaType || mediaType !== declaredMime) throw new Error("UPLOAD_MIME_MISMATCH");
+    if (options.allowedMediaTypes && !options.allowedMediaTypes.includes(mediaType)) {
+      throw new Error("UPLOAD_MEDIA_TYPE_NOT_ALLOWED");
+    }
     settled = true;
     return { workDir, path, mediaType, sizeBytes, hash: hash.digest("hex"), cleanup };
   } finally {

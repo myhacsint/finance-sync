@@ -115,6 +115,8 @@ import {
   pensionAssumptionsFromFields,
   pensionImpact
 } from "./pension-revisions.js";
+import type { StoredSutorPreview } from "./sutor-document-types.js";
+import { createConfirmedSutorRevision } from "./sutor-revisions.js";
 import { createNamedScenario } from "./named-scenarios.js";
 import { createLifeEvent } from "./life-events.js";
 import { compareNamedScenarios } from "./scenario-compare.js";
@@ -568,6 +570,99 @@ export class FinanceService {
     const { impact, assumptions } = await this.previewPensionFire(preview);
     const revision = createConfirmedPensionRevision(preview, assumptions, impact);
     return this.db.confirmPensionRevision(preview, revision);
+  }
+
+  getSutorSource(): SourceConfig | null {
+    return this.config.sources.find((source) => {
+      const workflow = source.settings?.manualWorkflow as { provider?: string } | undefined;
+      return source.enabled && source.kind === "manual" && workflow?.provider === "sutor";
+    }) ?? null;
+  }
+
+  listSutorRevisions() {
+    return this.db.listSutorRevisions().map((revision) => ({
+      revisionId: revision.revisionId,
+      confirmedAt: revision.confirmedAt,
+      extractionVersion: revision.extractionVersion,
+      statementDate: revision.statementDate,
+      documentType: revision.documentType,
+      positionCount: revision.positionCount,
+      totalMarketValueMinor: revision.totalMarketValueMinor,
+      cashMinor: revision.cashMinor,
+      contractValueMinor: revision.contractValueMinor,
+      previous: revision.previous,
+      deltaMinor: revision.deltaMinor,
+      reconciliation: revision.reconciliation,
+      status: revision.status
+    }));
+  }
+
+  async confirmSutorPreview(preview: StoredSutorPreview) {
+    if (!preview.canConfirm) throw new FinanceServiceError("Bitte alle markierten Sutor-Werte zuerst prüfen", 409);
+    const source = this.getSource(preview.source.id);
+    if (!source || source.kind !== "manual") throw new FinanceServiceError("Sutor-Quelle nicht gefunden", 404);
+    if (this.running.has(source.id)) throw new FinanceServiceError("Für Sutor läuft bereits ein Vorgang", 409);
+    const existing = this.db.sutorRevisionByHash(preview.documentHash);
+    if (existing) {
+      return {
+        revision: this.db.listSutorRevisions().find((item) => item.revisionId === existing.revisionId),
+        created: false,
+        snapshotState: "equivalent" as const,
+        message: "Dieser Sutor-Auszug wurde bereits bestätigt"
+      };
+    }
+    this.running.add(source.id);
+    const runId = this.db.beginRun(source.id);
+    try {
+      const bundle = manualSnapshotBundle(source, preview.snapshot);
+      const snapshotState = this.db.manualSnapshotState(source.id, bundle);
+      if (snapshotState === "conflict") throw new Error("SUTOR_SAME_DATE_CONFLICT");
+      if (snapshotState === "equivalent") {
+        this.db.finishRun(runId, source.id, "SUCCESS", "Sutor-Stand bereits vorhanden", { balances: 0, holdings: 0 });
+        return {
+          revision: null,
+          created: false,
+          snapshotState,
+          message: "Dieser Sutor-Stand ist bereits vollständig vorhanden"
+        };
+      }
+      const mappingReady = Boolean(
+        this.config.ghostfolio?.enabled
+        && this.config.ghostfolio.accountMap[preview.snapshot.accountId]
+        && (preview.snapshot.holdings ?? []).every((holding) => this.config.ghostfolio?.holdingMap?.[holding.symbol])
+      );
+      if (!mappingReady) throw new Error("SUTOR_MAPPING_REQUIRED");
+
+      // Reconcile first: if Ghostfolio is unavailable, no Sutor source value or
+      // confirmation audit is persisted. Retrying remains safe and idempotent.
+      const ghostfolioHoldings = await reconcileGhostfolioHoldings(
+        this.config.ghostfolio!,
+        bundle.holdings ?? [],
+        "Confirmed Sutor Riester position adjustment by FinanceSync; not tax cost basis"
+      );
+      const backupName = `finance-before-sutor-${new Date().toISOString().replace(/[:.]/g, "-")}.sqlite`;
+      snapshotSqlite(this.db, join(paths.archive, "normalized", "snapshots", backupName));
+      const counts = importBundle(this.db, paths.archive, source.id, bundle);
+      counts.ghostfolioHoldings = ghostfolioHoldings;
+      const revision = createConfirmedSutorRevision(preview, "SYNCED");
+      const confirmed = this.db.confirmSutorRevision(preview, revision);
+      exportAll(this.db, paths.archive);
+      const message = `Bestätigter Sutor-Stand übernommen; ${counts.balances} Gesamtwert und ${counts.holdings} Positionen neu`;
+      this.db.finishRun(runId, source.id, "SUCCESS", message, counts);
+      return { ...confirmed, snapshotState, message, counts };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.db.finishRun(runId, source.id, "ERROR", message);
+      if (message === "SUTOR_SAME_DATE_CONFLICT") {
+        throw new FinanceServiceError("Zu diesem Sutor-Stichtag gibt es bereits einen abweichenden Stand", 409);
+      }
+      if (message === "SUTOR_MAPPING_REQUIRED") {
+        throw new FinanceServiceError("Mindestens eine ISIN benötigt zuerst eine bestätigte Ghostfolio-Zuordnung", 409);
+      }
+      throw new FinanceServiceError("Der Sutor-Stand konnte nicht vollständig übernommen werden; es wurden keine Sutor-Werte bestätigt", 503);
+    } finally {
+      this.running.delete(source.id);
+    }
   }
 
   getDashboardCryptoAnalysis(): DashboardCryptoAnalysis {

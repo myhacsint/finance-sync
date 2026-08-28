@@ -18,7 +18,7 @@ export function renderUi(publicBaseUrl?: string): string {
   <meta name="theme-color" content="#080d19">
   <link rel="icon" type="image/png" href="/assets/finance-hub-mark.png">
   <title>Übersicht · Finance Hub</title>
-  <link rel="stylesheet" href="/assets/app.css?v=0.47.2">
+  <link rel="stylesheet" href="/assets/app.css?v=0.48.0">
 </head>
 <body>
   <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
@@ -62,7 +62,7 @@ export function renderUi(publicBaseUrl?: string): string {
     </main>
     <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile Hauptnavigation"></nav>
   </div>
-<script src="/assets/app.js?v=0.47.2" defer></script>
+<script src="/assets/app.js?v=0.48.0" defer></script>
 </body>
 </html>`;
 }

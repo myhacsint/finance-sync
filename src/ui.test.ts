@@ -10,7 +10,7 @@ function renderUi(): string {
 }
 
 test("externes UI-JavaScript ist syntaktisch gültig", () => {
-  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.47\.2" defer><\/script>/);
+  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.48\.0" defer><\/script>/);
   assert.match(clientSource, /match\(\/\^\(\\d\{4\}\)-\(\\d\{2\}\)\$\//);
   assert.doesNotMatch(clientSource, /match\(\/\^\(\\\\d\{4\}\)-\(\\\\d\{2\}\)\$\//);
   assert.doesNotThrow(() => new Function(clientSource));
@@ -34,6 +34,24 @@ test("Renteninformation führt sicher durch Upload, Prüfung und explizite Best�
   assert.match(html, /Nicht erkannt/);
   assert.match(html, /@media \(max-width: 760px\)/);
   assert.match(html, /\.pension-review-layout \{ display: grid/);
+});
+
+test("Sutor Riester nutzt den sicheren PDF-Vier-Schritt-Workflow ohne Doppelzählung", () => {
+  const html = renderUi();
+  assert.match(html, /#\/sutor-riester/);
+  assert.match(html, /Monatlichen Sutor-Depotauszug prüfen/);
+  assert.match(html, /accept="application\/pdf"/);
+  assert.match(html, /maximal 12 MB · maximal 12 Seiten/);
+  assert.match(html, /\/api\/sutor-documents\/previews/);
+  assert.match(html, /sutor-confirm-check/);
+  assert.match(html, /USER_CONFIRMED/);
+  assert.match(html, /beide Werte werden nicht addiert/);
+  assert.match(html, /Ghostfolio-Marktwert bleibt der einzige aktuelle Vermögenswert/);
+  assert.match(html, /Manuelle Vorsorge-Eingabe \(Fallback\)/);
+  assert.match(html, /aria-current="step"/);
+  assert.match(html, /role="status" aria-live="polite"/);
+  assert.match(html, /\.sutor-position-cards \{ display: grid/);
+  assert.match(html, /#sutor-upload-form/);
 });
 
 test("DKB-Abruf führt die App-Freigabe ohne zweiten Klick zu Ende", () => {
