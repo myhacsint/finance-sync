@@ -81,7 +81,9 @@ export async function extractPensionDocument(
   runner: CommandRunner = runBounded,
   malwareScanner: (path: string, runner?: CommandRunner) => Promise<void> = scanMalware
 ): Promise<ExtractedPensionDocument> {
-  await malwareScanner(path, runner);
+  // Do not reuse the tighter parser runner: ClamAV has a separately measured,
+  // still bounded address-space limit for loading its signature database.
+  await malwareScanner(path);
   return mediaType === "application/pdf"
     ? extractPdf(path, workDir, runner)
     : extractImage(path, workDir, runner);

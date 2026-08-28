@@ -27,6 +27,7 @@ RUN apt-get update \
     && groupadd --gid 10001 finance \
     && useradd --uid 10001 --gid finance --home-dir /app --no-create-home finance \
     && sed -i 's/^DatabaseOwner .*/DatabaseOwner finance/' /etc/clamav/freshclam.conf \
+    && sed -i 's|^UpdateLogFile .*|UpdateLogFile /tmp/finance-freshclam.log|' /etc/clamav/freshclam.conf \
     && mkdir -p /app/data /archive /inbox /run/secrets /var/lib/clamav \
     && chown -R finance:finance /app /archive /inbox /var/lib/clamav
 COPY --from=build --chown=finance:finance /build/package.json /app/package.json

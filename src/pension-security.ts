@@ -15,6 +15,15 @@ export const runBounded: CommandRunner = async (command, args, timeoutMs = 60_00
   return { stdout: result.stdout, stderr: result.stderr };
 };
 
+// Loading the official ClamAV signature set requires more address space than
+// document parsing. Keep the scanner isolated with its own measured ceiling.
+export const runClamBounded: CommandRunner = async (command, args, timeoutMs = 60_000) => {
+  const result = await execFileAsync("/usr/bin/prlimit", [
+    "--as=1610612736", "--cpu=60", "--nproc=32", "--", command, ...args
+  ], { timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024, encoding: "utf8" });
+  return { stdout: result.stdout, stderr: result.stderr };
+};
+
 export function assertFreshClamDatabase(directory = process.env.FINANCE_CLAMAV_DATABASE_DIR || "/var/lib/clamav"): void {
   let newest = 0;
   try {
@@ -28,7 +37,7 @@ export function assertFreshClamDatabase(directory = process.env.FINANCE_CLAMAV_D
   if (!newest || Date.now() - newest > MAX_SIGNATURE_AGE_MS) throw new Error("SECURITY_SIGNATURES_STALE");
 }
 
-export async function scanMalware(path: string, runner: CommandRunner = runBounded): Promise<void> {
+export async function scanMalware(path: string, runner: CommandRunner = runClamBounded): Promise<void> {
   assertFreshClamDatabase();
   try {
     const result = await runner("/usr/bin/clamscan", ["--no-summary", "--stdout", path], 60_000);
