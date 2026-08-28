@@ -53,7 +53,10 @@ bereits angelegt.
 - `POST /api/export`
 - `POST /api/reconcile`
 - `POST /api/backup`
-- `POST /api/manual-snapshot`
+- `POST /api/manual-snapshot` (nur weiterhin manuell geführte Quellen; Sutor ausschließlich per PDF)
+- `GET /api/sutor-documents/revisions`
+- `POST /api/sutor-documents/previews`
+- `POST /api/sutor-documents/previews/:id/confirm`
 - `GET /api/dashboard/analyses/recurring-expenses`
 - `GET /api/dashboard/analyses/recurring-expenses/:candidate`
 - `PUT /api/decisions/recurring-expenses/:candidate`

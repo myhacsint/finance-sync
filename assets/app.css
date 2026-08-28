@@ -1540,6 +1540,8 @@
     .fire-pension-link strong, .fire-pension-link span { display: block; }
     .fire-pension-link span { margin-top: 3px; color: var(--muted); font-size: 12px; }
     @media (max-width: 760px) {
+      .section-heading { align-items: stretch; flex-direction: column; }
+      .section-heading > .button { width: 100%; }
       .newsletter-toolbar { grid-template-columns: 1fr 1fr; }
       .newsletter-toolbar label:first-child, .newsletter-toolbar label:last-child { grid-column: 1 / -1; }
       .newsletter-meta { align-items: flex-start; flex-wrap: wrap; }

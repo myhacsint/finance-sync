@@ -10,7 +10,7 @@ function renderUi(): string {
 }
 
 test("externes UI-JavaScript ist syntaktisch gültig", () => {
-  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.48\.0" defer><\/script>/);
+  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.48\.1" defer><\/script>/);
   assert.match(clientSource, /match\(\/\^\(\\d\{4\}\)-\(\\d\{2\}\)\$\//);
   assert.doesNotMatch(clientSource, /match\(\/\^\(\\\\d\{4\}\)-\(\\\\d\{2\}\)\$\//);
   assert.doesNotThrow(() => new Function(clientSource));
@@ -47,7 +47,10 @@ test("Sutor Riester nutzt den sicheren PDF-Vier-Schritt-Workflow ohne Doppelzäh
   assert.match(html, /USER_CONFIRMED/);
   assert.match(html, /beide Werte werden nicht addiert/);
   assert.match(html, /Ghostfolio-Marktwert bleibt der einzige aktuelle Vermögenswert/);
-  assert.match(html, /Manuelle Vorsorge-Eingabe \(Fallback\)/);
+  assert.match(html, /ausschließlich über den sicheren PDF-Import/);
+  assert.match(html, /PDF aktualisieren/);
+  assert.doesNotMatch(html, /ältere ISIN-lose Depotbestände/);
+  assert.doesNotMatch(html, /manuellen Textimport/);
   assert.match(html, /aria-current="step"/);
   assert.match(html, /role="status" aria-live="polite"/);
   assert.match(html, /\.sutor-position-cards \{ display: grid/);

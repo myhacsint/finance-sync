@@ -15,7 +15,7 @@ const config: AppConfig = {
       kind: "manual",
       enabled: true,
       owners: ["Privatperson"],
-      settings: { manualWorkflow: { label: "Sutor Riester" } }
+      settings: { manualWorkflow: { provider: "sutor", label: "Sutor Riester" } }
     },
     { id: "dkb-csv-private-owner", kind: "dkb-csv", enabled: false, owners: ["Privatperson"] }
   ]
@@ -55,6 +55,25 @@ test("Dashboard gruppiert aktuelle, manuelle und historische Quellen", () => {
   assert.equal(result.tasks[0].label, "Sutor Riester");
   assert.equal(result.tasks[0].valueDate, "2026-07-17T23:59:59+02:00");
   assert.doesNotMatch(JSON.stringify(result), /private-owner|Privatperson/);
+});
+
+test("aktuelle bestätigte Sutor-PDF erledigt die manuelle Aufgabe", () => {
+  const result = buildDashboardStatus(rows, config, health, {}, {
+    "sutor-riester": "2026-07-17T12:00:00.000Z"
+  });
+  assert.equal(result.summary.tasks, 0);
+  assert.equal(result.tasks.some((task) => task.id === "sutor-riester"), false);
+});
+
+test("fehlende oder ältere Sutor-PDF bleibt als Aufgabe sichtbar", () => {
+  const missing = buildDashboardStatus(rows, config, health, {});
+  assert.equal(missing.tasks.some((task) => task.id === "sutor-riester"), true);
+  const stale = buildDashboardStatus(rows, config, health, {}, {
+    "sutor-riester": "2026-05-01T12:00:00.000Z"
+  });
+  assert.equal(stale.tasks.some((task) => task.id === "sutor-riester"), true);
+  assert.equal(stale.tasks.find((task) => task.id === "sutor-riester")?.valueDate,
+    "2026-05-01T12:00:00.000Z");
 });
 
 test("Fehler in einer automatischen Quelle wird als Handlungsbedarf gezeigt", () => {

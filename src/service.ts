@@ -1360,6 +1360,13 @@ export class FinanceService {
     if (!source || source.kind !== "manual") {
       return { state: "ERROR", message: "Manuelle Quelle nicht gefunden" };
     }
+    const workflow = source.settings?.manualWorkflow as { provider?: unknown } | undefined;
+    if (workflow?.provider === "sutor") {
+      return {
+        state: "ERROR",
+        message: "Sutor Riester wird ausschließlich über den bestätigten PDF-Import aktualisiert"
+      };
+    }
     if (this.running.has(id)) {
       return { state: "RUNNING", message: "Für diese Quelle läuft bereits ein Vorgang" };
     }

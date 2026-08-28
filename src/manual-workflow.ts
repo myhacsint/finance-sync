@@ -3,7 +3,7 @@ import { sha256 } from "./archive.js";
 import type { AppConfig, SourceConfig } from "./types.js";
 import type { ManualSnapshot } from "./connectors/manual.js";
 
-type Provider = "sutor" | "alte-leipziger";
+type Provider = "alte-leipziger";
 
 interface WorkflowSettings {
   provider: Provider;
@@ -17,39 +17,6 @@ interface Fund {
   symbol: string;
   name: string;
 }
-
-const sutorFunds: Fund[] = [
-  {
-    aliases: ["Amundi Solution MSCI Europe Min Vol"],
-    symbol: "LU1681041627",
-    name: "Amundi Solution MSCI Europe Min Vol"
-  },
-  {
-    aliases: ["iShares Edge MSCI EM Min Vol ETF"],
-    symbol: "IE00B8KGV557",
-    name: "iShares Edge MSCI EM Min Vol ETF"
-  },
-  {
-    aliases: ["iShares Edge MSCI USA Min Vol ESG"],
-    symbol: "IE00BKVL7331",
-    name: "iShares Edge MSCI USA Min Vol ESG"
-  },
-  {
-    aliases: ["iShares Edge MSCI World Minimum V."],
-    symbol: "IE00B8FHGS14",
-    name: "iShares Edge MSCI World Minimum V."
-  },
-  {
-    aliases: ["iShares MSCI Europe Minimum Volat."],
-    symbol: "IE00B86MWN23",
-    name: "iShares MSCI Europe Minimum Volat."
-  },
-  {
-    aliases: ["Xtrackers MSCI World Min Vol ETF"],
-    symbol: "IE00BL25JN58",
-    name: "Xtrackers MSCI World Min Vol ETF"
-  }
-];
 
 const alteFunds: Fund[] = [
   {
@@ -126,13 +93,25 @@ function workflowSettings(source: SourceConfig): WorkflowSettings {
   const value = source.settings?.manualWorkflow as Partial<WorkflowSettings> | undefined;
   if (
     !value
-    || (value.provider !== "sutor" && value.provider !== "alte-leipziger")
+    || value.provider !== "alte-leipziger"
     || typeof value.accountId !== "string"
     || value.accountId.length === 0
   ) {
     throw new Error(`Vorsorge-Konfiguration für ${source.id} fehlt`);
   }
   return value as WorkflowSettings;
+}
+
+export function supportsLegacyManualWorkflow(
+  source: SourceConfig | undefined
+): source is SourceConfig {
+  if (!source || source.kind !== "manual") return false;
+  try {
+    workflowSettings(source);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function germanMinor(value: string): bigint {
@@ -177,13 +156,6 @@ function endOfDayBerlin(value: string): string {
   return `${date}T23:59:59${offset}`;
 }
 
-function findFund(catalog: Fund[], name: string): Fund | undefined {
-  const normalized = name.trim().replace(/\s+/g, " ").toLocaleLowerCase("de");
-  return catalog.find((fund) => fund.aliases.some(
-    (alias) => alias.toLocaleLowerCase("de") === normalized
-  ));
-}
-
 function commonSnapshot(
   source: SourceConfig,
   settings: WorkflowSettings,
@@ -207,128 +179,6 @@ function commonSnapshot(
     details,
     holdings
   };
-}
-
-function parseSutor(
-  source: SourceConfig,
-  settings: WorkflowSettings,
-  text: string
-): ManualSnapshot {
-  const row = /^\s*(.+?)\s{2,}([\d.]+,\d+)\s+([\d.]+,\d+)\s+(EUR|US\$\*?\)?)\s+(\d{2}\.\d{2}\.\d{4})\s+([\d.]+,\d{2})\s+([\d.]+,\d{2})\s*$/gm;
-  const holdings: NonNullable<ManualSnapshot["holdings"]> = [];
-  const unknown: string[] = [];
-  const dates = new Set<string>();
-  let columnTotalMinor: bigint | undefined;
-  for (const match of text.matchAll(row)) {
-    const fund = findFund(sutorFunds, match[1]);
-    if (!fund) {
-      unknown.push(match[1].trim());
-      continue;
-    }
-    const quantity = decimalAtomic(match[2], ",");
-    const price = decimalAtomic(match[3], ",");
-    const priceCurrency = match[4].startsWith("US$") ? "USD" : "EUR";
-    dates.add(match[5]);
-    holdings.push({
-      symbol: fund.symbol,
-      name: fund.name,
-      quantityAtomic: quantity.atomic,
-      atomicDecimals: quantity.decimals,
-      currency: priceCurrency,
-      priceAtomic: price.atomic,
-      priceDecimals: price.decimals,
-      priceCurrency,
-      marketValueMinor: germanMinor(match[7]).toString(),
-      marketValueCurrency: "EUR"
-    });
-  }
-  if (holdings.length === 0) {
-    const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
-    const names = sutorFunds.map((fund) =>
-      lines.find((line) => findFund([fund], line))
-    );
-    const quantities = lines.filter((line) => /^\d+(?:\.\d{3})*,\d{4}$/.test(line));
-    const prices = lines.flatMap((line) => {
-      const match = /^([\d.]+,\d{4})\s+(EUR|US\$\*\))$/.exec(line);
-      return match ? [{ value: match[1], currency: match[2] }] : [];
-    });
-    const courseDateIndex = lines.indexOf("Kursdatum");
-    const totalLabelIndex = lines.indexOf("Summe:");
-    const columnDates = courseDateIndex < 0 || totalLabelIndex < 0
-      ? []
-      : lines.slice(courseDateIndex + 1, totalLabelIndex)
-        .filter((line) => /^\d{2}\.\d{2}\.\d{4}$/.test(line));
-    const depotValueIndex = lines.lastIndexOf("Depotwert");
-    const marketValues = depotValueIndex < 0
-      ? []
-      : lines.slice(depotValueIndex + 1)
-        .filter((line) => /^[\d.]+,\d{2}$/.test(line));
-    if (
-      names.every(Boolean)
-      && quantities.length === sutorFunds.length
-      && prices.length === sutorFunds.length
-      && columnDates.length === sutorFunds.length
-      && marketValues.length === sutorFunds.length + 1
-    ) {
-      for (let index = 0; index < sutorFunds.length; index += 1) {
-        const quantity = decimalAtomic(quantities[index], ",");
-        const price = decimalAtomic(prices[index].value, ",");
-        const priceCurrency = prices[index].currency.startsWith("US$") ? "USD" : "EUR";
-        dates.add(columnDates[index]);
-        holdings.push({
-          symbol: sutorFunds[index].symbol,
-          name: sutorFunds[index].name,
-          quantityAtomic: quantity.atomic,
-          atomicDecimals: quantity.decimals,
-          currency: priceCurrency,
-          priceAtomic: price.atomic,
-          priceDecimals: price.decimals,
-          priceCurrency,
-          marketValueMinor: germanMinor(marketValues[index]).toString(),
-          marketValueCurrency: "EUR"
-        });
-      }
-      columnTotalMinor = germanMinor(marketValues.at(-1)!);
-    }
-  }
-  if (unknown.length > 0) {
-    throw new Error(`Unbekannte Sutor-Positionen: ${unknown.join(", ")}`);
-  }
-  if (holdings.length !== sutorFunds.length) {
-    throw new Error(
-      `Sutor-Auszug unvollständig: ${holdings.length} von ${sutorFunds.length} Positionen erkannt`
-    );
-  }
-  if (dates.size !== 1) throw new Error("Sutor-Positionen haben kein einheitliches Kursdatum");
-  const totalMatch = /Summe:\s+[\d.]+,\d{2}\s+([\d.]+,\d{2})/.exec(text);
-  const amountMinor = totalMatch
-    ? germanMinor(totalMatch[1])
-    : columnTotalMinor;
-  if (amountMinor === undefined) throw new Error("Sutor-Gesamtsumme wurde nicht erkannt");
-  const holdingTotal = holdings.reduce(
-    (sum, holding) => sum + BigInt(holding.marketValueMinor ?? 0),
-    0n
-  );
-  if (holdingTotal !== amountMinor) {
-    throw new Error("Sutor-Gesamtsumme stimmt nicht mit den Positionen überein");
-  }
-  const date = [...dates][0];
-  const rate = /Währungskurs \(EUR\/US\$\)\s+([\d.,]+)/.exec(text)?.[1];
-  return commonSnapshot(
-    source,
-    settings,
-    text,
-    endOfDayBerlin(date),
-    amountMinor,
-    holdings,
-    {
-      evidenceType: "confirmed-pasted-text",
-      documentType: "Depotbestände",
-      cashMinor: "0",
-      cashCurrency: "EUR",
-      eurUsdRate: rate?.replace(",", ".")
-    }
-  );
 }
 
 function escapeRegExp(value: string): string {
@@ -425,9 +275,7 @@ export function parseManualWorkflowText(
   const settings = workflowSettings(source);
   const normalized = text.replace(/\r\n/g, "\n").trim();
   if (normalized.length < 100) throw new Error("Der eingefügte Text ist zu kurz");
-  const snapshot = settings.provider === "sutor"
-    ? parseSutor(source, settings, normalized)
-    : parseAlte(source, settings, normalized);
+  const snapshot = parseAlte(source, settings, normalized);
   return { settings, snapshot };
 }
 

@@ -107,6 +107,24 @@ function hasRecentDkbStand(row: SourceStatusRow, now: Date): boolean {
   return Number.isFinite(age) && age >= 0 && age <= 7 * 24 * 60 * 60_000;
 }
 
+function isCurrentSutorPdf(
+  source: SourceConfig | undefined,
+  confirmedDate: string | undefined,
+  now: Date
+): boolean {
+  const workflow = source?.settings?.manualWorkflow as {
+    provider?: unknown;
+    freshnessDays?: unknown;
+  } | undefined;
+  if (workflow?.provider !== "sutor" || !confirmedDate) return false;
+  const configuredDays = Number(workflow.freshnessDays);
+  const freshnessDays = Number.isFinite(configuredDays) && configuredDays > 0
+    ? configuredDays
+    : 45;
+  const age = now.getTime() - new Date(confirmedDate).getTime();
+  return Number.isFinite(age) && age >= 0 && age <= freshnessDays * 24 * 60 * 60_000;
+}
+
 function toDashboardSource(
   row: SourceStatusRow,
   source: SourceConfig | undefined,
@@ -134,7 +152,8 @@ export function buildDashboardStatus(
   rows: SourceStatusRow[],
   config: AppConfig,
   health: HealthReport,
-  manualValueDates: Record<string, string | undefined> = {}
+  manualValueDates: Record<string, string | undefined> = {},
+  confirmedDocumentDates: Record<string, string | undefined> = {}
 ): DashboardStatus {
   const now = new Date(health.time);
   const configById = new Map(config.sources.map((source) => [source.id, source]));
@@ -150,9 +169,14 @@ export function buildDashboardStatus(
     .map((row) => toDashboardSource(row, configById.get(row.id), now));
   const manual = enabled
     .filter((row) => row.kind === "manual")
+    .filter((row) => !isCurrentSutorPdf(
+      configById.get(row.id),
+      confirmedDocumentDates[row.id],
+      now
+    ))
     .map((row) => ({
       ...toDashboardSource(row, configById.get(row.id), now),
-      valueDate: manualValueDates[row.id]
+      valueDate: confirmedDocumentDates[row.id] ?? manualValueDates[row.id]
     }));
   const historicalRows = rows.filter((row) => !Boolean(row.enabled));
   const historicalLastSuccess = historicalRows

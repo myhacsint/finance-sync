@@ -93,6 +93,7 @@
       "settings": {
         "manualWorkflow": {
           "provider": "sutor",
+          "freshnessDays": 45,
           "accountId": "sutor-riester-person-a",
           "owner": "Person A",
           "label": "Sutor Riester"

@@ -18,7 +18,10 @@ import { renderUi } from "./ui.js";
 import { buildHealth } from "./health.js";
 import { buildCouncilInvestmentSnapshot } from "./council-investment.js";
 import { buildCouncilPortfolioSnapshot } from "./council-portfolio.js";
-import { ManualPreviewStore } from "./manual-workflow.js";
+import {
+  ManualPreviewStore,
+  supportsLegacyManualWorkflow
+} from "./manual-workflow.js";
 import { buildDashboardStatus, type SourceStatusRow } from "./dashboard-status.js";
 import type { DecisionLabRequest } from "./dashboard-decision-lab.js";
 import { receivePensionUpload } from "./pension-upload.js";
@@ -121,7 +124,7 @@ function sutorFailure(error: unknown): FinanceServiceError {
     SECURITY_SIGNATURES_STALE: ["Die Sicherheitsprüfung ist nicht aktuell; Upload wurde sicher abgebrochen", 503],
     SECURITY_SCANNER_UNAVAILABLE: ["Die Sicherheitsprüfung ist nicht verfügbar; Upload wurde sicher abgebrochen", 503],
     SECURITY_SCAN_FAILED: ["Die Sicherheitsprüfung konnte nicht abgeschlossen werden", 503],
-    SUTOR_HOLDINGS_TABLE_MISSING: ["Keine Sutor-Bestandstabelle erkannt. Für ältere Depotbestände bitte die manuelle Texteingabe verwenden", 400],
+    SUTOR_HOLDINGS_TABLE_MISSING: ["Keine gültige ISIN-Bestandstabelle im Sutor-PDF erkannt", 400],
     SUTOR_STATEMENT_DATES_MISSING: ["Die beiden Sutor-Stichtage wurden nicht vollständig erkannt", 400],
     SUTOR_STATEMENT_DATES_CONFLICT: ["Die Sutor-Stichtage im Anschreiben und Bestand stimmen nicht überein", 400],
     SUTOR_POSITIONS_MISSING: ["Keine gültigen ISIN-Positionen in der Bestandstabelle erkannt", 400],
@@ -666,11 +669,17 @@ const server = createServer(async (req, res) => {
           .filter((source) => source.kind === "manual")
           .map((source) => [source.id, db.latestBalanceCapturedAt(source.id)])
       );
+      const latestSutorRevision = db.listSutorRevisions()[0];
+      const sutorSource = service.getSutorSource();
+      const confirmedDocumentDates = latestSutorRevision && sutorSource
+        ? { [sutorSource.id]: `${latestSutorRevision.statementDate}T12:00:00.000Z` }
+        : {};
       return json(res, 200, buildDashboardStatus(
         rows,
         config,
         buildHealth(db, config),
-        manualValueDates
+        manualValueDates,
+        confirmedDocumentDates
       ));
     }
     if (req.method === "GET" && url.pathname === "/api/status") {
@@ -684,7 +693,7 @@ const server = createServer(async (req, res) => {
       const sourceId = String((payload as { sourceId?: string }).sourceId ?? "");
       const text = String((payload as { text?: string }).text ?? "");
       const source = service.getSource(sourceId);
-      if (!source || source.kind !== "manual") {
+      if (!supportsLegacyManualWorkflow(source)) {
         return json(res, 400, { error: "Manuelle Quelle nicht gefunden" });
       }
       const preview = manualPreviews.create(source, text, config);
@@ -751,7 +760,7 @@ const server = createServer(async (req, res) => {
       const payload = await body(req);
       const sourceId = String((payload as { sourceId?: string }).sourceId ?? "");
       const source = service.getSource(sourceId);
-      if (!source || source.kind !== "manual") {
+      if (!supportsLegacyManualWorkflow(source)) {
         return json(res, 400, { error: "Manuelle Quelle nicht gefunden" });
       }
       const bundle = manualSnapshotBundle(source, payload as never);
