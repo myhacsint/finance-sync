@@ -54,6 +54,7 @@ const patterns: Pattern[] = [
   {
     key: "dataThrough",
     expressions: [
+      new RegExp(`vom\\s+\\d{2}\\.\\d{2}\\.\\d{4}\\s+bis\\s+zum\\s+${date}\\s+gespeicherten\\s+Daten`, "i"),
       new RegExp(`(?:Daten|Versicherungsverlauf|Zeiten|Beiträge)[^\\n.]{0,100}?(?:bis|bis zum)\\s*${date}`, "i"),
       new RegExp(`berücksichtigt(?:en Daten)?[^\\n.]{0,80}?(?:bis|bis zum)\\s*${date}`, "i"),
       new RegExp(`Datenstand\\s*:?\\s*${date}`, "i")
@@ -63,6 +64,7 @@ const patterns: Pattern[] = [
   {
     key: "pensionStart",
     expressions: [
+      new RegExp(`Regelaltersrente\\s+würde\\s+am\\s*${date}`, "i"),
       new RegExp(`(?:regulärer |Regelalters)?Rentenbeginn\\s*:?\\s*${date}`, "i"),
       new RegExp(`Regelaltersrente[^\\n.]{0,100}?(?:beginnt|beginnen|ab)\\s*(?:am)?\\s*${date}`, "i"),
       new RegExp(`Rente[^\\n.]{0,80}?ab\\s*${date}`, "i")
@@ -72,6 +74,8 @@ const patterns: Pattern[] = [
   {
     key: "earnedPoints",
     expressions: [
+      new RegExp(`Entgeltpunkte\\s+in\\s+${points}\\s+folgender\\s+Höhe\\s+erworben`, "i"),
+      new RegExp(`insgesamt\\s+Entgeltpunkte\\s+in\\s+folgender\\s+Höhe\\s+erworben\\s*:\\s*${points}`, "i"),
       new RegExp(`(?:insgesamt\\s*)?${points}\\s*Entgeltpunkte`, "i"),
       new RegExp(`Entgeltpunkte\\s*:?\\s*${points}`, "i")
     ],
@@ -80,6 +84,7 @@ const patterns: Pattern[] = [
   {
     key: "earnedMonthlyGrossMinor",
     expressions: [
+      new RegExp(`bislang\\s+erreichte\\s+Rentenanwartschaft\\s+entspräche\\s+nach\\s+heutigem\\s+Stand\\s+einer\\s+monatlichen\\s+Rente\\s+von\\s*:\\s*${money}\\s*(?:EUR|€)`, "i"),
       new RegExp(`(?:bislang|bisher)[^\\n.]{0,120}?(?:monatliche |Regelalters)?rente[^\\d]{0,30}${money}\\s*(?:EUR|€)`, "i"),
       new RegExp(`erworbene(?:n)?[^\\n.]{0,100}?Rente[^\\d]{0,30}${money}\\s*(?:EUR|€)`, "i"),
       new RegExp(`monatliche Rente von\\s*${money}\\s*(?:EUR|€)[^\\n.]{0,80}?(?:erworben|bisher)`, "i")
@@ -89,6 +94,8 @@ const patterns: Pattern[] = [
   {
     key: "projectedMonthlyGrossMinor",
     expressions: [
+      new RegExp(`Sollten\\s+bis\\s+zum\\s+Rentenbeginn\\s+Beiträge\\s+wie\\s+im\\s+Durchschnitt\\s+der\\s+letzten\\s+fünf[\\s\\S]{0,220}?Kalenderjahre\\s+gezahlt\\s+werden,?\\s+bekämen\\s+Sie\\s+ohne\\s+Berücksichtigung\\s+von\\s+Rentenanpassungen\\s+von\\s+uns\\s+eine\\s+monatliche\\s+Rente\\s+von\\s*:\\s*${money}\\s*(?:EUR|€)`, "i"),
+      new RegExp(`Sollten\\s+bis\\s+zum\\s+Rentenbeginn\\s+Beiträge\\s+wie\\s+im\\s+Durchschnitt\\s+der\\s+letzten\\s+fünf\\s+Kalenderjahre\\s+gezahlt\\s+werden,?\\s+bekämen\\s+Sie\\s+ohne\\s+Berücksichtigung\\s+von\\s+Rentenanpassungen\\s+von\\s+uns\\s+eine\\s+monatliche\\s+Rente\\s+von\\s*:\\s*${money}\\s*(?:EUR|€)`, "i"),
       new RegExp(`(?:Prognose|voraussichtlich|hochgerechnet)[^\\n.]{0,180}?(?:monatliche |Regelalters)?rente[^\\d]{0,30}${money}\\s*(?:EUR|€)`, "i"),
       new RegExp(`Beiträge[^\\n.]{0,220}?(?:Durchschnitt|weiter)[^\\n.]{0,220}?monatliche Rente(?: von)?\\s*${money}\\s*(?:EUR|€)`, "i"),
       new RegExp(`monatliche Rente(?: von)?\\s*${money}\\s*(?:EUR|€)[^\\n.]{0,220}?(?:Beiträge|Durchschnitt der letzten fünf)`, "i")

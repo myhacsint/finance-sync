@@ -29,6 +29,47 @@ test("extracts all seven required DRV fields with provenance", () => {
   assert.equal(validatePensionFields(fields).valid, true);
 });
 
+test("extracts the current two-page DRV wording without confusing other pension amounts", () => {
+  const currentLayout = `
+Ihre Renteninformation
+in dieser Renteninformation haben wir die für Sie vom 01.01.1990 bis zum 31.12.2025 gespeicherten
+Daten und das geltende Rentenrecht berücksichtigt. Ihre Regelaltersrente würde am 01.10.2045
+beginnen.
+Wären Sie heute voll erwerbsgemindert, bekämen Sie von uns eine monatliche Rente von: 2.100,00 EUR
+Höhe Ihrer künftigen Regelaltersrente
+Ihre bislang erreichte Rentenanwartschaft entspräche nach heutigem Stand
+einer monatlichen Rente von: 1.700,00 EUR
+Sollten bis zum Rentenbeginn Beiträge wie im Durchschnitt der letzten fünf
+123
+Renteninformation
+Kalenderjahre gezahlt werden, bekämen Sie ohne Berücksichtigung von
+Rentenanpassungen von uns eine monatliche Rente von: 3.200,00 EUR
+Bei einem jährlichen Anpassungssatz von 1 Prozent ergäbe sich eine monatliche Rente von etwa 4.000,00 EUR.
+Renteninformation vom 21.08.2026
+`;
+  const explanationPage = `
+Aus den erhaltenen Beiträgen und Ihren sonstigen Versicherungszeiten haben Sie bisher insgesamt Entgeltpunkte in
+40,0000
+folgender Höhe erworben:
+Der aktuelle Rentenwert beträgt zurzeit 42,50 EUR.
+`;
+  const fields = parseDrvPensionPages([
+    { page: 1, text: currentLayout, method: "native", confidence: 0.98 },
+    { page: 2, text: explanationPage, method: "native", confidence: 0.98 }
+  ]);
+  assert.deepEqual(Object.fromEntries(fields.map((field) => [field.key, field.value])), {
+    documentDate: "2026-08-21",
+    dataThrough: "2025-12-31",
+    pensionStart: "2045-10-01",
+    earnedPoints: "40.0000",
+    earnedMonthlyGrossMinor: "170000",
+    projectedMonthlyGrossMinor: "320000",
+    currentPensionValueMinor: "4250"
+  });
+  assert.equal(validatePensionFields(fields).valid, true);
+  assert.ok(fields.every((field) => field.confidenceLabel === "hoch"));
+});
+
 test("missing and ambiguous values remain blocking until reviewed", () => {
   const fields = parseDrvPensionPages([
     { page: 1, text: syntheticText, method: "ocr", confidence: 0.82 },

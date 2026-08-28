@@ -10,7 +10,7 @@ function renderUi(): string {
 }
 
 test("externes UI-JavaScript ist syntaktisch gültig", () => {
-  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.47\.1" defer><\/script>/);
+  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.47\.2" defer><\/script>/);
   assert.match(clientSource, /match\(\/\^\(\\d\{4\}\)-\(\\d\{2\}\)\$\//);
   assert.doesNotMatch(clientSource, /match\(\/\^\(\\\\d\{4\}\)-\(\\\\d\{2\}\)\$\//);
   assert.doesNotThrow(() => new Function(clientSource));
@@ -27,6 +27,11 @@ test("Renteninformation führt sicher durch Upload, Prüfung und explizite Best�
   assert.match(html, /Nur bestätigte Werte werden übernommen/);
   assert.match(html, /\[SCHÄTZUNG\]/);
   assert.match(html, /pension-confirm-check/);
+  assert.match(html, /Pflichtwerte/);
+  assert.match(html, /Nicht automatisch erkannt\. Bitte den Wert aus der Renteninformation eintragen\./);
+  assert.match(html, /Bitte eintragen/);
+  assert.match(html, /aria-describedby="/);
+  assert.match(html, /Nicht erkannt/);
   assert.match(html, /@media \(max-width: 760px\)/);
   assert.match(html, /\.pension-review-layout \{ display: grid/);
 });

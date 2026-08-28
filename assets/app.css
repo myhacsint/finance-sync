@@ -1493,6 +1493,7 @@
     .pension-field-heading label { font-weight: 700; }
     .pension-field-control { display: grid; grid-template-columns: minmax(150px,1fr) auto auto; gap: 8px; align-items: center; margin-top: 8px; }
     .pension-field-control input { width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 9px; padding: 0 11px; background: var(--surface-2); color: var(--text); font-size: 16px; font-variant-numeric: tabular-nums; }
+    .pension-field-control input[aria-invalid="true"] { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber-soft); }
     .pension-unit, .pension-source { color: var(--muted); font-size: 12px; white-space: nowrap; }
     .pension-source { min-height: 36px; border: 1px solid #36577f; border-radius: 8px; padding: 8px 10px; color: #8ebcff; }
     .pension-field-warning { display: flex; align-items: flex-start; gap: 7px; margin-top: 8px; color: var(--amber); font-size: 12px; }

@@ -1,4 +1,4 @@
-export const PENSION_EXTRACTION_VERSION = "drv-v1";
+export const PENSION_EXTRACTION_VERSION = "drv-v2";
 
 export type PensionFieldKey =
   | "documentDate"
