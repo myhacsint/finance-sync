@@ -108,7 +108,13 @@ import {
   updateActualReviewTransaction,
   type DashboardReview
 } from "./dashboard-review.js";
-import { resolveFireAssumptions } from "./fire-assumptions.js";
+import { resolveFireAssumptions, type FireAssumptions } from "./fire-assumptions.js";
+import type { PensionPreviewSummary } from "./pension-document-types.js";
+import {
+  createConfirmedPensionRevision,
+  pensionAssumptionsFromFields,
+  pensionImpact
+} from "./pension-revisions.js";
 import { createNamedScenario } from "./named-scenarios.js";
 import { createLifeEvent } from "./life-events.js";
 import { compareNamedScenarios } from "./scenario-compare.js";
@@ -454,7 +460,8 @@ export class FinanceService {
 
   async getDashboardDecisionLab(
     force = false,
-    request: DecisionLabRequest = {}
+    request: DecisionLabRequest = {},
+    fireAssumptionsOverride?: FireAssumptions
   ): Promise<DashboardDecisionLab> {
     if (!this.config.actual?.enabled) throw new Error("Actual ist deaktiviert");
     const loadHistory = async (): Promise<DashboardSavingsBaseline> => {
@@ -508,11 +515,59 @@ export class FinanceService {
       analyses,
       request,
       new Date(),
-      resolveFireAssumptions(this.config.analysis?.fire),
+      fireAssumptionsOverride ?? this.effectiveFireAssumptions(),
       this.db.listMerchantRules(),
       this.config.analysis?.savingsBaseline?.employeeStockBenefitMonthlyMinor ?? 0,
       this.db.listLifeEvents()
     );
+  }
+
+  effectiveFireAssumptions(): FireAssumptions {
+    return this.db.activePensionFireAssumptions()
+      ?? resolveFireAssumptions(this.config.analysis?.fire);
+  }
+
+  listPensionRevisions() {
+    return this.db.listPensionRevisions().map((revision) => ({
+      revisionId: revision.revisionId,
+      confirmedAt: revision.confirmedAt,
+      extractionVersion: revision.extractionVersion,
+      status: revision.status,
+      fields: revision.fields,
+      impact: revision.impact
+    }));
+  }
+
+  async previewPensionFire(preview: PensionPreviewSummary) {
+    if (!preview.canPreview) throw new FinanceServiceError("Bitte alle markierten Werte zuerst prüfen", 409);
+    const currentAssumptions = this.effectiveFireAssumptions();
+    const proposedAssumptions = pensionAssumptionsFromFields(preview.fields, currentAssumptions);
+    const request: DecisionLabRequest = { fireTargetAge: 60 };
+    const [previousModel, proposedModel] = await Promise.all([
+      this.getDashboardDecisionLab(false, request, currentAssumptions),
+      this.getDashboardDecisionLab(false, request, proposedAssumptions)
+    ]);
+    const impact = pensionImpact(
+      previousModel.fire.targetAge,
+      {
+        exitAge: previousModel.fire.central.currentExitAge,
+        requiredCapitalAtTargetMinor: previousModel.fire.central.targetCapitalGoal.requiredCapitalMinor,
+        assumptions: currentAssumptions
+      },
+      {
+        exitAge: proposedModel.fire.central.currentExitAge,
+        requiredCapitalAtTargetMinor: proposedModel.fire.central.targetCapitalGoal.requiredCapitalMinor,
+        assumptions: proposedAssumptions
+      }
+    );
+    return { impact, assumptions: proposedAssumptions };
+  }
+
+  async confirmPensionPreview(preview: PensionPreviewSummary) {
+    if (!preview.canConfirm) throw new FinanceServiceError("Explizite Prüfung fehlt", 409);
+    const { impact, assumptions } = await this.previewPensionFire(preview);
+    const revision = createConfirmedPensionRevision(preview, assumptions, impact);
+    return this.db.confirmPensionRevision(preview, revision);
   }
 
   getDashboardCryptoAnalysis(): DashboardCryptoAnalysis {

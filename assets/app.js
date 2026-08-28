@@ -22,9 +22,9 @@ const navItems=[
   {label:"Analysen",icon:"analysis",view:"analyses"},
   {label:"Status",icon:"status",view:"status"}
 ];
-function activeView(){const hash=location.hash;return hash==="#/data-status"?"status":hash==="#/spending"?"spending":hash==="#/assets"?"assets":hash==="#/review"?"review":hash==="#/decision-lab"?"lab":hash==="#/analyses"?"analyses":"overview"}
+function activeView(){const hash=location.hash;return hash==="#/pension-documents"?"pension":hash==="#/data-status"?"status":hash==="#/spending"?"spending":hash==="#/assets"?"assets":hash==="#/review"?"review":hash==="#/decision-lab"?"lab":hash==="#/analyses"?"analyses":"overview"}
 function viewHref(view){return view==="status"?"#/data-status":view==="spending"?"#/spending":view==="assets"?"#/assets":view==="review"?"#/review":view==="lab"?"#/decision-lab":view==="analyses"?"#/analyses":"#/overview"}
-function navMarkup(compact=false){const current=activeView();const items=compact?navItems.filter(item=>["overview","spending","assets","review","lab"].includes(item.view)):navItems;return items.map(item=>item.view?'<a class="nav-item" href="'+viewHref(item.view)+'"'+(item.view===current?' aria-current="page"':'')+'>'+icons[item.icon]+'<span>'+item.label+'</span></a>':'<button class="nav-item" type="button" disabled title="Folgt in einem späteren Schritt">'+icons[item.icon]+'<span>'+item.label+'</span></button>').join("")}
+function navMarkup(compact=false){const current=activeView();const navCurrent=current==="pension"?"status":current;const compactViews=current==="pension"||current==="status"?["overview","spending","assets","lab","status"]:["overview","spending","assets","review","lab"];const items=compact?navItems.filter(item=>compactViews.includes(item.view)):navItems;return items.map(item=>item.view?'<a class="nav-item" href="'+viewHref(item.view)+'"'+(item.view===navCurrent?' aria-current="page"':'')+'>'+icons[item.icon]+'<span>'+item.label+'</span></a>':'<button class="nav-item" type="button" disabled title="Folgt in einem späteren Schritt">'+icons[item.icon]+'<span>'+item.label+'</span></button>').join("")}
 function renderNavigation(){document.getElementById("desktop-nav").innerHTML=navMarkup();document.getElementById("mobile-nav").innerHTML=navMarkup(true)}
 renderNavigation();
 
@@ -45,6 +45,9 @@ let currentReviewData=null;
 let currentWealthHistory=null;
 let wealthHistoryRange="1y";
 let currentNewsletterData=null;
+let currentPensionPreview=null;
+let currentPensionImpact=null;
+let currentPensionFileName="";
 
 function headerAction(){if(activeView()==="analyses"&&analysisSelection().view==="expense-structure")exportAnalysisCsv();else refresh(true)}
 
@@ -69,7 +72,9 @@ function submitToken(event){
 document.getElementById("token-form").addEventListener("submit",submitToken);
 async function call(path,options={},retry=true){
   if(!token&&!requestToken())throw new Error("Für die Finance-Hub-Daten wird das Verwaltungstoken benötigt.");
-  const response=await fetch(path,{...options,headers:{authorization:"Bearer "+token,"content-type":"application/json",...options.headers}});
+  const headers={authorization:"Bearer "+token,...options.headers};
+  if(!(options.body instanceof FormData)&&!headers["content-type"])headers["content-type"]="application/json";
+  const response=await fetch(path,{...options,headers});
   let result={};
   try{result=await response.json()}catch{}
   if(response.status===401&&retry){sessionStorage.removeItem("financeToken");token="";if(requestToken())return call(path,options,false)}
@@ -1179,7 +1184,7 @@ function renderFireTracking(fire){
   const oneTimeGroup=group('one-time','Historische Einzelposten','Vergangenheit, zählt nicht als Ersparnis',fire.oneTimeCandidates.length,'Beobachtete Beträge',oneTimeCosts,'Einmalig angesetzt',fire.selectedOneTimeSavingsMinor,oneTimeRows,'<div class="fire-empty">Keine geeigneten Einzelposten verfügbar.</div>');
   const basis=fire.basis.map(item=>'<li>'+esc(item)+'</li>').join('');
   const warnings=fire.warnings.map(warning=>'<div class="analysis-warning" role="status">'+icons.warning+'<span>'+esc(warning)+'</span></div>').join('');
-  return '<section class="analysis-panel fire-cockpit" aria-labelledby="fire-title"><div class="analysis-panel-head"><div><h2 id="fire-title">FIRE-Kurs und konkrete Stellschrauben</h2><p>Ausstiegsalter und Kapitalziele kommen nur aus dem FIRE-Phasenmodell, nicht aus der 20-Jahres-Linie.</p></div><span class="fire-model">'+esc(fire.modelVersion)+' · nur dieses Modell · '+analysisEstimate(true)+'</span></div><div class="fire-course"><div><span>Aktueller Kurs</span><strong class="'+(current!==null&&current<=fire.targetAge?'tone-ok':'tone-warning')+'">'+esc(fireExit(current))+'</strong><small>Bei 3 % Realrendite, ohne Erbschaft</small>'+fireCapitalGoal(fire.central.currentCapitalGoal)+'</div><div><span>Zielalter</span><strong>'+fire.targetAge+'</strong><small>Aktuell gewähltes Arbeitsziel</small>'+fireCapitalGoal(fire.central.targetCapitalGoal)+'</div><div><span>Lücke zum Ziel</span><strong class="'+(gap===0?'tone-ok':'tone-warning')+'">'+(gap===null?'–':moneyWhole(gap)+' / Jahr')+'</strong><small>'+(fire.central.monthlyGapToTargetMinor===null?'Nicht verfügbar':moneyWhole(fire.central.monthlyGapToTargetMinor)+' pro Monat')+' '+analysisEstimate(true)+'</small></div><div><span>Mit ausgewählten Hebeln</span><strong class="'+(scenario!==null&&scenario<=fire.targetAge?'tone-ok':'tone-warning')+'">'+esc(fireExit(scenario))+'</strong><small>'+moneyWhole(fire.selectedAnnualSavingsMinor)+' jährlich · '+moneyWhole(fire.selectedOneTimeSavingsMinor)+' einmalig · '+(years===null?'Wirkung offen':years+' Jahre gewonnen')+'</small></div></div><div class="fire-capital"><div><span>Überbrückungskapital heute</span><strong>'+(fire.bridgeCapitalMinor===null?'–':moneyWhole(fire.bridgeCapitalMinor))+'</strong><small>Liquidität, Depots, Krypto und Gold</small></div><div><span>Gebundene Vorsorge</span><strong>'+(fire.lockedPensionMinor===null?'–':moneyWhole(fire.lockedPensionMinor))+'</strong><small>Separat zu den vorgesehenen Leistungszeitpunkten</small></div><div><span>Aktuelle Ausgaben-Hochrechnung</span><strong>'+(fire.liveProjectedAnnualExpensesMinor===null?'–':moneyWhole(fire.liveProjectedAnnualExpensesMinor))+'</strong><small>Normalisiert '+(fire.normalizedAnnualExpensesMinor===null?'–':moneyWhole(fire.normalizedAnnualExpensesMinor))+' '+analysisEstimate(true)+'</small></div><div><span>Tragbar beim Zielalter</span><strong>'+(fire.central.maximumExpensesAtTargetMinor===null?'–':moneyWhole(fire.central.maximumExpensesAtTargetMinor))+'</strong><small>Bei 3 % real '+analysisEstimate(true)+'</small></div></div><div class="fire-workspace"><form class="fire-controls" onsubmit="applyFireScenario(event)"><label for="fire-target-age">Gewünschtes Zielalter<select id="fire-target-age" autocomplete="off">'+targetOptions+'</select></label><div class="fire-band"><table><thead><tr><th scope="col">Renditeband</th><th scope="col">Aktuell</th><th scope="col">Mit Hebeln</th></tr></thead><tbody>'+bandRows+'</tbody></table></div><button class="button" type="submit">FIRE-Szenario aktualisieren</button></form><div class="fire-levers"><div class="fire-levers-head"><div><h3>Reale Ausgabenhebel</h3><p>Nur bestätigte laufende Maßnahmen zählen. Kategorieprozente und historische Einzelposten sind Beobachtung, kein Szenario.</p></div><strong>'+moneyWhole(fire.selectedAnnualSavingsMinor)+' / Jahr</strong></div><div class="fire-lever-groups">'+gapBox+nextInbox+recurringGroup+variableGroup+oneTimeGroup+'</div></div></div><details class="fire-basis"><summary>Modellannahmen und Grenzen</summary><ul>'+basis+'</ul></details>'+warnings+'</section>';
+  return '<section class="analysis-panel fire-cockpit" aria-labelledby="fire-title"><div class="analysis-panel-head"><div><h2 id="fire-title">FIRE-Kurs und konkrete Stellschrauben</h2><p>Ausstiegsalter und Kapitalziele kommen nur aus dem FIRE-Phasenmodell, nicht aus der 20-Jahres-Linie.</p></div><span class="fire-model">'+esc(fire.modelVersion)+' · nur dieses Modell · '+analysisEstimate(true)+'</span></div><div class="fire-course"><div><span>Aktueller Kurs</span><strong class="'+(current!==null&&current<=fire.targetAge?'tone-ok':'tone-warning')+'">'+esc(fireExit(current))+'</strong><small>Bei 3 % Realrendite, ohne Erbschaft</small>'+fireCapitalGoal(fire.central.currentCapitalGoal)+'</div><div><span>Zielalter</span><strong>'+fire.targetAge+'</strong><small>Aktuell gewähltes Arbeitsziel</small>'+fireCapitalGoal(fire.central.targetCapitalGoal)+'</div><div><span>Lücke zum Ziel</span><strong class="'+(gap===0?'tone-ok':'tone-warning')+'">'+(gap===null?'–':moneyWhole(gap)+' / Jahr')+'</strong><small>'+(fire.central.monthlyGapToTargetMinor===null?'Nicht verfügbar':moneyWhole(fire.central.monthlyGapToTargetMinor)+' pro Monat')+' '+analysisEstimate(true)+'</small></div><div><span>Mit ausgewählten Hebeln</span><strong class="'+(scenario!==null&&scenario<=fire.targetAge?'tone-ok':'tone-warning')+'">'+esc(fireExit(scenario))+'</strong><small>'+moneyWhole(fire.selectedAnnualSavingsMinor)+' jährlich · '+moneyWhole(fire.selectedOneTimeSavingsMinor)+' einmalig · '+(years===null?'Wirkung offen':years+' Jahre gewonnen')+'</small></div></div><div class="fire-capital"><div><span>Überbrückungskapital heute</span><strong>'+(fire.bridgeCapitalMinor===null?'–':moneyWhole(fire.bridgeCapitalMinor))+'</strong><small>Liquidität, Depots, Krypto und Gold</small></div><div><span>Gebundene Vorsorge</span><strong>'+(fire.lockedPensionMinor===null?'–':moneyWhole(fire.lockedPensionMinor))+'</strong><small>Separat zu den vorgesehenen Leistungszeitpunkten</small></div><div><span>Aktuelle Ausgaben-Hochrechnung</span><strong>'+(fire.liveProjectedAnnualExpensesMinor===null?'–':moneyWhole(fire.liveProjectedAnnualExpensesMinor))+'</strong><small>Normalisiert '+(fire.normalizedAnnualExpensesMinor===null?'–':moneyWhole(fire.normalizedAnnualExpensesMinor))+' '+analysisEstimate(true)+'</small></div><div><span>Tragbar beim Zielalter</span><strong>'+(fire.central.maximumExpensesAtTargetMinor===null?'–':moneyWhole(fire.central.maximumExpensesAtTargetMinor))+'</strong><small>Bei 3 % real '+analysisEstimate(true)+'</small></div></div><div class="fire-workspace"><form class="fire-controls" onsubmit="applyFireScenario(event)"><label for="fire-target-age">Gewünschtes Zielalter<select id="fire-target-age" autocomplete="off">'+targetOptions+'</select></label><div class="fire-band"><table><thead><tr><th scope="col">Renditeband</th><th scope="col">Aktuell</th><th scope="col">Mit Hebeln</th></tr></thead><tbody>'+bandRows+'</tbody></table></div><button class="button" type="submit">FIRE-Szenario aktualisieren</button></form><div class="fire-levers"><div class="fire-levers-head"><div><h3>Reale Ausgabenhebel</h3><p>Nur bestätigte laufende Maßnahmen zählen. Kategorieprozente und historische Einzelposten sind Beobachtung, kein Szenario.</p></div><strong>'+moneyWhole(fire.selectedAnnualSavingsMinor)+' / Jahr</strong></div><div class="fire-lever-groups">'+gapBox+nextInbox+recurringGroup+variableGroup+oneTimeGroup+'</div></div></div><div class="fire-pension-link"><div><strong>Gesetzliche Rentenannahmen</strong><span>Dokumentbasiert, versioniert und nur nach Bestätigung aktiv.</span></div><a class="button secondary" href="#/pension-documents">Renteninformation prüfen</a></div><details class="fire-basis"><summary>Modellannahmen und Grenzen</summary><ul>'+basis+'</ul></details>'+warnings+'</section>';
 }
 
 function reviewCategoryOptions(categories, selected){
@@ -1298,6 +1303,83 @@ function renderDecisionLabError(error){
 function renderTask(task){
   return '<article class="task-card"><span class="task-mark">'+icons.manual+'</span><div><h3>'+esc(task.label)+'</h3><p>Letzter bestätigter Wert: '+esc(formatDate(task.valueDate))+'</p></div><button class="button secondary" type="button" onclick="openManual(&quot;'+encoded(task.id)+'&quot;)">Werte aktualisieren</button></article>';
 }
+
+const pensionValidationLabels={
+  FIELD_MISSING:"Wert fehlt",
+  FIELD_AMBIGUOUS:"Mehrere mögliche Werte erkannt",
+  DATE_INVALID:"Datum ist ungültig",
+  VALUE_INVALID:"Wert ist ungültig",
+  DATA_AFTER_DOCUMENT:"Datenstand liegt nach dem Dokumentdatum",
+  PENSION_NOT_FUTURE:"Rentenbeginn liegt nicht nach dem Dokumentdatum",
+  POINTS_VALUE_MISMATCH:"Entgeltpunkte × Rentenwert weichen von der erworbenen Rente ab",
+  FORECAST_BELOW_EARNED:"Prognose liegt unter der bereits erworbenen Rente"
+};
+function pensionStep(active){return '<ol class="pension-steps" aria-label="Fortschritt"><li class="'+(active>=1?'done ':'')+(active===1?'active':'')+'"><span>1</span>Hochladen</li><li class="'+(active>=2?'done ':'')+(active===2?'active':'')+'"><span>2</span>Erkennen</li><li class="'+(active>=3?'done ':'')+(active===3?'active':'')+'"><span>3</span>Prüfen</li><li class="'+(active>=4?'done ':'')+(active===4?'active':'')+'"><span>4</span>Übernehmen</li></ol>'}
+function pensionHistory(revisions){
+  if(!revisions?.length)return '<div class="pension-history-empty">Noch keine bestätigte Renteninformation vorhanden.</div>';
+  return '<div class="pension-history-list">'+revisions.map(revision=>{const documentDate=revision.fields?.find(field=>field.key==="documentDate")?.value;return '<article><div><strong>Renteninformation '+esc(documentDate?formatDate(documentDate):"")+'</strong><span>Bestätigt '+esc(formatDate(revision.confirmedAt,true))+' · '+esc(revision.extractionVersion)+'</span></div><span class="state-label tone-ok"><span class="state-dot"></span>Bestätigt</span></article>'}).join("")+'</div>';
+}
+function renderPensionHome(revisions=[]){
+  currentPensionPreview=null;currentPensionImpact=null;currentPensionFileName="";
+  document.getElementById("dashboard").innerHTML=pensionStep(1)+'<section class="pension-security-note" role="note">'+icons.check+'<div><strong>Privat verarbeitet</strong><span>Das Dokument wird ausschließlich auf deinem Finance-Hub-Server verarbeitet und danach gelöscht.</span></div></section><section class="pension-upload-panel" aria-labelledby="pension-upload-title"><div class="pension-upload-copy"><span class="pension-document-icon">'+icons.manual+'</span><div><h2 id="pension-upload-title">Neue Renteninformation prüfen</h2><p>PDF, JPEG oder PNG · maximal 12 MB · maximal 6 PDF-Seiten</p></div></div><form id="pension-upload-form" onsubmit="uploadPension(event)"><label class="pension-file-control" for="pension-document"><span>Datei auswählen</span><input id="pension-document" name="document" type="file" accept="application/pdf,image/jpeg,image/png" required onchange="pensionFileSelected(this)"></label><span id="pension-selected-file" class="pension-selected-file">Noch keine Datei ausgewählt</span><button class="button" type="submit">Sicher prüfen</button></form><ul class="pension-privacy-list"><li>Versicherungsnummer, Adresse und QR-/Barcode-Inhalte werden nicht gespeichert.</li><li>Nur bestätigte Werte, Quelle/Seite, Dokumenthash und Revision bleiben erhalten.</li><li>FIRE-Auswirkungen sind eine Vorschau [SCHÄTZUNG] und ändern noch nichts.</li></ul></section><section class="pension-history" aria-labelledby="pension-history-title"><div class="section-heading"><div><h2 id="pension-history-title">Bestätigte Revisionen</h2><p>Jede Übernahme bleibt nachvollziehbar und wird nie still überschrieben.</p></div></div>'+pensionHistory(revisions)+'</section>';
+  document.getElementById("dashboard").setAttribute("aria-busy","false");
+}
+function pensionFileSelected(input){const file=input.files?.[0];currentPensionFileName=file?.name||"";const label=document.getElementById("pension-selected-file");if(label)label.textContent=file?file.name+" · "+formatBytes(file.size):"Noch keine Datei ausgewählt"}
+function renderPensionProcessing(){
+  document.getElementById("dashboard").innerHTML=pensionStep(2)+'<section class="pension-processing" role="status" aria-live="polite"><div class="pension-spinner" aria-hidden="true"></div><h2>Dokument wird sicher geprüft …</h2><p>Format, aktive Inhalte, Schadcode und Seiten werden geprüft. Anschließend werden die DRV-Werte lokal erkannt.</p><strong>'+esc(currentPensionFileName||"Ausgewählte Datei")+'</strong></section>';
+  document.getElementById("dashboard").setAttribute("aria-busy","true");
+}
+async function uploadPension(event){
+  event.preventDefault();const input=document.getElementById("pension-document");const file=input?.files?.[0];if(!file)return;
+  if(file.size>12*1024*1024){msg("Die Datei ist größer als 12 MB.",true);return}
+  currentPensionFileName=file.name;renderPensionProcessing();msg("Dokument wird lokal geprüft …");
+  try{const form=new FormData();form.append("document",file);currentPensionPreview=await call("/api/pension-documents/previews",{method:"POST",body:form});currentPensionImpact=null;renderPensionReview();msg("")}
+  catch(error){renderPensionHome([]);msg(error.message,true)}
+}
+function pensionDisplayValue(field){
+  if(!field.value)return "";
+  if(field.unit==="date")return field.value;
+  if(field.unit==="points")return String(field.value).replace(".",",");
+  return new Intl.NumberFormat("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(field.value)/100);
+}
+function pensionFieldRow(field){
+  const codes=field.validatorCodes||[];const warning=codes.length?'<div class="pension-field-warning" role="alert">'+icons.warning+'<span>'+codes.map(code=>esc(pensionValidationLabels[code]||"Bitte Wert prüfen")).join(" · ")+'</span></div>':'';
+  const type=field.unit==="date"?'date':'text';const inputmode=field.unit==="date"?'':' inputmode="decimal"';const step=field.unit==="points"?'0.0001':'0.01';
+  return '<div class="pension-field '+(codes.length?'needs-review':'verified')+'"><div class="pension-field-heading"><label for="pension-field-'+esc(field.key)+'">'+esc(field.label)+'</label><span class="confidence '+esc(field.confidenceLabel)+'">'+(field.confidenceLabel==="hoch"?icons.check:icons.warning)+esc(field.confidenceLabel)+'</span></div><div class="pension-field-control"><input id="pension-field-'+esc(field.key)+'" name="'+esc(field.key)+'" type="'+type+'"'+inputmode+' step="'+step+'" autocomplete="off" value="'+esc(pensionDisplayValue(field))+'" onblur="updatePensionField(&quot;'+esc(field.key)+'&quot;,this.value)"><span class="pension-unit">'+(field.unit==="points"?"Punkte":field.unit==="date"?"":field.unit==="EUR_POINT"?"€ / Punkt":"€ / Monat")+'</span><span class="pension-source">'+(field.page?'Seite '+field.page:'Manuell')+'</span></div>'+warning+'</div>';
+}
+function pensionImpactMarkup(impact){
+  if(!impact)return '<section class="pension-impact pending" aria-labelledby="pension-impact-title"><h2 id="pension-impact-title">Auswirkung auf FIRE <span>[SCHÄTZUNG]</span></h2><p>Prüfe zuerst alle markierten Werte. Danach wird die Alt-neu-Auswirkung ohne Speicherung berechnet.</p></section>';
+  const exit=value=>value===null?'Nicht verfügbar':'Exit mit '+value;
+  const pension=value=>value===null?'Nicht verfügbar':money(value)+' / Monat';
+  return '<section class="pension-impact" aria-labelledby="pension-impact-title"><h2 id="pension-impact-title">Auswirkung auf FIRE <span>[SCHÄTZUNG]</span></h2><div class="pension-impact-table"><div></div><strong>Bisherige Annahme</strong><strong>Neue Vorschau</strong><span>Exit-Alter</span><b>'+esc(exit(impact.previous.exitAge))+'</b><b class="tone-ok">'+esc(exit(impact.proposed.exitAge))+'</b><span>Monatliche Rente ab Start</span><b>'+pension(impact.previous.monthlyPensionAtStartMinor)+'</b><b class="tone-ok">'+pension(impact.proposed.monthlyPensionAtStartMinor)+'</b><span>Kapitalbedarf am Zielalter</span><b>'+moneyWhole(impact.previous.requiredCapitalAtTargetMinor)+'</b><b class="tone-ok">'+moneyWhole(impact.proposed.requiredCapitalAtTargetMinor)+'</b></div><div class="pension-preview-only">Nur Vorschau · noch nichts übernommen</div><details><summary>Modellannahmen und Quellen '+icons.chevron+'</summary><ul>'+impact.assumptions.map(value=>'<li>'+esc(value)+'</li>').join("")+'</ul></details></section>';
+}
+function renderPensionReview(){
+  const preview=currentPensionPreview;if(!preview)return;
+  if(preview.duplicate){document.getElementById("dashboard").innerHTML=pensionStep(3)+'<section class="pension-duplicate">'+icons.warning+'<h2>Dokument bereits bestätigt</h2><p>Diese Datei wurde bereits am '+esc(formatDate(preview.duplicate.confirmedAt,true))+' übernommen. Es wurde keine neue Vorschau oder Revision angelegt.</p><div class="actions"><button class="button secondary" type="button" onclick="discardPension()">Zur Übersicht</button></div></section>';document.getElementById("dashboard").setAttribute("aria-busy","false");return}
+  const secure=Math.max(0,preview.fields.filter(field=>field.confidenceLabel==="hoch"&&!field.validatorCodes.length).length);const review=preview.fields.length-secure;
+  const fields=preview.fields.map(pensionFieldRow).join("");
+  const action=currentPensionImpact?'<label class="pension-confirm-check"><input id="pension-confirm-check" type="checkbox" onchange="document.getElementById(&quot;pension-confirm-button&quot;).disabled=!this.checked"><span>Ich habe alle markierten Werte und die Vorschau geprüft.</span></label><button class="button" id="pension-confirm-button" type="button" onclick="confirmPension()" disabled>Werte bestätigen und übernehmen</button>':'<button class="button" type="button" onclick="previewPensionFire()"'+(preview.canPreview?'':' disabled')+'>FIRE-Auswirkung berechnen</button>';
+  document.getElementById("dashboard").innerHTML=pensionStep(3)+'<section class="pension-security-note" role="note">'+icons.check+'<div><strong>Privat verarbeitet · kein externer Upload</strong><span>Rohdatei und Volltext wurden nach der Extraktion gelöscht.</span></div></section><div class="pension-review-layout"><div><section class="pension-document-summary"><span class="pension-document-icon">'+icons.manual+'</span><div><h2>'+esc(currentPensionFileName||"Renteninformation")+'</h2><p>'+preview.pageCount+' '+(preview.pageCount===1?'Seite':'Seiten')+' · '+formatBytes(preview.sizeBytes)+'</p><span>Hash geprüft · kein Duplikat</span></div></section><section class="pension-fields" aria-labelledby="pension-fields-title"><div class="pension-fields-summary"><div><h2 id="pension-fields-title">'+preview.fields.length+' Werte erkannt</h2><p><span class="confidence hoch">'+icons.check+secure+' sicher</span> <span class="confidence prüfen">'+icons.warning+review+' prüfen</span></p></div></div>'+fields+'</section></div><aside>'+pensionImpactMarkup(currentPensionImpact)+'<section class="pension-confirm"><h2>Hinweise &amp; Einverständnis</h2><ul><li>Identifikationsmerkmale werden nicht gespeichert.</li><li>Adresse und QR-/Barcode-Inhalte werden nicht gespeichert.</li><li>Nur bestätigte Werte werden übernommen.</li></ul>'+action+'<button class="button secondary" type="button" onclick="discardPension()">Abbrechen</button></section></aside></div>';
+  document.getElementById("dashboard").setAttribute("aria-busy","false");
+}
+async function updatePensionField(key,value){
+  if(!currentPensionPreview)return;try{currentPensionPreview=await call("/api/pension-documents/previews/"+currentPensionPreview.id+"/fields/"+key,{method:"PATCH",body:JSON.stringify({value})});currentPensionImpact=null;renderPensionReview();msg("Korrigierter Wert wurde nur in der Vorschau aktualisiert.")}
+  catch(error){msg(error.message,true);const input=document.getElementById("pension-field-"+key);if(input){input.setAttribute("aria-invalid","true");input.focus()}}
+}
+async function previewPensionFire(){
+  if(!currentPensionPreview)return;try{msg("FIRE-Auswirkung wird ohne Speicherung berechnet …");const result=await call("/api/pension-documents/previews/"+currentPensionPreview.id+"/fire-preview",{method:"POST",body:"{}"});currentPensionPreview=result.preview;currentPensionImpact=result.impact;renderPensionReview();msg("Vorschau berechnet. Noch wurde nichts übernommen.")}
+  catch(error){msg(error.message,true)}
+}
+async function confirmPension(){
+  if(!currentPensionPreview||!document.getElementById("pension-confirm-check")?.checked)return;
+  const button=document.getElementById("pension-confirm-button");button.disabled=true;button.textContent="Wird übernommen …";
+  try{const result=await call("/api/pension-documents/previews/"+currentPensionPreview.id+"/confirm",{method:"POST",body:JSON.stringify({confirmed:true})});currentPensionPreview=null;currentPensionImpact=null;document.getElementById("dashboard").innerHTML=pensionStep(4)+'<section class="pension-success" role="status">'+icons.check+'<h2>Renteninformation übernommen</h2><p>Die bestätigten Werte sind als neue, nachvollziehbare Revision aktiv. Das Rohdokument wurde nicht gespeichert.</p><div class="actions"><a class="button" href="?labView=fire#/decision-lab">FIRE-Kurs öffnen</a><button class="button secondary" type="button" onclick="refresh()">Revisionen ansehen</button></div></section>';msg(result.created?"Bestätigte Revision wurde aktiviert.":"Diese Revision war bereits vorhanden.")}
+  catch(error){button.disabled=false;button.textContent="Werte bestätigen und übernehmen";msg(error.message,true)}
+}
+async function discardPension(){
+  const id=currentPensionPreview?.id;currentPensionPreview=null;currentPensionImpact=null;if(id){try{await call("/api/pension-documents/previews/"+id,{method:"DELETE",body:"{}"})}catch{}}
+  await refresh();
+}
 function renderSource(source){
   const info=stateInfo(source);
   const approval=source.supportsDkbApproval&&source.actionPending?'<button class="button small" type="button" onclick="continueDkb(&quot;'+encoded(source.id)+'&quot;)">App-Freigabe prüfen</button>':'';
@@ -1320,6 +1402,7 @@ function renderDashboard(data){
       <div class="overview-main"><div class="overall-line">'+statusIcon(overallTone)+'<h2>'+esc(data.headline)+'</h2></div><p class="checked-at">Zuletzt geprüft: '+esc(formatDate(data.generatedAt,true))+'</p></div>\
       <div class="overview-stats"><div class="stat"><strong>'+data.summary.automaticCurrent+'<span class="tone-'+(data.summary.automaticCurrent===data.summary.automaticTotal?'ok':'warning')+'"> / '+data.summary.automaticTotal+'</span></strong><span>Automatisch aktuell</span></div><div class="stat"><strong>'+data.summary.tasks+'</strong><span>Aufgaben</span></div><div class="stat"><strong>'+data.summary.historicalImports+'</strong><span>Historische Importe</span></div></div>\
     </section>\
+    <section class="section" aria-labelledby="pension-documents-title"><div class="section-heading"><div><h2 id="pension-documents-title">Renteninformationen</h2><p>DRV-Werte sicher erkennen, prüfen und als FIRE-Annahme bestätigen.</p></div><a class="button secondary" href="#/pension-documents">Renteninformation prüfen</a></div></section>\
     <section class="section" aria-labelledby="tasks-title"><div class="section-heading"><div><h2 id="tasks-title">Offene Aufgaben</h2><p>Vertragswerte, die bewusst bestätigt werden müssen.</p></div></div><div class="task-list">'+tasks+'</div></section>\
     <section class="section" aria-labelledby="sources-title"><div class="section-heading"><div><h2 id="sources-title">Automatische Quellen</h2><p>Banken, Depots und Wallets mit geplantem Abruf.</p></div></div><div class="source-list">'+sources+'</div></section>\
     <section class="section" aria-labelledby="history-title"><div class="section-heading"><div><h2 id="history-title">Historische Daten</h2></div></div><details class="historical"><summary><strong>'+icons.archive+'Historische CSV-Importe</strong><span class="details-label">'+data.historical.count+' Quellen '+icons.chevron+'</span></summary><p>'+data.historical.count+' deaktivierte Importquellen bleiben im lückenlosen Archiv erhalten.'+(data.historical.lastSuccessAt?' Letzter Import: '+esc(formatDate(data.historical.lastSuccessAt))+'.':'')+'</p></details></section>\
@@ -1337,16 +1420,18 @@ function renderHeader(view){
     lab:{title:"Planen",subtitle:"Finanzielle Entscheidungen über 20 Jahre als nachvollziehbare Szenarien vergleichen."},
     analyses:{title:"Analysen",subtitle:"Ausgaben verstehen und Veränderungen nachvollziehen."},
     status:{title:"Datenstatus",subtitle:"Aktualität, offene Aufgaben und Systemzustand auf einen Blick."}
+    ,pension:{title:"Renteninformation prüfen",subtitle:"DRV-Werte lokal erkennen, nachvollziehen und bewusst übernehmen."}
   }[view];
   if(view==="analyses"&&analysisSelection().view==="crypto-origin-tax")content.subtitle="Krypto-Herkunft, Investmentbasis und Steuerstatus nachvollziehen.";
   if(view==="analyses"&&analysisSelection().view==="investment-newsletters")content.subtitle="Newsletter-Signale prüfen, einordnen und nachvollziehen.";
   document.title=content.title+" · Finance Hub";
   const eyebrow=document.getElementById("page-eyebrow");
-  eyebrow.hidden=view!=="status";
+  eyebrow.hidden=view!=="status"&&view!=="pension";
   document.getElementById("page-title").textContent=content.title;
   document.getElementById("page-subtitle").textContent=content.subtitle;
   const action=document.getElementById("refresh-button");
   const analysisExport=view==="analyses"&&analysisSelection().view==="expense-structure";
+  action.hidden=view==="pension";
   action.setAttribute("aria-label",analysisExport?"Aktuelle Analyse als CSV exportieren":content.title+" aktualisieren");
   action.querySelector("[aria-hidden]").textContent=analysisExport?"↓":"↻";
   action.querySelector(".desktop-label").textContent=analysisExport?"CSV exportieren":"Aktualisieren";
@@ -1368,7 +1453,7 @@ async function refresh(force=false){
   const view=activeView();
   const button=document.getElementById("refresh-button");
   renderHeader(view);renderNavigation();renderLoading(view);
-  const loadingLabel=view==="overview"?"Übersicht":view==="spending"?"Ausgaben":view==="assets"?"Vermögen":view==="review"?"Prüfen":view==="lab"?"Planung":view==="analyses"?"Analyse":"Datenstatus";
+  const loadingLabel=view==="overview"?"Übersicht":view==="spending"?"Ausgaben":view==="assets"?"Vermögen":view==="review"?"Prüfen":view==="lab"?"Planung":view==="analyses"?"Analyse":view==="pension"?"Renteninformationen":"Datenstatus";
   button.disabled=true;msg(loadingLabel+" wird aktualisiert …");
   try{
     if(view==="overview"){
@@ -1414,6 +1499,8 @@ async function refresh(force=false){
       if(selection.fireOneTimeKeys.length)params.set("fireOneTimeKeys",selection.fireOneTimeKeys.join(","));
       if(force)params.set("refresh","1");
       const data=await call("/api/dashboard/analyses/decision-lab?"+params.toString());renderDecisionLab(data);
+    }else if(view==="pension"){
+      if(currentPensionPreview)renderPensionReview();else{const data=await call("/api/pension-documents/revisions");renderPensionHome(data.revisions||[])}
     }else if(view==="analyses"){
       const selection=analysisSelection();
       const params=new URLSearchParams();

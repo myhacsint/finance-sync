@@ -34,6 +34,7 @@ export interface FireAssumptions {
   bavStartYear: number;
   wifeExitAge: number;
   erikPensionAge: number;
+  erikPensionStartMonth: number;
 }
 
 export const DEFAULT_FIRE_ASSUMPTIONS: FireAssumptions = {
@@ -71,7 +72,8 @@ export const DEFAULT_FIRE_ASSUMPTIONS: FireAssumptions = {
   bavBaseYear: 2025,
   bavStartYear: 2041,
   wifeExitAge: 60,
-  erikPensionAge: 67
+  erikPensionAge: 67,
+  erikPensionStartMonth: 10
 };
 
 export function resolveFireAssumptions(raw?: Partial<FireAssumptions> | null): FireAssumptions {

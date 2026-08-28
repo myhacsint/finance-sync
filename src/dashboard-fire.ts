@@ -201,7 +201,10 @@ function capitalAfterYear(
     else if (erikWorks) income += a.householdEconomicMeansMinor - a.wifeEconomicMeansMinor;
     else if (wifeWorks) income += a.wifeEconomicMeansMinor;
     if (year > context.erikPensionYear) income += context.erikPensionMinor;
-    else if (year === context.erikPensionYear) income += context.erikPensionMinor * 3 / 12;
+    else if (year === context.erikPensionYear) {
+      const paidMonths = Math.max(0, Math.min(12, 13 - Math.round(a.erikPensionStartMonth)));
+      income += context.erikPensionMinor * paidMonths / 12;
+    }
     if (year >= context.wifePensionYear) income += context.wifePensionMinor;
     if (year >= Math.max(a.bavStartYear, context.exitYear)) income += context.bavPensionMinor;
     let need = annualExpensesMinor;

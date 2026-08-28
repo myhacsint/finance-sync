@@ -17,6 +17,9 @@ import type {
   SyncState
   , NewsletterAnalysis
 } from "./types.js";
+import type { ConfirmedPensionRevision } from "./pension-revisions.js";
+import type { FireAssumptions } from "./fire-assumptions.js";
+import type { PensionPreviewSummary } from "./pension-document-types.js";
 
 export class FinanceDatabase {
   readonly db: DatabaseSync;
@@ -210,6 +213,33 @@ export class FinanceDatabase {
         state TEXT NOT NULL CHECK(state IN ('UNREVIEWED', 'REVIEWED', 'DISMISSED')),
         analyzed_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS pension_document_receipts (
+        id TEXT PRIMARY KEY,
+        document_hash TEXT NOT NULL UNIQUE,
+        media_type TEXT NOT NULL,
+        page_count INTEGER NOT NULL,
+        size_bytes INTEGER NOT NULL,
+        received_at TEXT NOT NULL,
+        extraction_version TEXT NOT NULL,
+        retention_mode TEXT NOT NULL CHECK(retention_mode='derived-only'),
+        security_status TEXT NOT NULL CHECK(security_status='PASSED')
+      );
+      CREATE TABLE IF NOT EXISTS pension_revisions (
+        revision_id TEXT PRIMARY KEY,
+        receipt_id TEXT NOT NULL UNIQUE REFERENCES pension_document_receipts(id),
+        confirmed_at TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status='USER_CONFIRMED'),
+        fields_json TEXT NOT NULL,
+        assumptions_json TEXT NOT NULL,
+        impact_json TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS pension_audit_events (
+        id INTEGER PRIMARY KEY,
+        revision_id TEXT NOT NULL REFERENCES pension_revisions(revision_id),
+        event TEXT NOT NULL CHECK(event='USER_CONFIRMED'),
+        occurred_at TEXT NOT NULL,
+        extraction_version TEXT NOT NULL
+      );
       CREATE UNIQUE INDEX IF NOT EXISTS idx_newsletter_analyses_content_hash
         ON newsletter_analyses(content_hash);
       CREATE INDEX IF NOT EXISTS idx_transactions_account_date
@@ -244,6 +274,92 @@ export class FinanceDatabase {
     }
     if (!monthCloseColumns.has("checklist_json")) {
       this.db.exec("ALTER TABLE month_closes ADD COLUMN checklist_json TEXT");
+    }
+  }
+
+  pensionRevisionByHash(documentHash: string): { revisionId: string; confirmedAt: string } | null {
+    const row = this.db.prepare(`
+      SELECT r.revision_id AS revision_id, r.confirmed_at AS confirmed_at
+      FROM pension_revisions r
+      JOIN pension_document_receipts d ON d.id=r.receipt_id
+      WHERE d.document_hash=? LIMIT 1
+    `).get(documentHash) as { revision_id: string; confirmed_at: string } | undefined;
+    return row ? { revisionId: row.revision_id, confirmedAt: row.confirmed_at } : null;
+  }
+
+  activePensionFireAssumptions(): FireAssumptions | null {
+    const row = this.db.prepare(`
+      SELECT assumptions_json FROM pension_revisions
+      WHERE status='USER_CONFIRMED' ORDER BY confirmed_at DESC, revision_id DESC LIMIT 1
+    `).get() as { assumptions_json: string } | undefined;
+    return row ? JSON.parse(row.assumptions_json) as FireAssumptions : null;
+  }
+
+  listPensionRevisions(): ConfirmedPensionRevision[] {
+    const rows = this.db.prepare(`
+      SELECT r.revision_id, d.document_hash, r.confirmed_at, d.extraction_version,
+             r.fields_json, r.assumptions_json, r.impact_json, r.status
+      FROM pension_revisions r JOIN pension_document_receipts d ON d.id=r.receipt_id
+      ORDER BY r.confirmed_at DESC, r.revision_id DESC
+    `).all() as Array<{
+      revision_id: string; document_hash: string; confirmed_at: string; extraction_version: string;
+      fields_json: string; assumptions_json: string; impact_json: string; status: "USER_CONFIRMED";
+    }>;
+    return rows.map((row) => ({
+      revisionId: row.revision_id,
+      documentHash: row.document_hash,
+      confirmedAt: row.confirmed_at,
+      extractionVersion: row.extraction_version,
+      fields: JSON.parse(row.fields_json),
+      assumptions: JSON.parse(row.assumptions_json),
+      impact: JSON.parse(row.impact_json),
+      status: row.status
+    }));
+  }
+
+  confirmPensionRevision(preview: PensionPreviewSummary, revision: ConfirmedPensionRevision): {
+    revision: ConfirmedPensionRevision;
+    created: boolean;
+  } {
+    const existing = this.pensionRevisionByHash(preview.documentHash);
+    if (existing) {
+      const revisionRow = this.listPensionRevisions().find((item) => item.revisionId === existing.revisionId)!;
+      return { revision: revisionRow, created: false };
+    }
+    const receiptId = `pension-receipt-${revision.revisionId.slice(-36)}`;
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.db.prepare(`
+        INSERT INTO pension_document_receipts(
+          id, document_hash, media_type, page_count, size_bytes, received_at,
+          extraction_version, retention_mode, security_status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'derived-only', 'PASSED')
+      `).run(
+        receiptId, preview.documentHash, preview.mediaType, preview.pageCount,
+        preview.sizeBytes, preview.createdAt, preview.extractionVersion
+      );
+      this.db.prepare(`
+        INSERT INTO pension_revisions(
+          revision_id, receipt_id, confirmed_at, status, fields_json, assumptions_json, impact_json
+        ) VALUES (?, ?, ?, 'USER_CONFIRMED', ?, ?, ?)
+      `).run(
+        revision.revisionId, receiptId, revision.confirmedAt,
+        JSON.stringify(revision.fields), JSON.stringify(revision.assumptions), JSON.stringify(revision.impact)
+      );
+      this.db.prepare(`
+        INSERT INTO pension_audit_events(revision_id, event, occurred_at, extraction_version)
+        VALUES (?, 'USER_CONFIRMED', ?, ?)
+      `).run(revision.revisionId, revision.confirmedAt, revision.extractionVersion);
+      this.db.exec("COMMIT");
+      return { revision, created: true };
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      const raced = this.pensionRevisionByHash(preview.documentHash);
+      if (raced) {
+        const revisionRow = this.listPensionRevisions().find((item) => item.revisionId === raced.revisionId)!;
+        return { revision: revisionRow, created: false };
+      }
+      throw error;
     }
   }
 

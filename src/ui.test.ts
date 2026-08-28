@@ -10,10 +10,25 @@ function renderUi(): string {
 }
 
 test("externes UI-JavaScript ist syntaktisch gültig", () => {
-  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.46\.2" defer><\/script>/);
+  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.47\.0" defer><\/script>/);
   assert.match(clientSource, /match\(\/\^\(\\d\{4\}\)-\(\\d\{2\}\)\$\//);
   assert.doesNotMatch(clientSource, /match\(\/\^\(\\\\d\{4\}\)-\(\\\\d\{2\}\)\$\//);
   assert.doesNotThrow(() => new Function(clientSource));
+});
+
+test("Renteninformation führt sicher durch Upload, Prüfung und explizite Bestätigung", () => {
+  const html = renderUi();
+  assert.match(html, /#\/pension-documents/);
+  assert.match(html, /Renteninformationen/);
+  assert.match(html, /PDF, JPEG oder PNG/);
+  assert.match(html, /maximal 12 MB · maximal 6 PDF-Seiten/);
+  assert.match(html, /pension-documents\/previews/);
+  assert.match(html, /fire-preview/);
+  assert.match(html, /Nur bestätigte Werte werden übernommen/);
+  assert.match(html, /\[SCHÄTZUNG\]/);
+  assert.match(html, /pension-confirm-check/);
+  assert.match(html, /@media \(max-width: 760px\)/);
+  assert.match(html, /\.pension-review-layout \{ display: grid/);
 });
 
 test("DKB-Abruf führt die App-Freigabe ohne zweiten Klick zu Ende", () => {

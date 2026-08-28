@@ -21,6 +21,11 @@ import { buildCouncilPortfolioSnapshot } from "./council-portfolio.js";
 import { ManualPreviewStore } from "./manual-workflow.js";
 import { buildDashboardStatus, type SourceStatusRow } from "./dashboard-status.js";
 import type { DecisionLabRequest } from "./dashboard-decision-lab.js";
+import { receivePensionUpload } from "./pension-upload.js";
+import { extractPensionDocument } from "./pension-extractor.js";
+import { parseDrvPensionPages } from "./drv-pension-parser.js";
+import { PensionPreviewStore } from "./pension-preview-store.js";
+import type { PensionFieldKey } from "./pension-document-types.js";
 
 mkdirSync(paths.data, { recursive: true });
 mkdirSync(paths.archive, { recursive: true });
@@ -30,6 +35,9 @@ const db = new FinanceDatabase(join(paths.data, "finance.sqlite"));
 const service = new FinanceService(db, config);
 const scheduler = service.startScheduler();
 const manualPreviews = new ManualPreviewStore();
+const pensionPreviews = new PensionPreviewStore();
+let pensionParserBusy = false;
+const pensionUploadAttempts = new Map<string, number[]>();
 const financeHubMark = readFileSync(new URL("../assets/finance-hub-mark.png", import.meta.url));
 const financeHubClient = readFileSync(new URL("../assets/app.js", import.meta.url));
 const financeHubStyles = readFileSync(new URL("../assets/app.css", import.meta.url));
@@ -43,8 +51,55 @@ const securityHeaders = {
 };
 
 function json(res: ServerResponse, status: number, body: unknown): void {
-  res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
+  res.writeHead(status, { ...securityHeaders, "content-type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(body, (_, value) => typeof value === "bigint" ? value.toString() : value));
+}
+
+function sameOriginMutation(req: IncomingMessage): boolean {
+  const origin = req.headers.origin;
+  const fetchSite = req.headers["sec-fetch-site"];
+  if (!origin || (fetchSite && fetchSite !== "same-origin" && fetchSite !== "same-site")) return false;
+  const forwarded = String(req.headers["x-forwarded-proto"] ?? "").split(",")[0].trim();
+  const scheme = forwarded || (origin.startsWith("https://") ? "https" : "http");
+  const requestOrigin = `${scheme}://${req.headers.host ?? ""}`;
+  const allowed = new Set([requestOrigin]);
+  if (config.publicBaseUrl) allowed.add(new URL(config.publicBaseUrl).origin);
+  return allowed.has(origin);
+}
+
+function consumePensionRate(req: IncomingMessage): boolean {
+  const key = req.socket.remoteAddress ?? "unknown";
+  const cutoff = Date.now() - 10 * 60_000;
+  const recent = (pensionUploadAttempts.get(key) ?? []).filter((value) => value >= cutoff);
+  if (recent.length >= 3) return false;
+  recent.push(Date.now());
+  pensionUploadAttempts.set(key, recent);
+  return true;
+}
+
+function pensionFailure(error: unknown): FinanceServiceError {
+  const code = error instanceof Error ? error.message : String(error);
+  const messages: Record<string, [string, number]> = {
+    UPLOAD_MULTIPART_REQUIRED: ["Bitte eine PDF-, JPEG- oder PNG-Datei auswählen", 400],
+    UPLOAD_TOO_LARGE: ["Die Datei ist größer als 12 MB", 413],
+    UPLOAD_MIME_MISMATCH: ["Dateiformat und Dateiinhalt stimmen nicht überein", 400],
+    UPLOAD_FILE_EMPTY: ["Die Datei ist leer", 400],
+    UPLOAD_FILE_MISSING: ["Es wurde keine Datei übertragen", 400],
+    PDF_TOO_MANY_PAGES: ["Die PDF hat mehr als 6 Seiten", 400],
+    PDF_ENCRYPTED: ["Verschlüsselte PDFs werden nicht verarbeitet", 400],
+    PDF_ACTIVE_CONTENT: ["Die PDF enthält nicht zulässige aktive Inhalte", 400],
+    SECURITY_MALWARE_DETECTED: ["Die Sicherheitsprüfung hat die Datei abgelehnt", 400],
+    SECURITY_SIGNATURES_STALE: ["Die Sicherheitsprüfung ist nicht aktuell; Upload wurde sicher abgebrochen", 503],
+    SECURITY_SCANNER_UNAVAILABLE: ["Die Sicherheitsprüfung ist nicht verfügbar; Upload wurde sicher abgebrochen", 503],
+    SECURITY_SCAN_FAILED: ["Die Sicherheitsprüfung konnte nicht abgeschlossen werden", 503],
+    IMAGE_DIMENSIONS_INVALID: ["Das Bild ist zu klein oder technisch nicht sicher verarbeitbar", 400],
+    PREVIEW_EXPIRED: ["Die Vorschau ist abgelaufen; bitte Datei erneut prüfen", 410],
+    FIELD_VALUE_INVALID: ["Der korrigierte Wert hat ein ungültiges Format", 400],
+    FIELD_UNKNOWN: ["Das Feld ist unbekannt", 404],
+    PREVIEW_NOT_CONFIRMABLE: ["Bitte alle markierten Werte zuerst prüfen", 409]
+  };
+  const match = messages[code];
+  return new FinanceServiceError(match?.[0] ?? "Die Datei konnte sicher nicht verarbeitet werden", match?.[1] ?? 400);
 }
 
 function authorized(req: IncomingMessage): boolean {
@@ -121,6 +176,72 @@ const server = createServer(async (req, res) => {
       return res.end(financeHubMark);
     }
     if (!authorized(req)) return json(res, 401, { error: "Nicht autorisiert" });
+    if (req.method === "GET" && url.pathname === "/api/pension-documents/revisions") {
+      return json(res, 200, { revisions: service.listPensionRevisions() });
+    }
+    if (req.method === "POST" && url.pathname === "/api/pension-documents/previews") {
+      if (!sameOriginMutation(req)) return json(res, 403, { error: "Ungültiger Anfrageursprung" });
+      if (!consumePensionRate(req)) return json(res, 429, { error: "Zu viele Uploadversuche; bitte später erneut versuchen" });
+      if (pensionParserBusy) return json(res, 429, { error: "Eine Dokumentprüfung läuft bereits" });
+      pensionParserBusy = true;
+      let uploaded: Awaited<ReturnType<typeof receivePensionUpload>> | undefined;
+      try {
+        uploaded = await receivePensionUpload(req);
+        const extracted = await extractPensionDocument(uploaded.path, uploaded.mediaType, uploaded.workDir);
+        const fields = parseDrvPensionPages(extracted.pages);
+        const duplicate = db.pensionRevisionByHash(uploaded.hash);
+        return json(res, 200, pensionPreviews.create({
+          documentHash: uploaded.hash,
+          mediaType: uploaded.mediaType,
+          pageCount: extracted.pageCount,
+          sizeBytes: uploaded.sizeBytes,
+          fields,
+          duplicate
+        }));
+      } catch (error) {
+        throw pensionFailure(error);
+      } finally {
+        uploaded?.cleanup();
+        pensionParserBusy = false;
+      }
+    }
+    const pensionPreview = /^\/api\/pension-documents\/previews\/([0-9a-f-]{36})$/.exec(url.pathname);
+    if (req.method === "GET" && pensionPreview) {
+      try { return json(res, 200, pensionPreviews.get(pensionPreview[1])); }
+      catch (error) { throw pensionFailure(error); }
+    }
+    const pensionField = /^\/api\/pension-documents\/previews\/([0-9a-f-]{36})\/fields\/([A-Za-z]+)$/.exec(url.pathname);
+    if (req.method === "PATCH" && pensionField) {
+      if (!sameOriginMutation(req)) return json(res, 403, { error: "Ungültiger Anfrageursprung" });
+      const payload = await body(req, 4096).catch(() => { throw new FinanceServiceError("Ungültiger Feldwert", 400); }) as { value?: string };
+      try { return json(res, 200, pensionPreviews.updateField(pensionField[1], pensionField[2] as PensionFieldKey, String(payload.value ?? ""))); }
+      catch (error) { throw pensionFailure(error); }
+    }
+    const pensionFirePreview = /^\/api\/pension-documents\/previews\/([0-9a-f-]{36})\/fire-preview$/.exec(url.pathname);
+    if (req.method === "POST" && pensionFirePreview) {
+      if (!sameOriginMutation(req)) return json(res, 403, { error: "Ungültiger Anfrageursprung" });
+      try {
+        const preview = pensionPreviews.markReviewed(pensionFirePreview[1]);
+        return json(res, 200, { preview, ...(await service.previewPensionFire(preview)) });
+      } catch (error) { throw error instanceof FinanceServiceError ? error : pensionFailure(error); }
+    }
+    const pensionConfirm = /^\/api\/pension-documents\/previews\/([0-9a-f-]{36})\/confirm$/.exec(url.pathname);
+    if (req.method === "POST" && pensionConfirm) {
+      if (!sameOriginMutation(req)) return json(res, 403, { error: "Ungültiger Anfrageursprung" });
+      const payload = await body(req, 1024).catch(() => ({})) as { confirmed?: boolean };
+      if (payload.confirmed !== true) return json(res, 409, { error: "Explizite Bestätigung fehlt" });
+      try {
+        const preview = pensionPreviews.get(pensionConfirm[1]);
+        const result = await service.confirmPensionPreview(preview);
+        pensionPreviews.consume(pensionConfirm[1]);
+        return json(res, result.created ? 201 : 200, result);
+      } catch (error) { throw error instanceof FinanceServiceError ? error : pensionFailure(error); }
+    }
+    if (req.method === "DELETE" && pensionPreview) {
+      if (!sameOriginMutation(req)) return json(res, 403, { error: "Ungültiger Anfrageursprung" });
+      pensionPreviews.consume(pensionPreview[1]);
+      return json(res, 200, { ok: true });
+    }
     if (req.method === "GET" && url.pathname === "/api/dashboard/review") {
       return json(res, 200, await service.getDashboardReview(
         url.searchParams.get("refresh") === "1",
