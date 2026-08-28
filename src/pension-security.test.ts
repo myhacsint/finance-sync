@@ -16,6 +16,8 @@ test("file type is derived from magic bytes, not extension", () => {
 test("active PDF content is rejected", () => {
   assert.throws(() => assertSafePdfJson('{"/OpenAction":{"/JS":"alert(1)"}}'), /PDF_ACTIVE_CONTENT/);
   assert.doesNotThrow(() => assertSafePdfJson('{"pages":[{}]}'));
+  assert.doesNotThrow(() => assertSafePdfJson('{"/DocChecksum":"/AA4796DE0994AF32C2D5D22CE3E4C61F"}'));
+  assert.throws(() => assertSafePdfJson("not-json"), /PDF_STRUCTURE_INVALID/);
 });
 
 test("malware scanner fails closed and distinguishes a detection", async () => {

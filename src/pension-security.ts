@@ -61,5 +61,15 @@ export function magicMediaType(buffer: Buffer): "application/pdf" | "image/jpeg"
 
 export function assertSafePdfJson(json: string): void {
   const forbidden = ["/JavaScript", "/JS", "/Launch", "/EmbeddedFile", "/OpenAction", "/AA", "/RichMedia"];
-  if (forbidden.some((token) => json.includes(token))) throw new Error("PDF_ACTIVE_CONTENT");
+  let parsed: unknown;
+  try { parsed = JSON.parse(json); } catch { throw new Error("PDF_STRUCTURE_INVALID"); }
+  const inspect = (value: unknown): boolean => {
+    if (typeof value === "string") return forbidden.includes(value);
+    if (Array.isArray(value)) return value.some(inspect);
+    if (value && typeof value === "object") {
+      return Object.entries(value).some(([key, child]) => forbidden.includes(key) || inspect(child));
+    }
+    return false;
+  };
+  if (inspect(parsed)) throw new Error("PDF_ACTIVE_CONTENT");
 }
