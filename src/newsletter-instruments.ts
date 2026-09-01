@@ -51,10 +51,15 @@ export function resolveNewsletterInstrument(instrument: string, ticker: string |
   yahooSymbol?: string;
 } {
   const suppliedTicker = String(ticker ?? "").trim();
-  if (suppliedTicker) {
-    if (suppliedTicker.toUpperCase() === "CBTC") return { ticker: "CBTC", yahooSymbol: "CBTC.SW" };
-    return { ticker: suppliedTicker };
-  }
   const mapping = MAPPING_BY_NAME.get(normalizeNewsletterInstrument(instrument));
-  return mapping ? { ticker: mapping.ticker, yahooSymbol: mapping.yahooSymbol } : { ticker: null };
+  if (mapping) {
+    const mappedBaseTicker = mapping.ticker.split(".")[0];
+    if (!suppliedTicker
+      || normalizeNewsletterInstrument(suppliedTicker) === normalizeNewsletterInstrument(mappedBaseTicker)
+      || normalizeNewsletterInstrument(suppliedTicker) === normalizeNewsletterInstrument(mapping.ticker)) {
+      return { ticker: mapping.ticker, yahooSymbol: mapping.yahooSymbol };
+    }
+  }
+  if (suppliedTicker.toUpperCase() === "CBTC") return { ticker: "CBTC", yahooSymbol: "CBTC.SW" };
+  return suppliedTicker ? { ticker: suppliedTicker } : { ticker: null };
 }

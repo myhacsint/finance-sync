@@ -18,6 +18,12 @@ test("Explizite Ticker haben Vorrang vor Namens-Aliassen", () => {
   assert.deepEqual(resolveNewsletterInstrument("Novo Nordisk", "NOVO-B.CO"), { ticker: "NOVO-B.CO" });
 });
 
+test("Nackte Heimatbörsen-Ticker werden auf das validierte Yahoo-Suffix erweitert", () => {
+  assert.deepEqual(resolveNewsletterInstrument("Ivanhoe Mines", "IVN"), { ticker: "IVN.TO", yahooSymbol: "IVN.TO" });
+  assert.deepEqual(resolveNewsletterInstrument("Silver Mountain Resources", "AGMR"), { ticker: "AGMR.TO", yahooSymbol: "AGMR.TO" });
+  assert.deepEqual(resolveNewsletterInstrument("Southern Silver Exploration", "SSV"), { ticker: "SSV.V", yahooSymbol: "SSV.V" });
+});
+
 test("CBTC verwendet den SIX-Yahoo-Ticker, behält aber den Cockpit-Schlüssel", () => {
   assert.deepEqual(resolveNewsletterInstrument("21Shares Bitcoin Core ETP", "CBTC"), { ticker: "CBTC", yahooSymbol: "CBTC.SW" });
   assert.deepEqual(resolveNewsletterInstrument("Unbekanntes Instrument", "CBTC"), { ticker: "CBTC", yahooSymbol: "CBTC.SW" });

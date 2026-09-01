@@ -39,6 +39,7 @@ test("Tickerlose Basiswerte verwenden das validierte Yahoo-Mapping ohne Lookup",
     theses: [
       { instrument: "Chipotle Mexican Grill", ticker: null, assetClass: "Aktie" },
       { instrument: "Northern Star Resources", ticker: null, assetClass: "Aktie" },
+      { instrument: "Ivanhoe Mines", ticker: "IVN", assetClass: "Aktie" },
       { instrument: "21Shares Bitcoin Core ETP", ticker: "CBTC", assetClass: "ETP" }
     ]
   } as NewsletterAnalysis;
@@ -53,14 +54,16 @@ test("Tickerlose Basiswerte verwenden das validierte Yahoo-Mapping ohne Lookup",
     requestedSymbols.push(symbol);
     if (symbol === "CMG") return Response.json({ symbol, dataSource: "YAHOO", currency: "USD", marketPrice: 38.03 });
     if (symbol === "NST.AX") return Response.json({ symbol, dataSource: "YAHOO", currency: "AUD", marketPrice: 23.69 });
+    if (symbol === "IVN.TO") return Response.json({ symbol, dataSource: "YAHOO", currency: "CAD", marketPrice: 12.11 });
     if (symbol === "CBTC.SW") return Response.json({ symbol, dataSource: "YAHOO", currency: "CHF", marketPrice: 15.01 });
     return new Response(null, { status: 404 });
   };
   const quotes = await readGhostfolioNewsletterQuotes(config, [mappedAnalysis], { fetcher: fetcher as typeof fetch, securityToken: "secret" });
-  assert.deepEqual(requestedSymbols.sort(), ["CBTC.SW", "CMG", "NST.AX"]);
+  assert.deepEqual(requestedSymbols.sort(), ["CBTC.SW", "CMG", "IVN.TO", "NST.AX"]);
   assert.deepEqual(quotes.map(({ symbol, priceMinor, currency }) => ({ symbol, priceMinor, currency })), [
     { symbol: "CMG", priceMinor: 3_803, currency: "USD" },
     { symbol: "NST.AX", priceMinor: 2_369, currency: "AUD" },
+    { symbol: "IVN.TO", priceMinor: 1_211, currency: "CAD" },
     { symbol: "CBTC", priceMinor: 1_501, currency: "CHF" }
   ]);
 });
