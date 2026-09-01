@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { normalizeNewsletterInstrument, resolveNewsletterInstrument } from "./newsletter-instruments.js";
 import type { NewsletterAnalysis } from "./types.js";
 
 type NewsletterPrice = {
@@ -34,10 +35,9 @@ export function buildCouncilInvestmentSnapshot(input: {
     capturedAt: price.capturedAt ?? null,
     source: price.source ?? "Ghostfolio"
   }));
-  const normalized = (value: string | null | undefined) => String(value ?? "").normalize("NFKD").replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
   const pricesByKey = new Map(prices.flatMap((price) => [
-    [normalized(price.instrumentKey), price] as const,
-    [normalized(price.name), price] as const
+    [normalizeNewsletterInstrument(price.instrumentKey), price] as const,
+    [normalizeNewsletterInstrument(price.name), price] as const
   ]));
   const groups = new Map<string, {
     instrumentKey: string;
@@ -49,12 +49,19 @@ export function buildCouncilInvestmentSnapshot(input: {
     theses: NewsletterAnalysis["theses"];
     entries: Array<{ analysis: (typeof analyses)[number]; thesis: NewsletterAnalysis["theses"][number] }>;
   }>();
+  const tickerByInstrumentName = new Map<string, string>();
   for (const analysis of analyses) for (const thesis of analysis.theses) {
-    const instrumentKey = String(thesis.ticker || thesis.instrument).trim().toLocaleUpperCase("de-DE");
+    const resolved = resolveNewsletterInstrument(thesis.instrument, thesis.ticker);
+    if (resolved.ticker) tickerByInstrumentName.set(normalizeNewsletterInstrument(thesis.instrument), resolved.ticker);
+  }
+  for (const analysis of analyses) for (const thesis of analysis.theses) {
+    const resolved = resolveNewsletterInstrument(thesis.instrument, thesis.ticker);
+    const ticker = resolved.ticker ?? tickerByInstrumentName.get(normalizeNewsletterInstrument(thesis.instrument)) ?? null;
+    const instrumentKey = String(ticker || thesis.instrument).trim().toLocaleUpperCase("de-DE");
     const group = groups.get(instrumentKey) ?? {
       instrumentKey,
       instrument: thesis.instrument,
-      ticker: thesis.ticker,
+      ticker,
       assetClass: thesis.assetClass,
       sources: new Set<string>(),
       analyses: [],
@@ -73,7 +80,9 @@ export function buildCouncilInvestmentSnapshot(input: {
       .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
     const latestAnalysis = groupAnalyses[0];
     const latestThesis = entries[0]?.thesis;
-    const price = pricesByKey.get(normalized(group.ticker)) ?? pricesByKey.get(normalized(group.instrument)) ?? null;
+    const price = pricesByKey.get(normalizeNewsletterInstrument(group.ticker))
+      ?? pricesByKey.get(normalizeNewsletterInstrument(group.instrument))
+      ?? null;
     return {
       instrumentKey: group.instrumentKey,
       instrument: group.instrument,
