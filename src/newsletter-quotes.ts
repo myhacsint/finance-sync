@@ -1,4 +1,5 @@
 import { readSecret } from "./config.js";
+import { normalizeNewsletterInstrument, resolveNewsletterInstrument } from "./newsletter-instruments.js";
 import type { AppConfig, NewsletterAnalysis } from "./types.js";
 
 type LookupItem = {
@@ -39,10 +40,6 @@ const SPECIAL_SYMBOLS: Record<string, { dataSource: string; symbol: string }> = 
   "ÖL": { dataSource: "YAHOO", symbol: "CL=F" }
 };
 
-function normalized(value: string | undefined): string {
-  return String(value ?? "").normalize("NFKD").replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-}
-
 function isCrypto(assetClass: string | undefined): boolean {
   return /crypto|krypto/i.test(String(assetClass ?? ""));
 }
@@ -53,10 +50,10 @@ function chooseLookup(items: LookupItem[], instrument: string, ticker: string, a
     ? item.dataSource === "COINGECKO" || item.assetSubClass === "CRYPTOCURRENCY"
     : item.dataSource === "YAHOO" && item.assetSubClass !== "CRYPTOCURRENCY")
     .sort((a, b) => Number(b.dataSource === "YAHOO") - Number(a.dataSource === "YAHOO"));
-  const tickerKey = normalized(ticker);
-  const instrumentKey = normalized(instrument);
-  return candidates.find((item) => normalized(item.symbol) === tickerKey)
-    ?? candidates.find((item) => normalized(item.name) === instrumentKey);
+  const tickerKey = normalizeNewsletterInstrument(ticker);
+  const instrumentKey = normalizeNewsletterInstrument(instrument);
+  return candidates.find((item) => normalizeNewsletterInstrument(item.symbol) === tickerKey)
+    ?? candidates.find((item) => normalizeNewsletterInstrument(item.name) === instrumentKey);
 }
 
 async function poolMap<T, R>(values: T[], concurrency: number, task: (value: T) => Promise<R>): Promise<R[]> {
@@ -89,14 +86,17 @@ export async function readGhostfolioNewsletterQuotes(
   const auth = await authResponse.json() as { authToken?: string };
   if (!auth.authToken) return [];
   const headers = { authorization: `Bearer ${auth.authToken}` };
-  const unique = new Map<string, { instrument: string; ticker: string; assetClass?: string }>();
+  const unique = new Map<string, { instrument: string; ticker: string; yahooSymbol?: string; assetClass?: string }>();
   for (const analysis of analyses) for (const thesis of analysis.theses) {
-    const ticker = String(thesis.ticker ?? "").trim();
-    if (!ticker) continue;
-    unique.set(`${normalized(ticker)}:${normalized(thesis.instrument)}`, {
-      instrument: thesis.instrument,
-      ticker,
-      assetClass: thesis.assetClass
+    const resolved = resolveNewsletterInstrument(thesis.instrument, thesis.ticker);
+    if (!resolved.ticker) continue;
+    const key = normalizeNewsletterInstrument(resolved.ticker);
+    const previous = unique.get(key);
+    unique.set(key, {
+      instrument: previous?.instrument ?? thesis.instrument,
+      ticker: resolved.ticker,
+      yahooSymbol: resolved.yahooSymbol ?? previous?.yahooSymbol,
+      assetClass: previous?.assetClass ?? thesis.assetClass
     });
   }
   const capturedAt = new Date().toISOString();
@@ -104,7 +104,9 @@ export async function readGhostfolioNewsletterQuotes(
     try {
       const ticker = request.ticker.toUpperCase();
       const special = SPECIAL_SYMBOLS[ticker];
-      let selected: LookupItem | undefined = special ? { ...special, name: request.instrument } : undefined;
+      let selected: LookupItem | undefined = request.yahooSymbol
+        ? { dataSource: "YAHOO", symbol: request.yahooSymbol, name: request.instrument }
+        : special ? { ...special, name: request.instrument } : undefined;
       if (!selected) {
         const queries = isCrypto(request.assetClass) || request.ticker.length > 12
           ? [request.instrument]
@@ -126,7 +128,7 @@ export async function readGhostfolioNewsletterQuotes(
       let quote = quoteResponse.ok
         ? await quoteResponse.json() as { marketPrice?: number; currency?: string; symbol?: string; dataSource?: string }
         : undefined;
-      if ((!quote || !Number.isFinite(quote.marketPrice)) && selected.dataSource === "YAHOO") {
+      if ((!quote || !Number.isFinite(quote.marketPrice) || Number(quote.marketPrice) <= 0) && selected.dataSource === "YAHOO") {
         const yahooUrl = new URL(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(selected.symbol)}`);
         yahooUrl.searchParams.set("range", "1d");
         yahooUrl.searchParams.set("interval", "1d");
@@ -138,7 +140,7 @@ export async function readGhostfolioNewsletterQuotes(
         }
       }
       if (!quote) return undefined;
-      if (!Number.isFinite(quote.marketPrice) || !quote.currency) return undefined;
+      if (!Number.isFinite(quote.marketPrice) || Number(quote.marketPrice) <= 0 || !quote.currency) return undefined;
       return {
         symbol: request.ticker,
         name: request.instrument,
