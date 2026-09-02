@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { NEWSLETTER_INSTRUMENT_MAPPINGS, resolveNewsletterInstrument } from "./newsletter-instruments.js";
 
-test("Ticker-Mapping deckt alle 31 validierten Basiswerte ab", () => {
-  assert.equal(NEWSLETTER_INSTRUMENT_MAPPINGS.length, 31);
+test("Ticker-Mapping deckt alle validierten Basiswerte ab", () => {
+  assert.equal(NEWSLETTER_INSTRUMENT_MAPPINGS.length, 32);
   for (const mapping of NEWSLETTER_INSTRUMENT_MAPPINGS) {
     for (const alias of mapping.aliases) {
       assert.deepEqual(resolveNewsletterInstrument(alias, null), { ticker: mapping.ticker, yahooSymbol: mapping.yahooSymbol });
@@ -12,6 +12,7 @@ test("Ticker-Mapping deckt alle 31 validierten Basiswerte ab", () => {
   assert.deepEqual(resolveNewsletterInstrument("Chipotle Mexican Grill", null), { ticker: "CMG", yahooSymbol: "CMG" });
   assert.deepEqual(resolveNewsletterInstrument("Loma Negra Compañía Industrial Argentina S.A.", null), { ticker: "LOMA", yahooSymbol: "LOMA" });
   assert.deepEqual(resolveNewsletterInstrument("Andrada Mining (ehemals Afritin)", null), { ticker: "ATM.L", yahooSymbol: "ATM.L" });
+  assert.deepEqual(resolveNewsletterInstrument("Copper Giant Resources", null), { ticker: "CGNT.V", yahooSymbol: "CGNT.V" });
 });
 
 test("Explizite Ticker haben Vorrang vor Namens-Aliassen", () => {
