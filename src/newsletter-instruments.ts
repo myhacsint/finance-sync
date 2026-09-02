@@ -35,7 +35,8 @@ export const NEWSLETTER_INSTRUMENT_MAPPINGS: readonly NewsletterInstrumentMappin
   { aliases: ["Theta Gold Mines"], ticker: "TGM.AX", yahooSymbol: "TGM.AX" },
   { aliases: ["Andrada Mining", "Andrada Mining (ehemals Afritin)"], ticker: "ATM.L", yahooSymbol: "ATM.L" },
   { aliases: ["Cassiar Gold"], ticker: "GLDC.V", yahooSymbol: "GLDC.V" },
-  { aliases: ["Kutcho Copper"], ticker: "KC.V", yahooSymbol: "KC.V" }
+  { aliases: ["Kutcho Copper"], ticker: "KC.V", yahooSymbol: "KC.V" },
+  { aliases: ["Copper Giant Resources", "Copper Giant Resources Corp."], ticker: "CGNT.V", yahooSymbol: "CGNT.V" }
 ] as const;
 
 export function normalizeNewsletterInstrument(value: string | null | undefined): string {
