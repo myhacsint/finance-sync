@@ -86,6 +86,9 @@ export async function receivePensionUpload(
         return;
       }
       busboy.on("file", (name, stream, info) => {
+        // destroy() also emits on rejected file streams. Attach before ANY
+        // validation so an invalid field cannot terminate the HTTP server.
+        stream.on("error", (error) => fail(error));
         if (name !== "document" || fileSeen) {
           stream.resume();
           fail(new Error("UPLOAD_FILE_INVALID"));
@@ -100,7 +103,6 @@ export async function receivePensionUpload(
           sizeBytes += chunk.length;
           hash.update(chunk);
         });
-        stream.on("error", (error) => fail(error));
         output.on("error", (error) => fail(error));
         output.on("close", () => { writerFinished = true; finish(); });
         stream.pipe(output);

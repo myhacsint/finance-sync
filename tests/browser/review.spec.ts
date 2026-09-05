@@ -39,6 +39,15 @@ test('cookie writes require same origin', async ({request}) => {
   expect((await request.post('/api/backup',{headers:{origin:'https://invalid.example'}})).status()).toBe(403);
 });
 
+test('invalid upload field returns an error and the server stays available', async ({page}) => {
+  const response=await page.request.post('/api/pension-documents/previews',{
+    headers:{origin:'http://127.0.0.1:18083'},
+    multipart:{file:{name:'synthetic.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.7 synthetic invalid field '.repeat(10))}}
+  });
+  expect(response.status()).toBe(400);
+  expect((await page.request.get('/health')).status()).toBe(200);
+});
+
 test('Council read endpoints remain accessible without token or session', async ({request}) => {
   expect((await request.get('/api/dashboard/status')).status()).toBe(401);
   const portfolio=await request.get('/api/v1/council/portfolio');

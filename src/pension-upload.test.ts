@@ -20,16 +20,23 @@ test("interrupted and timed-out uploads reject and remove their private files", 
   }
 });
 
-function multipart(content: Buffer, declaredMime: string): IncomingMessage {
+function multipart(content: Buffer, declaredMime: string, name = "document"): IncomingMessage {
   const boundary = "finance-synthetic-boundary";
   const head = Buffer.from(
-    `--${boundary}\r\nContent-Disposition: form-data; name="document"; filename="synthetic.bin"\r\nContent-Type: ${declaredMime}\r\n\r\n`
+    `--${boundary}\r\nContent-Disposition: form-data; name="${name}"; filename="synthetic.bin"\r\nContent-Type: ${declaredMime}\r\n\r\n`
   );
   const tail = Buffer.from(`\r\n--${boundary}--\r\n`);
   const stream = Readable.from([head, content, tail]) as IncomingMessage;
   stream.headers = { "content-type": `multipart/form-data; boundary=${boundary}` };
   return stream;
 }
+
+test("invalid multipart file field is rejected without an unhandled stream error", async () => {
+  const prefix = `finance-invalid-field-${crypto.randomUUID()}`;
+  await assert.rejects(receivePensionUpload(multipart(Buffer.from("%PDF-1.7 synthetic test ".repeat(10)), "application/pdf", "file"), {tempPrefix:prefix}), /UPLOAD_FILE_INVALID/);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(readdirSync(tmpdir()).some(name=>name.startsWith(prefix)),false);
+});
 
 test("streaming upload rejects files above 12 MiB", async () => {
   const content = Buffer.alloc(MAX_PENSION_UPLOAD_BYTES + 1, 0x20);
