@@ -90,13 +90,15 @@ async function extractPdf(
     const text = readFileSync(output, "utf8");
     nativePages.push({ page, text, method: "native", confidence: text.trim().length >= 80 ? 0.98 : 0.45 });
   }
-  if (nativePages.reduce((sum, page) => sum + page.text.trim().length, 0) >= 200) return { pageCount, pages: nativePages };
-
-  const prefix = join(workDir, "page");
-  await runner("/usr/bin/pdftoppm", ["-png", "-r", "200", extractionPath, prefix], 60_000);
   const pages: PensionTextPage[] = [];
-  for (let page = 1; page <= pageCount; page += 1) {
-    const source = join(workDir, `page-${page}.png`);
+  for (const native of nativePages) {
+    if (native.text.trim().length >= 200) { pages.push(native); continue; }
+    const page = native.page;
+    // Single-file output avoids Poppler's page-number padding for 10+ pages.
+    const prefix = join(workDir, `ocr-${page}`);
+    await runner("/usr/bin/pdftoppm", ["-f", String(page), "-l", String(page), "-singlefile", "-png", "-r", "200", extractionPath, prefix], 60_000);
+    const source = `${prefix}.png`;
+    chmodSync(source, 0o600);
     const result = await ocrImage(source, runner);
     pages.push({ page, text: result.text, method: "ocr", confidence: result.confidence });
   }

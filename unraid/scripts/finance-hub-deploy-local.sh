@@ -4,7 +4,7 @@ set -euo pipefail
 
 SECRET_ROOT=/mnt/user/appdata/finance-hub/secrets
 
-for name in ActualServer Ghostfolio Ghostfolio-Postgres Ghostfolio-Redis FinanceSync; do
+for name in ActualServer Ghostfolio Ghostfolio-Postgres Ghostfolio-Redis FinanceDocumentWorker FinanceSync; do
   if /usr/bin/docker inspect "${name}" >/dev/null 2>&1; then
     echo "Container ${name} existiert bereits; Abbruch ohne Änderung." >&2
     exit 1
@@ -69,6 +69,16 @@ fi
   -p 127.0.0.1:3333:3333 \
   ghostfolio/ghostfolio:latest
 
+/usr/bin/install -d -m 0700 -o 10001 -g 10001 /tmp/finance-hub-parser-work
+/usr/bin/docker create \
+  --name FinanceDocumentWorker --network none --restart unless-stopped \
+  --read-only --cap-drop ALL --security-opt no-new-privileges:true \
+  --memory 768m --pids-limit 64 --tmpfs /tmp:rw,noexec,nosuid,size=256m \
+  --label net.unraid.docker.managed=dockerman \
+  -e FINANCE_MODE=parser-worker -e FINANCE_PARSER_WORK_DIR=/parser-work \
+  -v /tmp/finance-hub-parser-work:/parser-work \
+  finance-sync:local
+
 /usr/bin/docker create \
   --name FinanceSync \
   --network finance-hub \
@@ -82,6 +92,8 @@ fi
   -v /mnt/user/finance-inbox:/inbox \
   -v "${SECRET_ROOT}:/run/secrets:ro" \
   -v /mnt/user/backup/finance-hub:/backup:ro \
+  -v /tmp/finance-hub-parser-work:/parser-work \
+  -e FINANCE_PARSER_WORK_DIR=/parser-work \
   -e TZ=Europe/Berlin \
   finance-sync:local
 
@@ -104,4 +116,4 @@ for container in Ghostfolio-Postgres Ghostfolio-Redis; do
   }
 done
 
-/usr/bin/docker start ActualServer Ghostfolio FinanceSync >/dev/null
+/usr/bin/docker start ActualServer Ghostfolio FinanceDocumentWorker FinanceSync >/dev/null

@@ -13,11 +13,12 @@ const config = {
 test("Vermögenshistorie verbindet Kontosalden und Anlagen ohne alte Lücken zu verstecken", async () => {
   const actual = {
     async init() {}, async downloadBudget() {}, async shutdown() {},
-    async getAccounts() { return [{ id: "giro" }]; },
+    async getAccounts() { return [{ id: "giro" }, {id:"virtual-clearing"}, {id:"pension",offbudget:true}]; },
     async getTransactions() {
       return [{ date: "2024-07-31", starting_balance_flag: true }];
     },
     async getAccountBalance(_id: string, cutoff?: Date) {
+      assert.equal(_id,"giro");
       return cutoff && cutoff < new Date("2024-07-31T00:00:00Z") ? 0 : 10_000;
     }
   };
@@ -37,7 +38,8 @@ test("Vermögenshistorie verbindet Kontosalden und Anlagen ohne alte Lücken zu 
     password: "secret",
     ghostfolioAccessToken: "secret",
     fetcher: fetcher as typeof fetch,
-    loadActual: async () => actual
+    loadActual: async () => actual,
+    cashAccountIds:["giro"]
   });
   assert.equal(result.coverage.completeFrom, "2026-07-27");
   assert.equal(result.points[0].quality, "partial");

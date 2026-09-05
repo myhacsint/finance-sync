@@ -12,7 +12,7 @@
   <Overview>Lokaler Daten-Hub für Bank-, Depot-, Vorsorge- und Solana-Daten. Keine Secrets im Image oder Template.</Overview>
   <Category>Other:</Category>
   <WebUI>https://homeserver.coin-matrix.ts.net:8080</WebUI>
-  <TemplateURL>https://raw.githubusercontent.com/myhacsint/finance-sync/main/unraid/templates/my-FinanceSync.xml</TemplateURL>
+  <TemplateURL>https://raw.githubusercontent.com/myhacsint/finance-sync/v0.49.0/unraid/templates/my-FinanceSync.xml</TemplateURL>
   <Icon/>
   <ExtraParams>--restart=unless-stopped --security-opt=no-new-privileges:true -p 127.0.0.1:8080:8080</ExtraParams>
   <PostArgs/>
@@ -27,4 +27,6 @@
   <Config Name="Backup-Status" Target="/backup" Default="/mnt/user/backup/finance-hub" Mode="ro" Description="Nur Leserechte für Backup-Altersprüfung" Type="Path" Display="advanced" Required="true" Mask="false">/mnt/user/backup/finance-hub</Config>
   <Config Name="Timezone" Target="TZ" Default="Europe/Berlin" Mode="" Description="" Type="Variable" Display="advanced" Required="true" Mask="false">Europe/Berlin</Config>
   <TailscaleStateDir/>
+  <Config Name="Parser-Arbeitsbereich" Target="/parser-work" Default="/tmp/finance-hub-parser-work" Mode="rw" Type="Path" Display="advanced" Required="true">/tmp/finance-hub-parser-work</Config>
+  <Config Name="Parser-Verzeichnis" Target="FINANCE_PARSER_WORK_DIR" Default="/parser-work" Type="Variable" Display="advanced" Required="true">/parser-work</Config>
 </Container>

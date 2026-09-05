@@ -104,6 +104,7 @@ export async function readDashboardWealthHistory(
     password?: string;
     fetcher?: typeof fetch;
     ghostfolioAccessToken?: string;
+    cashAccountIds?: string[];
   } = {}
 ): Promise<DashboardWealthHistory> {
   if (!config.actual?.enabled) throw new Error("Actual ist deaktiviert");
@@ -123,7 +124,12 @@ export async function readDashboardWealthHistory(
     await actual.init({ dataDir, serverURL: config.actual.serverUrl, password });
     initialized = true;
     await actual.downloadBudget(config.actual.budgetId);
-    const accounts = (await actual.getAccounts()).filter((account) => !account.closed);
+    const allAccounts = await actual.getAccounts();
+    const accounts = allAccounts.filter((account) => !account.offbudget
+      && (!options.cashAccountIds || options.cashAccountIds.includes(account.id)));
+    if (options.cashAccountIds && (!accounts.length || accounts.length !== new Set(options.cashAccountIds).size)) {
+      throw new Error("Historische Girokontenbasis ist nicht vollständig zugeordnet");
+    }
     const anchors = (await Promise.all(accounts.map(async (account) => {
       const transactions = await actual.getTransactions(account.id, "2000-01-01", isoDate(now));
       return transactions

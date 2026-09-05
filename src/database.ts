@@ -18,18 +18,33 @@ import type {
   , NewsletterAnalysis
 } from "./types.js";
 import type { ConfirmedPensionRevision } from "./pension-revisions.js";
+import { migrateSchema } from "./schema-migrations.js";
 import type { FireAssumptions } from "./fire-assumptions.js";
 import type { PensionPreviewSummary } from "./pension-document-types.js";
 import type { ConfirmedSutorRevision, StoredSutorPreview, SutorPreviousStand } from "./sutor-document-types.js";
 
 export class FinanceDatabase {
   readonly db: DatabaseSync;
+  private savepointSequence = 0;
+
+  atomic<T>(operation: () => T): T {
+    const name = `finance_bundle_${++this.savepointSequence}`;
+    this.db.exec(`SAVEPOINT ${name}`);
+    try {
+      const result = operation();
+      this.db.exec(`RELEASE ${name}`);
+      return result;
+    } catch (error) {
+      this.db.exec(`ROLLBACK TO ${name}; RELEASE ${name}`);
+      throw error;
+    }
+  }
 
   constructor(file: string) {
     mkdirSync(dirname(file), { recursive: true });
     this.db = new DatabaseSync(file);
     this.db.exec("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;");
-    this.migrate();
+    migrateSchema(this.db, [{ version: 1, name: "baseline-0.49", up: () => this.migrate() }]);
   }
 
   private migrate(): void {
@@ -666,7 +681,7 @@ export class FinanceDatabase {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     let inserted = 0;
-    this.db.exec("BEGIN IMMEDIATE");
+    this.db.exec("SAVEPOINT import_transactions");
     try {
       for (const item of items) {
         const identity = item.sourceTransactionId
@@ -681,10 +696,10 @@ export class FinanceDatabase {
         );
         inserted += Number(result.changes);
       }
-      this.db.exec("COMMIT");
+      this.db.exec("RELEASE import_transactions");
       return inserted;
     } catch (error) {
-      this.db.exec("ROLLBACK");
+      this.db.exec("ROLLBACK TO import_transactions; RELEASE import_transactions");
       throw error;
     }
   }

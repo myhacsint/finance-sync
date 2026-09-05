@@ -101,8 +101,8 @@ test("offene DKB-Aktualisierung entwertet einen frischen Depotstand nicht", () =
     : row);
   const result = buildDashboardStatus(waiting, config, health);
   const depot = result.automatic.find((source) => source.id === "dkb-depots");
-  assert.equal(result.headline, "Alle automatischen Quellen sind aktuell");
-  assert.equal(result.overall, "ok");
+  assert.equal(result.headline, "Eine Quelle wartet auf deine Freigabe");
+  assert.equal(result.overall, "warning");
   assert.equal(depot?.status, "current");
   assert.equal(depot?.actionPending, true);
   assert.match(depot?.message ?? "", /nächste Aktualisierung/);

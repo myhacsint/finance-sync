@@ -1,3 +1,7 @@
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+const assetHash = (file: string) => createHash("sha256").update(readFileSync(new URL(`../assets/${file}`, import.meta.url))).digest("hex").slice(0, 16);
+
 function connectedAppUrl(publicBaseUrl: string | undefined, port: number): string {
   const url = new URL(publicBaseUrl || "http://localhost:8080");
   url.port = String(port);
@@ -18,7 +22,7 @@ export function renderUi(publicBaseUrl?: string): string {
   <meta name="theme-color" content="#080d19">
   <link rel="icon" type="image/png" href="/assets/finance-hub-mark.png">
   <title>Übersicht · Finance Hub</title>
-  <link rel="stylesheet" href="/assets/app.css?v=0.48.1">
+  <link rel="stylesheet" href="/assets/app.css?v=${assetHash("app.css")}">
 </head>
 <body>
   <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
@@ -36,14 +40,14 @@ export function renderUi(publicBaseUrl?: string): string {
       <div class="content-inner">
         <header class="page-header">
           <div><p class="eyebrow" id="page-eyebrow" hidden>Finance Hub</p><h1 id="page-title">Übersicht</h1><p class="subtitle" id="page-subtitle">Finanzen, Vermögen und offene Punkte auf einen Blick.</p></div>
-          <button class="button quiet" id="refresh-button" type="button" onclick="headerAction()" aria-label="Übersicht aktualisieren">
+          <button class="button quiet" id="refresh-button" type="button" data-fh-click="headerAction()" aria-label="Übersicht aktualisieren">
             <span aria-hidden="true">↻</span><span class="desktop-label">Aktualisieren</span>
           </button>
         </header>
         <div id="message" class="notice" role="status" aria-live="polite"></div>
         <section class="token-request" id="token-request" aria-hidden="true" aria-labelledby="token-request-title">
           <h2 id="token-request-title">Zugang zum Finance Hub</h2>
-          <p>Gib den Verwaltungstoken ein. Er bleibt nur für diese Browsersitzung gespeichert.</p>
+          <p>Bestätige deinen Zugang mit dem Verwaltungstoken. Danach wird nur eine geschützte Sitzung für bis zu acht Stunden verwendet.</p>
           <form id="token-form">
             <label for="token-input">Verwaltungstoken</label>
             <div class="token-request-row">
@@ -62,7 +66,8 @@ export function renderUi(publicBaseUrl?: string): string {
     </main>
     <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile Hauptnavigation"></nav>
   </div>
-<script src="/assets/app.js?v=0.48.1" defer></script>
+<script src="/assets/ui-actions.js?v=${assetHash("ui-actions.js")}" defer></script>
+<script src="/assets/app.js?v=${assetHash("app.js")}" defer></script>
 </body>
 </html>`;
 }

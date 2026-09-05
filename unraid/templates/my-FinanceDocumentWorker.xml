@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>FinanceDocumentWorker</Name>
+  <Repository>ghcr.io/myhacsint/finance-sync:stable</Repository>
+  <Registry>https://ghcr.io/myhacsint/finance-sync</Registry>
+  <Network>none</Network>
+  <Privileged>false</Privileged>
+  <Shell>sh</Shell>
+  <Overview>Isolierte lokale Dokumenterkennung. Kein Netzwerk, keine Secrets, keine Finanzdatenbank.</Overview>
+  <TemplateURL>https://raw.githubusercontent.com/myhacsint/finance-sync/v0.49.0/unraid/templates/my-FinanceDocumentWorker.xml</TemplateURL>
+  <ExtraParams>--restart=unless-stopped --security-opt=no-new-privileges:true --cap-drop=ALL --read-only --memory=768m --pids-limit=64 --tmpfs /tmp:rw,noexec,nosuid,size=256m</ExtraParams>
+  <Config Name="Modus" Target="FINANCE_MODE" Default="parser-worker" Type="Variable" Display="advanced" Required="true">parser-worker</Config>
+  <Config Name="Arbeitsverzeichnis" Target="FINANCE_PARSER_WORK_DIR" Default="/parser-work" Type="Variable" Display="advanced" Required="true">/parser-work</Config>
+  <Config Name="Temporäre Dokumente" Target="/parser-work" Default="/tmp/finance-hub-parser-work" Mode="rw" Type="Path" Display="always" Required="true">/tmp/finance-hub-parser-work</Config>
+</Container>

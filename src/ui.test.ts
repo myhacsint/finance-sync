@@ -10,7 +10,7 @@ function renderUi(): string {
 }
 
 test("externes UI-JavaScript ist syntaktisch gültig", () => {
-  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=0\.48\.1" defer><\/script>/);
+  assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=[a-f0-9]{16}" defer><\/script>/);
   assert.match(clientSource, /match\(\/\^\(\\d\{4\}\)-\(\\d\{2\}\)\$\//);
   assert.doesNotMatch(clientSource, /match\(\/\^\(\\\\d\{4\}\)-\(\\\\d\{2\}\)\$\//);
   assert.doesNotThrow(() => new Function(clientSource));
@@ -88,7 +88,7 @@ test("Datenstatus enthält responsive Navigation und zugängliche Hauptbereiche"
   assert.match(html, /<main class="content" id="main-content">/);
   assert.match(html, /aria-label="Mobile Hauptnavigation"/);
   assert.match(html, /Gesamtvermögen/);
-  assert.match(html, /Monatsvergleich/);
+  assert.match(html, /Vergleichbare historische Bewertung/);
   assert.match(html, /Gesamtvergleich offen/);
   assert.match(html, /Unvollständige Anteile werden nicht summiert/);
   assert.match(html, /Vergleichswert/);
@@ -326,13 +326,14 @@ test("Analysenansicht trennt Kryptoherkunft, Investmentbasis und Steuerprüfung"
   assert.doesNotMatch(html, /walletAddress|stakeAccountAddress|sourceAddress/i);
 });
 
-test("Verwaltungstoken bleibt nur für die Browsersitzung gespeichert", () => {
+test("Verwaltungstoken wird gegen eine geschützte Browsersitzung getauscht", () => {
   const html = renderUi();
   assert.match(html, /id="token-form"/);
   assert.match(html, /id="token-input" type="password"/);
   assert.match(html, /function submitToken\(event\)/);
   assert.doesNotMatch(html, /prompt\(/);
-  assert.match(html, /sessionStorage\.setItem\("financeToken"/);
+  assert.match(html, /fetch\("\/api\/session"/);
+  assert.doesNotMatch(html, /sessionStorage\.setItem\("financeToken"/);
   assert.match(html, /localStorage\.removeItem\("financeToken"\)/);
   assert.doesNotMatch(html, /localStorage\.setItem\("financeToken"/);
 });

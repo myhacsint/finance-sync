@@ -1,7 +1,8 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { timingSafeEqual } from "node:crypto";
+import { timingSafeEqual, randomUUID } from "node:crypto";
+import { BrowserSessions } from "./browser-sessions.js";
 import { loadConfig, paths, readSecret } from "./config.js";
 import { FinanceDatabase } from "./database.js";
 import { FinanceService, FinanceServiceError } from "./service.js";
@@ -42,15 +43,17 @@ const scheduler = service.startScheduler();
 const manualPreviews = new ManualPreviewStore();
 const pensionPreviews = new PensionPreviewStore();
 const sutorPreviews = new SutorPreviewStore();
+const browserSessions = new BrowserSessions();
 let pensionParserBusy = false;
 const pensionUploadAttempts = new Map<string, number[]>();
 const financeHubMark = readFileSync(new URL("../assets/finance-hub-mark.png", import.meta.url));
 const financeHubClient = readFileSync(new URL("../assets/app.js", import.meta.url));
+const financeHubActions = readFileSync(new URL("../assets/ui-actions.js", import.meta.url));
 const financeHubStyles = readFileSync(new URL("../assets/app.css", import.meta.url));
 
 const securityHeaders = {
   "cache-control": "no-store",
-  "content-security-policy": "default-src 'self'; img-src 'self' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+  "content-security-policy": "default-src 'self'; img-src 'self' data:; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   "referrer-policy": "no-referrer",
   "x-content-type-options": "nosniff",
   "x-frame-options": "DENY"
@@ -88,6 +91,8 @@ function pensionFailure(error: unknown): FinanceServiceError {
   const messages: Record<string, [string, number]> = {
     UPLOAD_MULTIPART_REQUIRED: ["Bitte eine PDF-, JPEG- oder PNG-Datei auswählen", 400],
     UPLOAD_TOO_LARGE: ["Die Datei ist größer als 12 MB", 413],
+    UPLOAD_ABORTED: ["Die Übertragung wurde abgebrochen. Bitte Datei erneut auswählen.", 400],
+    UPLOAD_TIMEOUT: ["Die Übertragung hat zu lange gedauert. Bitte erneut versuchen.", 408],
     UPLOAD_MIME_MISMATCH: ["Dateiformat und Dateiinhalt stimmen nicht überein", 400],
     UPLOAD_FILE_EMPTY: ["Die Datei ist leer", 400],
     UPLOAD_FILE_MISSING: ["Es wurde keine Datei übertragen", 400],
@@ -98,6 +103,9 @@ function pensionFailure(error: unknown): FinanceServiceError {
     SECURITY_SIGNATURES_STALE: ["Die Sicherheitsprüfung ist nicht aktuell; Upload wurde sicher abgebrochen", 503],
     SECURITY_SCANNER_UNAVAILABLE: ["Die Sicherheitsprüfung ist nicht verfügbar; Upload wurde sicher abgebrochen", 503],
     SECURITY_SCAN_FAILED: ["Die Sicherheitsprüfung konnte nicht abgeschlossen werden", 503],
+    SECURITY_PARSER_UNAVAILABLE: ["Die isolierte Dokumenterkennung ist nicht verfügbar. Bitte den Dokument-Worker im Datenstatus beziehungsweise in Unraid prüfen.", 503],
+    SECURITY_PARSER_TIMEOUT: ["Die Dokumenterkennung hat zu lange gedauert. Bitte eine kleinere oder besser lesbare Datei versuchen.", 422],
+    SECURITY_PARSER_FAILED: ["Die Datei konnte nicht sicher gelesen werden. Bitte ein neues PDF oder einen besser lesbaren Scan versuchen.", 422],
     IMAGE_DIMENSIONS_INVALID: ["Das Bild ist zu klein oder technisch nicht sicher verarbeitbar", 400],
     PREVIEW_EXPIRED: ["Die Vorschau ist abgelaufen; bitte Datei erneut prüfen", 410],
     FIELD_VALUE_INVALID: ["Der korrigierte Wert hat ein ungültiges Format", 400],
@@ -113,6 +121,8 @@ function sutorFailure(error: unknown): FinanceServiceError {
   const messages: Record<string, [string, number]> = {
     UPLOAD_MULTIPART_REQUIRED: ["Bitte eine Sutor-PDF auswählen", 400],
     UPLOAD_TOO_LARGE: ["Die PDF ist größer als 12 MB", 413],
+    UPLOAD_ABORTED: ["Die Übertragung wurde abgebrochen. Bitte PDF erneut auswählen.", 400],
+    UPLOAD_TIMEOUT: ["Die Übertragung hat zu lange gedauert. Bitte erneut versuchen.", 408],
     UPLOAD_MEDIA_TYPE_NOT_ALLOWED: ["Für Sutor wird ausschließlich eine PDF verarbeitet", 400],
     UPLOAD_MIME_MISMATCH: ["Dateiformat und Dateiinhalt stimmen nicht überein", 400],
     UPLOAD_FILE_EMPTY: ["Die Datei ist leer", 400],
@@ -124,6 +134,9 @@ function sutorFailure(error: unknown): FinanceServiceError {
     SECURITY_SIGNATURES_STALE: ["Die Sicherheitsprüfung ist nicht aktuell; Upload wurde sicher abgebrochen", 503],
     SECURITY_SCANNER_UNAVAILABLE: ["Die Sicherheitsprüfung ist nicht verfügbar; Upload wurde sicher abgebrochen", 503],
     SECURITY_SCAN_FAILED: ["Die Sicherheitsprüfung konnte nicht abgeschlossen werden", 503],
+    SECURITY_PARSER_UNAVAILABLE: ["Die isolierte Dokumenterkennung ist nicht verfügbar. Bitte den Dokument-Worker im Datenstatus beziehungsweise in Unraid prüfen.", 503],
+    SECURITY_PARSER_TIMEOUT: ["Die Dokumenterkennung hat zu lange gedauert. Bitte eine kleinere oder besser lesbare Datei versuchen.", 422],
+    SECURITY_PARSER_FAILED: ["Die Datei konnte nicht sicher gelesen werden. Bitte ein neues PDF oder einen besser lesbaren Scan versuchen.", 422],
     SUTOR_HOLDINGS_TABLE_MISSING: ["Keine gültige ISIN-Bestandstabelle im Sutor-PDF erkannt", 400],
     SUTOR_STATEMENT_DATES_MISSING: ["Die beiden Sutor-Stichtage wurden nicht vollständig erkannt", 400],
     SUTOR_STATEMENT_DATES_CONFLICT: ["Die Sutor-Stichtage im Anschreiben und Bestand stimmen nicht überein", 400],
@@ -136,12 +149,13 @@ function sutorFailure(error: unknown): FinanceServiceError {
     PREVIEW_EXPIRED: ["Die Vorschau ist abgelaufen; bitte PDF erneut prüfen", 410]
   };
   const match = messages[code];
-  return new FinanceServiceError(match?.[0] ?? "Die Sutor-PDF konnte sicher nicht verarbeitet werden", match?.[1] ?? 400);
+  return new FinanceServiceError(match?.[0] ?? "Die Sutor-PDF konnte nicht sicher verarbeitet werden", match?.[1] ?? 400);
 }
 
-function authorized(req: IncomingMessage): boolean {
+function authorized(req: IncomingMessage, bearerOnly = false): boolean {
   const configured = readSecret("admin-token");
   if (!configured) return false;
+  if (!bearerOnly && browserSessions.valid(req.headers.cookie, configured)) return true;
   const supplied = req.headers.authorization?.replace(/^Bearer\s+/i, "") ?? "";
   const left = Buffer.from(configured);
   const right = Buffer.from(supplied);
@@ -161,6 +175,16 @@ async function body(req: IncomingMessage, max = 1_048_576): Promise<unknown> {
 }
 
 const server = createServer(async (req, res) => {
+  const requestId = randomUUID();
+  const started = Date.now();
+  res.setHeader("x-request-id", requestId);
+  res.once("finish", () => {
+    // No paths, parameters, payloads, source identifiers or provider errors.
+    if (res.statusCode >= 400 || Date.now() - started > 5000) {
+      process.stdout.write(JSON.stringify({ event: "http_request", requestId, method: req.method,
+        status: res.statusCode, durationMs: Date.now() - started }) + "\n");
+    }
+  });
   try {
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
     if (req.method === "GET" && url.pathname === "/health") {
@@ -197,6 +221,10 @@ const server = createServer(async (req, res) => {
       });
       return res.end(financeHubClient);
     }
+    if (req.method === "GET" && url.pathname === "/assets/ui-actions.js") {
+      res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff" });
+      return res.end(financeHubActions);
+    }
     if (req.method === "GET" && url.pathname === "/assets/app.css") {
       res.writeHead(200, {
         "content-type": "text/css; charset=utf-8",
@@ -212,7 +240,18 @@ const server = createServer(async (req, res) => {
       });
       return res.end(financeHubMark);
     }
+    if (req.method === "POST" && url.pathname === "/api/session") {
+      if (!authorized(req, true)) return json(res, 401, { error: "Nicht autorisiert" });
+      if (!sameOriginMutation(req)) return json(res, 403, { error: "Ungültiger Anfrageursprung" });
+      const id = browserSessions.create(readSecret("admin-token")!);
+      const secure = config.publicBaseUrl?.startsWith("https:") ? "; Secure" : "";
+      res.setHeader("set-cookie", `finance_session=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${secure}`);
+      return json(res, 200, { authenticated: true });
+    }
     if (!authorized(req)) return json(res, 401, { error: "Nicht autorisiert" });
+    if (req.method !== "GET" && req.method !== "HEAD" && !authorized(req, true) && !sameOriginMutation(req)) {
+      return json(res, 403, { error: "Ungültiger Anfrageursprung" });
+    }
     if (req.method === "GET" && url.pathname === "/api/sutor-documents/revisions") {
       return json(res, 200, { revisions: service.listSutorRevisions() });
     }

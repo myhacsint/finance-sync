@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { AppConfig } from "./types.js";
 import type { FinanceDatabase } from "./database.js";
 import { paths } from "./config.js";
+import { sourceIsStale } from "./source-freshness.js";
 
 export interface HealthReport {
   status: "ok" | "warning" | "critical";
@@ -28,10 +29,25 @@ export function buildHealth(db: FinanceDatabase, config: AppConfig): HealthRepor
   const warnings: string[] = [];
   const critical: string[] = [];
   const now = Date.now();
+  if (process.env.FINANCE_PARSER_WORK_DIR) {
+    try {
+      if (now - statSync(join(process.env.FINANCE_PARSER_WORK_DIR, ".queue", "heartbeat")).mtimeMs > 90_000) throw new Error();
+    } catch {
+      warnings.push("Isolierte Dokumenterkennung nicht verfügbar; Dokument-Worker in Unraid prüfen");
+    }
+  }
   for (const row of rows) {
     if (!row.enabled) continue;
     if (row.state === "ERROR") critical.push(`${row.id}: ${row.message ?? "Fehler"}`);
     const source = config.sources.find((item) => item.id === row.id);
+    const publish = db.getSetting(`publish:${row.id}`);
+    if (publish) {
+      const receipt = JSON.parse(publish);
+      if (receipt.state !== "SUCCESS") warnings.push("Eine importierte Quelle ist noch nicht vollständig an ihre Zielsysteme zugestellt");
+    }
+    if (source?.kind !== "dkb-fints" && sourceIsStale(source, row.last_success_at as string | null, new Date(now))) {
+      warnings.push("Eine automatische Quelle hat keinen ausreichend aktuellen Datenstand");
+    }
     if (source?.kind === "dkb-fints") {
       const basis = row.last_success_at ?? row.last_attempt_at;
       if (basis) {

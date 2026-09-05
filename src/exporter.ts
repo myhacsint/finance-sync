@@ -2,18 +2,19 @@ import { join } from "node:path";
 import { writeAtomic } from "./archive.js";
 import type { FinanceDatabase } from "./database.js";
 
-function csvCell(value: unknown): string {
+export function csvCell(value: unknown, spreadsheetSafe = false): string {
   if (value === null || value === undefined) return "";
-  const text = String(value);
+  const raw = String(value);
+  const text = spreadsheetSafe && typeof value === "string" && /^[\s\uFEFF]*[=+@-]/.test(raw) ? `'${raw}` : raw;
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
-function toCsv(rows: Record<string, unknown>[]): string {
+function toCsv(rows: Record<string, unknown>[], spreadsheetSafe = false): string {
   if (rows.length === 0) return "";
   const headers = Object.keys(rows[0]);
   return [
-    headers.map(csvCell).join(","),
-    ...rows.map((row) => headers.map((header) => csvCell(row[header])).join(","))
+    headers.map(header => csvCell(header, spreadsheetSafe)).join(","),
+    ...rows.map((row) => headers.map((header) => csvCell(row[header], spreadsheetSafe)).join(","))
   ].join("\n") + "\n";
 }
 
@@ -47,6 +48,8 @@ export function exportAll(db: FinanceDatabase, archiveRoot: string): void {
     `]
   ];
   for (const [file, query] of datasets) {
-    writeAtomic(join(exportsDir, file), toCsv(db.query(query)));
+    const rows = db.query(query);
+    writeAtomic(join(exportsDir, file), toCsv(rows));
+    writeAtomic(join(exportsDir, "tabellensicher", file), toCsv(rows, true));
   }
 }

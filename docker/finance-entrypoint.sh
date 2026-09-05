@@ -1,6 +1,10 @@
 #!/bin/sh
 set -eu
 
+if [ "${FINANCE_MODE:-server}" = "parser-worker" ]; then
+  exec python3 /app/python/parser_worker.py
+fi
+
 # The image carries a fresh signature set. Keep it current in the background;
 # document processing itself fails closed if the database becomes stale.
 freshclam --quiet || true

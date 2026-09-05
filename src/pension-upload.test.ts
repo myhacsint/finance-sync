@@ -1,8 +1,24 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Readable } from "node:stream";
+import { Readable, PassThrough } from "node:stream";
+import { readdirSync } from "node:fs";
+import { tmpdir } from "node:os";
 import type { IncomingMessage } from "node:http";
 import { MAX_PENSION_UPLOAD_BYTES, receivePensionUpload } from "./pension-upload.js";
+
+test("interrupted and timed-out uploads reject and remove their private files", async () => {
+  for (const abort of [true, false]) {
+    const prefix = `finance-abort-test-${crypto.randomUUID()}`;
+    const req = new PassThrough() as unknown as IncomingMessage;
+    req.headers = { "content-type": "multipart/form-data; boundary=test" };
+    const result = receivePensionUpload(req, { tempPrefix: prefix, timeoutMs: 40 });
+    (req as unknown as PassThrough).write('--test\r\nContent-Disposition: form-data; name="document"; filename="test.pdf"\r\nContent-Type: application/pdf\r\n\r\n%PDF-1.7 synthetic partial');
+    if (abort) req.emit("aborted");
+    await assert.rejects(result, abort ? /UPLOAD_ABORTED/ : /UPLOAD_TIMEOUT/);
+    assert.equal(readdirSync(tmpdir()).some((name) => name.startsWith(prefix)), false);
+    req.destroy();
+  }
+});
 
 function multipart(content: Buffer, declaredMime: string): IncomingMessage {
   const boundary = "finance-synthetic-boundary";

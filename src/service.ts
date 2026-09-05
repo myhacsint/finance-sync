@@ -28,7 +28,9 @@ import {
   type DkbFintsOutcome
 } from "./connectors/dkb-fints.js";
 import { importBundle } from "./importer.js";
+import { PublishJournal } from "./publish-journal.js";
 import { exportAll } from "./exporter.js";
+import { reconcileOverviewHistory } from "./overview-history.js";
 import { pushToActual } from "./sinks/actual.js";
 import {
   pushToGhostfolio,
@@ -83,10 +85,6 @@ import {
   buildDashboardCryptoAnalysis,
   type DashboardCryptoAnalysis
 } from "./dashboard-crypto-analysis.js";
-import {
-  lastCompletedMonthEnd,
-  readCoinGeckoSolPrice
-} from "./dashboard-asset-comparison.js";
 import {
   archiveGhostfolioMarketSnapshot,
   marketSnapshotDate
@@ -262,8 +260,7 @@ export class FinanceService {
     if (pending) return pending;
     const load = async (): Promise<DashboardOverview> => {
       const generatedAt = new Date();
-      const comparisonDate = lastCompletedMonthEnd(generatedAt, this.config.timezone).effectiveDate;
-      const [actual, wealth, solPrice] = await Promise.allSettled([
+      const [actual, wealth] = await Promise.allSettled([
         this.config.actual?.enabled
           ? this.withActual(() => readActualOverview(
               this.config.actual!,
@@ -276,23 +273,22 @@ export class FinanceService {
               }
             ))
           : Promise.reject(new Error("Actual ist deaktiviert")),
-        this.getDashboardAssets(force),
-        this.config.sources.some((source) => source.enabled && source.kind === "solana")
-          ? readCoinGeckoSolPrice(comparisonDate)
-          : Promise.reject(new Error("Solana ist deaktiviert"))
+        this.getDashboardAssets(force)
       ]);
       const generatedForOverview = wealth.status === "fulfilled"
         ? new Date(wealth.value.generatedAt)
         : generatedAt;
-      const value = buildDashboardOverview(
+      const computed = buildDashboardOverview(
         this.db,
         this.config,
         actual,
         { status: "rejected", reason: new Error("Vermögensansicht nicht verfügbar") },
         generatedForOverview,
-        solPrice,
+        undefined,
         wealth.status === "fulfilled" ? wealth.value : undefined
       );
+      const history = await this.getDashboardWealthHistory(force).catch(() => undefined);
+      const value = reconcileOverviewHistory(computed, history);
       this.overviewCache.set(cacheKey, {
         expiresAt: Date.now() + 5 * 60_000,
         value
@@ -313,7 +309,24 @@ export class FinanceService {
       return this.wealthHistoryCache.value;
     }
     if (this.wealthHistoryLoading) return this.wealthHistoryLoading;
-    const load = this.withActual(() => readDashboardWealthHistory(this.config));
+    const load = (async () => {
+      // Match the asset API's bank-only liquidity basis, not virtual clearing
+      // accounts or off-budget pension accounts in Actual.
+      const bankSources = new Set(this.config.sources.filter(source => source.enabled && source.kind === "enable-banking").map(source => source.id));
+      const bankAccounts = this.db.query("SELECT DISTINCT source_id,account_id FROM balances")
+        .filter(row => bankSources.has(String(row.source_id)));
+      const mapped = bankAccounts.map(row => this.config.actual?.accountMap[String(row.account_id)]);
+      if (!mapped.length || mapped.some(id => !id)) throw new Error("Historische Girokontenbasis ist nicht vollständig zugeordnet");
+      const [history, assets] = await Promise.all([
+        this.withActual(() => readDashboardWealthHistory(this.config, new Date(), {cashAccountIds:mapped as string[]})), this.getDashboardAssets(force)
+      ]);
+      if (assets.totalMinor === null) return history;
+      const date = new Intl.DateTimeFormat("en-CA", { timeZone: this.config.timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(assets.generatedAt));
+      const cashMinor = assets.areas.find(group => group.key === "cash")?.amountMinor;
+      if (cashMinor == null) return history;
+      const point = { date, cashMinor, investmentsMinor: assets.totalMinor - cashMinor, totalMinor: assets.totalMinor, quality: assets.state === "current" ? "measured" as const : "partial" as const };
+      return { ...history, points: [...history.points.filter(p => p.date < date), point] };
+    })();
     this.wealthHistoryLoading = load;
     try {
       const value = await load;
@@ -1154,19 +1167,24 @@ export class FinanceService {
     source: SourceConfig,
     bundle: ImportBundle
   ): Promise<Record<string, number>> {
-    const counts = importBundle(this.db, paths.archive, source.id, bundle);
+    let journal!: PublishJournal;
+    const counts = this.db.atomic(() => {
+      const result = importBundle(this.db, paths.archive, source.id, bundle);
+      journal = new PublishJournal(this.db, source.id, bundle);
+      return result;
+    });
     if (this.config.actual?.enabled) {
-      counts.actual = await this.withActual(() =>
+      counts.actual = await journal.stage("actual", () => this.withActual(() =>
         pushToActual(this.config.actual!, bundle.transactions ?? [])
-      );
+      ));
     }
     const publishDkbHoldings = source.kind !== "dkb-fints"
       || source.settings?.publishToGhostfolio === true;
     if (this.config.ghostfolio?.enabled && publishDkbHoldings) {
-      counts.ghostfolio = await pushToGhostfolio(
-        this.config.ghostfolio,
+      counts.ghostfolio = await journal.stage("ghostfolio-activities", () => pushToGhostfolio(
+        this.config.ghostfolio!,
         bundle.activities ?? []
-      );
+      ));
       const capturedAtByAccount = new Map<string, string>();
       for (const item of [...(bundle.holdings ?? []), ...(bundle.balances ?? [])]) {
         const current = capturedAtByAccount.get(item.accountId);
@@ -1177,8 +1195,8 @@ export class FinanceService {
       const dkbFallbackCapturedAt = [...capturedAtByAccount.values()]
         .sort()
         .at(-1) ?? new Date().toISOString();
-      counts.ghostfolioHoldings = await reconcileGhostfolioHoldings(
-        this.config.ghostfolio,
+      counts.ghostfolioHoldings = await journal.stage("ghostfolio-holdings", () => reconcileGhostfolioHoldings(
+        this.config.ghostfolio!,
         bundle.holdings ?? [],
         source.kind === "dkb-fints"
           ? "Reconstructed DKB position adjustment by FinanceSync; not tax cost basis"
@@ -1189,13 +1207,14 @@ export class FinanceService {
               capturedAt: capturedAtByAccount.get(accountId) ?? dkbFallbackCapturedAt
             }))
           : []
-      );
+      ));
     }
     if ((bundle.transactions?.length ?? 0) > 0) {
       const reconciled = await this.reconcileInternalTransfers();
       counts.transfers = reconciled.counts?.transfers ?? 0;
     }
-    exportAll(this.db, paths.archive);
+    await journal.stage("exports", async () => exportAll(this.db, paths.archive));
+    journal.complete();
     return counts;
   }
 

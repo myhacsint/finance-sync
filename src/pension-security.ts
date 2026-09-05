@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { readdirSync, statSync } from "node:fs";
 import { promisify } from "node:util";
+import { runParserWorker } from "./parser-worker-client.js";
 
 const execFileAsync = promisify(execFile);
 const MAX_SIGNATURE_AGE_MS = 72 * 60 * 60_000;
@@ -9,10 +10,7 @@ export interface CommandResult { stdout: string; stderr: string }
 export type CommandRunner = (command: string, args: string[], timeoutMs?: number) => Promise<CommandResult>;
 
 export const runBounded: CommandRunner = async (command, args, timeoutMs = 60_000) => {
-  const result = await execFileAsync("/usr/bin/prlimit", [
-    "--as=536870912", "--cpu=60", "--nproc=32", "--", command, ...args
-  ], { timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024, encoding: "utf8" });
-  return { stdout: result.stdout, stderr: result.stderr };
+  return runParserWorker(command, args, timeoutMs);
 };
 
 // Loading the official ClamAV signature set requires more address space than

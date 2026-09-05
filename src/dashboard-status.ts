@@ -1,5 +1,6 @@
 import type { AppConfig, SourceConfig, SourceKind, SyncState } from "./types.js";
 import type { HealthReport } from "./health.js";
+import { sourceIsStale } from "./source-freshness.js";
 
 export interface SourceStatusRow {
   id: string;
@@ -107,7 +108,7 @@ function hasRecentDkbStand(row: SourceStatusRow, now: Date): boolean {
   return Number.isFinite(age) && age >= 0 && age <= 7 * 24 * 60 * 60_000;
 }
 
-function isCurrentSutorPdf(
+export function isCurrentSutorPdf(
   source: SourceConfig | undefined,
   confirmedDate: string | undefined,
   now: Date
@@ -131,12 +132,13 @@ function toDashboardSource(
   now: Date
 ): DashboardSource {
   const recentDkbStand = hasRecentDkbStand(row, now);
+  const stale = sourceIsStale(source, row.last_success_at, now);
   return {
     id: row.id,
     label: sourceLabel(source, row),
     kind: row.kind,
     state: row.state,
-    status: recentDkbStand ? "current" : sourceStatus(row.state),
+    status: stale && row.state !== "ERROR" ? "action" : recentDkbStand ? "current" : sourceStatus(row.state),
     message: recentDkbStand
       ? "Datenstand ist verfügbar; die nächste Aktualisierung wartet auf Freigabe"
       : row.message?.trim() || "Noch kein Abruf ausgeführt",
@@ -186,7 +188,7 @@ export function buildDashboardStatus(
     .at(-1);
   const automaticCurrent = automatic.filter((source) => source.status === "current").length;
   const automaticError = automatic.some((source) => source.status === "error");
-  const automaticAction = automatic.some((source) => source.status === "action");
+  const automaticAction = automatic.some((source) => source.status === "action" || source.actionPending);
   const automaticRunning = automatic.some((source) => source.status === "running");
   const tasks = manual.length;
   const overall: DashboardStatus["overall"] = health.status === "critical" || automaticError
@@ -199,7 +201,8 @@ export function buildDashboardStatus(
   if (health.status === "critical" || automaticError) {
     headline = "Mindestens eine Quelle braucht Aufmerksamkeit";
   } else if (automaticAction) {
-    headline = "Eine Quelle wartet auf deine Freigabe";
+    headline = automatic.some(source => source.actionPending)
+      ? "Eine Quelle wartet auf deine Freigabe" : "Mindestens eine Quelle ist nicht aktuell";
   } else if (automaticRunning) {
     headline = "Daten werden gerade aktualisiert";
   } else if (automatic.length === 0) {

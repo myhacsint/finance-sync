@@ -10,3 +10,6 @@ data/
 archive/
 secrets/
 *.log
+.playwright-cli/
+test-results/
+playwright-report/

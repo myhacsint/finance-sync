@@ -98,6 +98,7 @@ export interface ActualSpendingRangeSnapshot {
   lines: SpendingLine[];
   accounts: Array<{ key: string; label: string }>;
   catalog: SpendingCatalogCategory[];
+  incomeByMonth?: Record<string, number>;
 }
 
 export interface ActualSpendingMonthSnapshot {
@@ -616,6 +617,22 @@ export async function readActualSpendingRange(
     const lines = accountTransactions
       .flatMap(({ account, transactions }) => normalizeTransactions(transactions, account, categories, payees, options.mode ?? "expenses"))
       .sort((left, right) => right.date.localeCompare(left.date) || right.id.localeCompare(left.id));
+    const incomeByMonth: Record<string, number> = {};
+    for (const { transactions } of accountTransactions) {
+      for (const parent of transactions) {
+        if (parent.is_child || parent.starting_balance_flag) continue;
+        const parts = parent.is_parent && parent.subtransactions?.length ? parent.subtransactions : [parent];
+        for (const part of parts) {
+          if (part.starting_balance_flag || parent.transfer_id || part.transfer_id
+            || payees.get(parent.payee ?? "")?.transfer_acct || payees.get(part.payee ?? "")?.transfer_acct) continue;
+          const category = categories.get(part.category ?? "");
+          // Categorized expense refunds stay in the net expense total, not income.
+          if (!category?.is_income && (category || part.amount <= 0)) continue;
+          const month = (part.date || parent.date).slice(0, 7);
+          incomeByMonth[month] = (incomeByMonth[month] ?? 0) + Math.round(part.amount);
+        }
+      }
+    }
     return {
       startDate,
       endDate,
@@ -623,6 +640,7 @@ export async function readActualSpendingRange(
       lines,
       accounts: accounts.map(({ key, label }) => ({ key, label })),
       catalog
+      , incomeByMonth
     };
   } finally {
     if (initialized) await api.shutdown().catch(() => undefined);

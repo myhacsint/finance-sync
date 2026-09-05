@@ -1,6 +1,6 @@
 import Busboy from "busboy";
 import { createHash, randomUUID } from "node:crypto";
-import { closeSync, createWriteStream, mkdirSync, openSync, readSync, rmSync } from "node:fs";
+import { closeSync, createWriteStream, mkdirSync, openSync, readSync, rmSync, type WriteStream } from "node:fs";
 import type { IncomingMessage } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -20,6 +20,7 @@ export interface PensionUploadedFile {
 export interface DocumentUploadOptions {
   tempPrefix?: string;
   allowedMediaTypes?: PensionUploadedFile["mediaType"][];
+  timeoutMs?: number;
 }
 
 export async function receivePensionUpload(
@@ -27,7 +28,7 @@ export async function receivePensionUpload(
   options: DocumentUploadOptions = {}
 ): Promise<PensionUploadedFile> {
   const tempPrefix = options.tempPrefix ?? "finance-pension";
-  const workDir = join(tmpdir(), `${tempPrefix}-${randomUUID()}`);
+  const workDir = join(process.env.FINANCE_PARSER_WORK_DIR || tmpdir(), `${tempPrefix}-${randomUUID()}`);
   mkdirSync(workDir, { recursive: false, mode: 0o700 });
   const path = join(workDir, "document.bin");
   let settled = false;
@@ -40,17 +41,37 @@ export async function receivePensionUpload(
   try {
     const result = await new Promise<void>((resolve, reject) => {
       let busboy: Busboy.Busboy;
+      let writer: WriteStream | undefined;
       let parserFinished = false;
       let writerFinished = false;
       let promiseFinished = false;
+      const detach = () => {
+        clearTimeout(timer);
+        req.off("aborted", aborted);
+        req.off("error", fail);
+        req.off("close", closed);
+      };
       const fail = (error: Error) => {
         if (promiseFinished) return;
         promiseFinished = true;
-        reject(error);
+        detach();
+        if (busboy) { req.unpipe(busboy); busboy.destroy(); }
+        // Wait for the fd to close before the caller removes the private directory.
+        if (writer && !writer.closed) {
+          writer.once("close", () => reject(error));
+          writer.destroy();
+        } else reject(error);
       };
+      const aborted = () => fail(new Error("UPLOAD_ABORTED"));
+      const closed = () => { if (!req.complete && !req.readableEnded) aborted(); };
+      const timer = setTimeout(() => fail(new Error("UPLOAD_TIMEOUT")), options.timeoutMs ?? 120_000);
+      req.once("aborted", aborted);
+      req.once("error", fail);
+      req.once("close", closed);
       const finish = () => {
         if (promiseFinished || !parserFinished || !writerFinished) return;
         promiseFinished = true;
+        detach();
         truncated ? reject(new Error("UPLOAD_TOO_LARGE")) : resolve();
       };
       try {
@@ -73,6 +94,7 @@ export async function receivePensionUpload(
         fileSeen = true;
         declaredMime = info.mimeType;
         const output = createWriteStream(path, { flags: "wx", mode: 0o600 });
+        writer = output;
         stream.on("limit", () => { truncated = true; });
         stream.on("data", (chunk: Buffer) => {
           sizeBytes += chunk.length;
@@ -80,7 +102,7 @@ export async function receivePensionUpload(
         });
         stream.on("error", (error) => fail(error));
         output.on("error", (error) => fail(error));
-        output.on("finish", () => { writerFinished = true; finish(); });
+        output.on("close", () => { writerFinished = true; finish(); });
         stream.pipe(output);
       });
       busboy.on("filesLimit", () => fail(new Error("UPLOAD_TOO_MANY_FILES")));

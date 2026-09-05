@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { extractPensionDocument } from "./pension-extractor.js";
@@ -42,13 +42,37 @@ function pdfRunner(options: { pages?: number; native?: string; tsv?: string }): 
     }
     if (command.endsWith("pdftoppm")) {
       const prefix = args.at(-1)!;
-      for (let page = 1; page <= (options.pages ?? 1); page += 1) writeFileSync(`${prefix}-${page}.png`, "synthetic", { mode: 0o600 });
+      writeFileSync(`${prefix}.png`, "synthetic", { mode: 0o600 });
       return { stdout: "", stderr: "" };
     }
     if (command.endsWith("tesseract")) return { stdout: options.tsv ?? "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n5\t1\t1\t1\t1\t1\t0\t0\t1\t1\t95\tRenteninformation", stderr: "" };
     throw new Error(`unexpected command ${command}`);
   };
 }
+
+test("mixed twelve-page PDF retains native cover and OCRs each scanned page with stable filenames", async () => {
+  const root = mkdtempSync(join(tmpdir(), "finance-mixed-test-"));
+  const base = pdfRunner({ pages: 12 });
+  const rendered: number[] = [];
+  const runner: CommandRunner = async (command, args, timeout) => {
+    if(command.endsWith("pdftotext") && args[1] === "1") {
+      writeFileSync(args.at(-1)!, "Native cover ".repeat(40), {mode: 0o600});
+      return {stdout: "", stderr: ""};
+    }
+    if(command.endsWith("pdftoppm")) {
+      assert.ok(args.includes("-singlefile"));
+      rendered.push(Number(args[1]));
+    }
+    return base(command, args, timeout);
+  };
+  try {
+    const result = await extractPensionDocument(join(root,"synthetic.pdf"), "application/pdf", root, runner, async()=>{}, {maxPdfPages:12});
+    assert.equal(result.pages[0].method,"native");
+    assert.equal(result.pages[11].method,"ocr");
+    assert.equal(rendered.length,11);
+    assert.equal(rendered.at(-1),12);
+  } finally { rmSync(root,{recursive:true,force:true}); }
+});
 
 test("native PDF text is preferred and OCR is a bounded fallback", async () => {
   const root = mkdtempSync(join(tmpdir(), "finance-pdf-test-"));

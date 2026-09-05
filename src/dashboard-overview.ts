@@ -1,6 +1,3 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import type { AppConfig, SourceKind } from "./types.js";
 import type { FinanceDatabase } from "./database.js";
 import { readSecret } from "./config.js";
@@ -11,6 +8,9 @@ import {
 } from "./dashboard-asset-comparison.js";
 import { physicalAssetsTotalMinor } from "./physical-assets.js";
 import type { DashboardAssets } from "./dashboard-assets.js";
+import { readActualSpendingRange, type ActualSpendingApiLoader } from "./dashboard-spending.js";
+import { isCurrentSutorPdf } from "./dashboard-status.js";
+import { sourceIsStale } from "./source-freshness.js";
 
 export interface OverviewMonth {
   key: string;
@@ -127,25 +127,6 @@ interface CashSnapshot {
   capturedAt?: string;
 }
 
-interface ActualApi {
-  init(options: { dataDir: string; serverURL: string; password: string }): Promise<unknown>;
-  downloadBudget(id: string): Promise<void>;
-  getBudgetMonth(month: string): Promise<{
-    totalIncome: number;
-    totalSpent: number;
-    categoryGroups: Array<Record<string, unknown> & {
-      name?: string;
-      categories?: Array<Record<string, unknown> & {
-        name?: string;
-        spent?: number;
-      }>;
-    }>;
-  }>;
-  shutdown(): Promise<void>;
-}
-
-export type ActualApiLoader = () => Promise<ActualApi>;
-
 function monthParts(now: Date, timezone: string): { year: number; month: number } {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
@@ -192,7 +173,7 @@ export async function readActualOverview(
   timezone: string,
   now = new Date(),
   options: {
-    loadApi?: ActualApiLoader;
+    loadApi?: ActualSpendingApiLoader;
     password?: string;
     months?: number;
     offset?: number;
@@ -202,47 +183,36 @@ export async function readActualOverview(
   if (!config.enabled) throw new Error("Actual ist deaktiviert");
   const password = options.password ?? readSecret("actual-password");
   if (!password) throw new Error("Actual-Zugang ist nicht verfügbar");
-  const dataDir = mkdtempSync(join(tmpdir(), "finance-overview-actual-"));
-  const api = await (options.loadApi ?? (async () =>
-    await import("@actual-app/api") as unknown as ActualApi))();
-  let initialized = false;
-  try {
-    await api.init({ dataDir, serverURL: config.serverUrl, password });
-    initialized = true;
-    await api.downloadBudget(config.budgetId);
     const keys = overviewMonthKeys(now, timezone, options.months, options.offset);
     const current = monthParts(now, timezone);
     const categoryMonthOffset = Math.max(0, Math.min(120, Math.trunc(options.spendingOffset ?? 0)));
     const latestCategoryMonth = monthKey(current.year, current.month, -1);
     const categoryKey = monthKey(current.year, current.month, -1 - categoryMonthOffset);
     const requestedKeys = [...new Set([...keys.map((month) => month.key), categoryKey])];
-    const budgetData = new Map(await Promise.all(requestedKeys.map(async (key) => [
-      key,
-      await api.getBudgetMonth(key)
-    ] as const)));
-    const budgetMonths = keys.map((month) => ({
-      ...month,
-      data: budgetData.get(month.key)!
-    }));
-    const months = budgetMonths.map(({ key, label, partial, data }) => ({
+    const ordered = requestedKeys.sort();
+    const endKey = ordered.at(-1)!;
+    const [year, month] = endKey.split("-").map(Number);
+    const monthEnd = new Date(Date.UTC(year, month, 0, 12)).toISOString().slice(0, 10);
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+    const end = monthEnd < today ? monthEnd : today;
+    const ledger = await readActualSpendingRange(config, `${ordered[0]}-01`, end, now, {
+      password, loadApi: options.loadApi
+    });
+    const months = keys.map(({ key, label, partial }) => ({
       key,
       label,
       partial,
-      incomeMinor: Math.max(0, Math.round(data.totalIncome)),
-      spentMinor: Math.max(0, Math.round(-data.totalSpent))
+      incomeMinor: ledger.incomeByMonth?.[key] ?? 0,
+      spentMinor: ledger.lines.filter((line) => line.date.startsWith(key))
+        .reduce((sum, line) => sum + line.amountMinor, 0)
     }));
-    const completedData = budgetData.get(categoryKey);
-    if (!completedData) throw new Error("Actual lieferte keinen abgeschlossenen Monat");
-    const completed = { key: categoryKey, data: completedData };
-    const categories = completed.data.categoryGroups
-      .flatMap((group) => (group.categories ?? []).map((category) => ({
-        label: String(category.name ?? "Ohne Kategorie"),
-        amountMinor: Math.max(0, Math.round(-(category.spent ?? 0)))
-      })))
-      .filter((category) => category.amountMinor > 0)
+    const grouped = new Map<string, number>();
+    const completedLines = ledger.lines.filter((line) => line.date.startsWith(categoryKey));
+    for (const line of completedLines) grouped.set(line.categoryLabel, (grouped.get(line.categoryLabel) ?? 0) + line.amountMinor);
+    const categories = [...grouped].map(([label, amountMinor]) => ({ label, amountMinor }))
       .sort((left, right) => right.amountMinor - left.amountMinor);
     const top = categories.slice(0, 4);
-    const categoryTotalMinor = Math.max(0, Math.round(-completed.data.totalSpent));
+    const categoryTotalMinor = completedLines.reduce((sum, line) => sum + line.amountMinor, 0);
     return {
       months,
       range: {
@@ -252,24 +222,17 @@ export async function readActualOverview(
         end: keys.at(-1)!.key,
         endPartial: Boolean(keys.at(-1)?.partial)
       },
-      categoryMonth: completed.key,
+      categoryMonth: categoryKey,
       categoryMonthLabel: new Intl.DateTimeFormat("de-DE", {
         timeZone: timezone,
         month: "long"
-      }).format(new Date(`${completed.key}-15T12:00:00Z`)),
+      }).format(new Date(`${categoryKey}-15T12:00:00Z`)),
       categoryMonthOffset,
       latestCategoryMonth,
       categoryTotalMinor,
       categories: top,
-      remainingMinor: Math.max(
-        0,
-        categoryTotalMinor - top.reduce((sum, category) => sum + category.amountMinor, 0)
-      )
+      remainingMinor: categoryTotalMinor - top.reduce((sum, category) => sum + category.amountMinor, 0)
     };
-  } finally {
-    if (initialized) await api.shutdown().catch(() => undefined);
-    rmSync(dataDir, { recursive: true, force: true });
-  }
 }
 
 function sourceKindById(config: AppConfig): Map<string, SourceKind> {
@@ -437,8 +400,11 @@ export function buildDashboardOverview(
   // legacy addition only for callers that still provide the investment view.
   const physicalAssetsMinor = wealth ? 0 : physicalAssetsTotalMinor(config);
   const actualData = actual.status === "fulfilled" ? actual.value : undefined;
+  const latestSutor = db.listSutorRevisions()[0];
   const manualActions = config.sources
     .filter((source) => source.enabled && source.kind === "manual")
+    .filter((source) => !isCurrentSutorPdf(source,
+      latestSutor ? `${latestSutor.statementDate}T12:00:00.000Z` : undefined, now))
     .map((source) => ({
       id: source.id,
       label: typeof source.settings?.displayName === "string"
@@ -450,13 +416,14 @@ export function buildDashboardOverview(
     }));
   const automaticRows = rows.filter((row) => Boolean(row.enabled) && row.kind !== "manual");
   const automaticCurrent = automaticRows.filter(
-    (row) => row.state === "SUCCESS" || row.state === "READY"
+    (row) => (row.state === "SUCCESS" || row.state === "READY")
+      && !sourceIsStale(config.sources.find(source => source.id === row.id), row.last_success_at, now)
   ).length;
   const giroFreshness = latestForKinds(rows, ["enable-banking"]);
   const depotFreshness = latestForKinds(rows, ["dkb-fints", "comdirect"]);
   const solanaFreshness = latestForKinds(rows, ["solana"]);
-  const pensionDates = manualActions
-    .map((action) => action.capturedAt)
+  const pensionDates = config.sources.filter(source => source.enabled && source.kind === "manual")
+    .map((source) => db.latestBalanceCapturedAt(source.id))
     .filter((value): value is string => Boolean(value))
     .sort();
   const warnings: string[] = [];
@@ -549,7 +516,7 @@ export function buildDashboardOverview(
       {
         key: "pensions",
         label: "Vorsorge",
-        status: pensionDates.length === manualActions.length ? "confirmed" : "warning",
+        status: pensionDates.length === config.sources.filter(source => source.enabled && source.kind === "manual").length ? "confirmed" : "warning",
         capturedAt: pensionDates.at(0)
       }
     ],

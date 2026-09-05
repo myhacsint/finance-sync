@@ -39,6 +39,6 @@ COPY --chown=finance:finance docker/finance-entrypoint.sh /app/finance-entrypoin
 USER finance
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD curl -fsS http://127.0.0.1:8080/health || exit 1
+  CMD if [ "$FINANCE_MODE" = "parser-worker" ]; then python3 /app/python/parser_worker.py --health; else curl -fsS http://127.0.0.1:8080/health; fi
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/app/finance-entrypoint.sh"]

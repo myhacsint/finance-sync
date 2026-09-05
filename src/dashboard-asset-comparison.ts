@@ -5,7 +5,7 @@ import {
   latestPhysicalAssetValuation
 } from "./physical-assets.js";
 
-export type AssetComparisonKey = "cash" | "depots" | "pensions" | "solana" | "gold";
+export type AssetComparisonKey = "cash" | "depots" | "pensions" | "solana" | "gold" | "investments";
 export type AssetComparisonValuation = "measured" | "confirmed" | "estimated" | "unavailable";
 
 export interface CoinGeckoSolPrice {

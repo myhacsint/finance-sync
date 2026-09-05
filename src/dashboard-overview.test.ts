@@ -211,7 +211,10 @@ test("Actual liefert vier Monate und die vier größten Kategorien des letzten v
       loadApi: async () => ({
         async init() { calls.push("init"); },
         async downloadBudget() { calls.push("download"); },
-        async getBudgetMonth(month) { return budgetData[month] as never; },
+        async getAccounts() { return [{ id: "a", name: "Giro" }]; },
+        async getCategories() { return ["A", "B", "C", "D", "E"].map(name => ({ id: name, name })); },
+        async getPayees() { return []; },
+        async getTransactions() { return ["A", "B", "C", "D", "E"].map((category, i) => ({ id: category, account: "a", category, amount: -(500 - i * 100), date: "2026-07-10" })); },
         async shutdown() { calls.push("shutdown"); }
       })
     }
@@ -254,7 +257,10 @@ test("Ausgabenkategorien können unabhängig auf einen älteren Monat gesetzt we
       loadApi: async () => ({
         async init() {},
         async downloadBudget() {},
-        async getBudgetMonth(month) { return budgetData[month as keyof typeof budgetData] as never; },
+        async getAccounts() { return [{ id: "a", name: "Giro" }]; },
+        async getCategories() { return ["Reisen", "Alltag"].map(name => ({ id: name, name })); },
+        async getPayees() { return []; },
+        async getTransactions() { return ["Reisen", "Alltag"].map((category, i) => ({ id: category, account: "a", category, amount: -(250 - i * 100), date: "2026-06-10" })); },
         async shutdown() {}
       })
     }

@@ -19,10 +19,10 @@ export function importBundle(
   for (const item of bundle.balances ?? []) item.rawHash ||= archived.hash;
   for (const item of bundle.holdings ?? []) item.rawHash ||= archived.hash;
   for (const item of bundle.activities ?? []) item.rawHash ||= archived.hash;
-  return {
+  return db.atomic(() => ({
     transactions: db.importTransactions(bundle.transactions ?? []),
     balances: db.importBalances(bundle.balances ?? []),
     holdings: db.importHoldings(bundle.holdings ?? []),
     activities: db.importActivities(bundle.activities ?? [])
-  };
+  }));
 }

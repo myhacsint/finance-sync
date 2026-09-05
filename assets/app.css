@@ -303,7 +303,8 @@
     .skeleton::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.05), transparent); animation: shimmer 1.4s infinite; }
     .expense-loading .skeleton::after { display: none; }
     @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
-    .sr-only {
+.sr-only {
+  contain: strict;
       position: absolute;
       width: 1px;
       height: 1px;
@@ -313,7 +314,18 @@
       clip: rect(0, 0, 0, 0);
       white-space: nowrap;
       border: 0;
-    }
+}
+
+.mobile-more { position: relative; min-width: 0; }
+.mobile-more > summary { list-style: none; cursor: pointer; }
+.mobile-more > summary::-webkit-details-marker { display: none; }
+.mobile-more-menu { position: absolute; right: 0; bottom: calc(100% + 12px); min-width: 190px; padding: 8px; background: #111b2d; border: 1px solid #364155; border-radius: 12px; box-shadow: 0 10px 30px #0008; }
+.mobile-more-menu .nav-item { min-height: 48px; flex-direction: row; justify-content: flex-start; }
+.mobile-more .is-current { color: #8ab8ff; }
+@media (max-width: 760px) {
+  .panel-link { display: inline-flex; align-items: center; min-height: 44px; }
+  .mobile-nav .nav-item { font-size: 12px; }
+}
     .wealth-overview {
       display: grid;
       grid-template-columns: minmax(300px, .7fr) minmax(420px, 1.3fr);
@@ -1586,4 +1598,9 @@
     }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+    @media (max-width: 760px) {
+      .panel-link, .text-action { min-height: 44px; display: inline-flex; align-items: center; }
+      .mobile-nav .nav-item { min-height: 44px; font-size: 12px; }
+      .source-meta, .pension-source { font-size: 12px; }
     }
