@@ -32,6 +32,9 @@ import { PensionPreviewStore } from "./pension-preview-store.js";
 import type { PensionFieldKey } from "./pension-document-types.js";
 import { parseSutorStatementPages } from "./sutor-statement-parser.js";
 import { buildSutorSnapshot, SutorPreviewStore, sutorWorkflowSettings } from "./sutor-preview-store.js";
+import { listSavedViews, saveView, deleteView } from "./saved-views.js";
+import { CardPreviews,parseCardPages,cardDerivedText,cardReceipt,cardSemanticHash,listCardReceipts } from "./card-document.js";
+import { confirmCardDocument } from "./card-confirm.js";
 
 mkdirSync(paths.data, { recursive: true });
 mkdirSync(paths.archive, { recursive: true });
@@ -43,6 +46,8 @@ const scheduler = service.startScheduler();
 const manualPreviews = new ManualPreviewStore();
 const pensionPreviews = new PensionPreviewStore();
 const sutorPreviews = new SutorPreviewStore();
+const cardPreviews = new CardPreviews();
+let cardConfirmBusy=false;
 const browserSessions = new BrowserSessions();
 let pensionParserBusy = false;
 const pensionUploadAttempts = new Map<string, number[]>();
@@ -50,6 +55,9 @@ const financeHubMark = readFileSync(new URL("../assets/finance-hub-mark.png", im
 const financeHubClient = readFileSync(new URL("../assets/app.js", import.meta.url));
 const financeHubActions = readFileSync(new URL("../assets/ui-actions.js", import.meta.url));
 const financeHubMonthCheck = readFileSync(new URL("../assets/month-check.js", import.meta.url));
+const financeHubSavedViews = readFileSync(new URL("../assets/saved-views.js", import.meta.url));
+const financeHubCard = readFileSync(new URL("../assets/card-upload.js", import.meta.url));
+const financeHubPaymentPaths = readFileSync(new URL("../assets/payment-paths.js", import.meta.url));
 const financeHubStyles = readFileSync(new URL("../assets/app.css", import.meta.url));
 
 const securityHeaders = {
@@ -222,6 +230,18 @@ const server = createServer(async (req, res) => {
       });
       return res.end(financeHubClient);
     }
+    if (req.method === "GET" && url.pathname === "/assets/payment-paths.js") {
+      res.writeHead(200, {"content-type":"text/javascript; charset=utf-8","cache-control":"public, max-age=31536000, immutable","x-content-type-options":"nosniff"});
+      return res.end(financeHubPaymentPaths);
+    }
+    if (req.method === "GET" && url.pathname === "/assets/card-upload.js") {
+      res.writeHead(200, {"content-type":"text/javascript; charset=utf-8","cache-control":"public, max-age=31536000, immutable","x-content-type-options":"nosniff"});
+      return res.end(financeHubCard);
+    }
+    if (req.method === "GET" && url.pathname === "/assets/saved-views.js") {
+      res.writeHead(200, {"content-type":"text/javascript; charset=utf-8","cache-control":"public, max-age=31536000, immutable","x-content-type-options":"nosniff"});
+      return res.end(financeHubSavedViews);
+    }
     if (req.method === "GET" && url.pathname === "/assets/month-check.js") {
       res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff" });
       return res.end(financeHubMonthCheck);
@@ -256,6 +276,51 @@ const server = createServer(async (req, res) => {
     if (!authorized(req)) return json(res, 401, { error: "Nicht autorisiert" });
     if (req.method !== "GET" && req.method !== "HEAD" && !authorized(req, true) && !sameOriginMutation(req)) {
       return json(res, 403, { error: "Ungültiger Anfrageursprung" });
+    }
+    if(req.method==='GET' && url.pathname==='/api/card-documents/receipts')return json(res,200,{receipts:listCardReceipts(db)});
+    if(req.method==='POST' && url.pathname==='/api/card-documents/previews') {
+      if(!sameOriginMutation(req))return json(res,403,{error:'Ungültiger Anfrageursprung'});
+      if(!consumePensionRate(req)||pensionParserBusy)return json(res,429,{error:'Eine Dokumentprüfung läuft bereits oder zu viele Uploadversuche'});
+      pensionParserBusy=true;
+      let uploaded:Awaited<ReturnType<typeof receivePensionUpload>>|undefined;
+      try {
+        uploaded=await receivePensionUpload(req,{tempPrefix:'finance-card',allowedMediaTypes:['application/pdf']});
+        const extracted=await extractSutorPdfDocument(uploaded.path,uploaded.workDir);
+        const document=parseCardPages(extracted.pages);
+        const previous=cardReceipt(db,document.statement.statementDate);
+        const state=previous ? previous.semanticHash!==cardSemanticHash(document) ? 'conflict' : previous.state==='APPLIED' ? 'duplicate' : 'retry' : 'new';
+        const preview=cardPreviews.create(uploaded.hash,document);
+        let settlement:unknown=null;
+        try{settlement=(await service.previewMilesMoreStatement(cardDerivedText(document),document.statement.statementDate)).settlement;}catch{/* no upstream details in document error payload */}
+        return json(res,200,{...preview,state,settlement});
+      } catch(error) {
+        if(error instanceof Error && /^(UPLOAD_|PDF_|SECURITY_|IMAGE_)/.test(error.message))throw pensionFailure(error);
+        throw new FinanceServiceError('Abrechnung konnte nicht eindeutig erkannt werden. Datum, Umsatzzeilen oder Saldo sind unvollständig bzw. widersprüchlich. Bitte digitales Original-PDF verwenden.',422);
+      } finally {uploaded?.cleanup();pensionParserBusy=false;}
+    }
+    const cardMatch=/^\/api\/card-documents\/previews\/([a-f0-9-]{36})(\/confirm)?$/.exec(url.pathname);
+    if(cardMatch) {
+      if(!sameOriginMutation(req))return json(res,403,{error:'Ungültiger Anfrageursprung'});
+      if(req.method==='DELETE'&&!cardMatch[2]){cardPreviews.delete(cardMatch[1]);return json(res,200,{ok:true});}
+      if(req.method==='POST'&&cardMatch[2]) {
+        if(cardConfirmBusy)return json(res,409,{error:'Eine Kartenübernahme läuft bereits'});
+        cardConfirmBusy=true;
+        try{
+          const payload=await body(req,1024) as {confirmed?:boolean;settlementKey?:string};
+          const preview=cardPreviews.get(cardMatch[1]);
+          const result=await confirmCardDocument(db,preview,payload,{preview:(text,date)=>service.previewMilesMoreStatement(text,date),import:(text,date,key,statement)=>service.importMilesMoreStatement(text,date,key,statement)});
+          cardPreviews.delete(preview.id);
+          return json(res,result.state==='applied'?201:200,result);
+        } catch(error){throw error instanceof FinanceServiceError?error:new FinanceServiceError('Übernahme nicht abgeschlossen. Bitte erneut prüfen; keine andere Abrechnung zur Korrektur importieren.',409);}
+        finally{cardConfirmBusy=false;}
+      }
+    }
+    if(url.pathname === "/api/dashboard/saved-views" || /^\/api\/dashboard\/saved-views\/[a-f0-9-]{36}$/.test(url.pathname)) {
+      try {
+        if(req.method === "GET" && url.pathname.endsWith('/saved-views'))return json(res,200,{views:listSavedViews(db)});
+        if(req.method === "POST" && url.pathname.endsWith('/saved-views'))return json(res,201,saveView(db,await body(req,4096)));
+        if(req.method === "DELETE" && !url.pathname.endsWith('/saved-views')){deleteView(db,url.pathname.split('/').at(-1)!);return json(res,200,{ok:true});}
+      } catch(error) {throw new FinanceServiceError(error instanceof Error ? error.message : "Ansicht ungültig",400);}
     }
     if (req.method === "GET" && url.pathname === "/api/sutor-documents/revisions") {
       return json(res, 200, { revisions: service.listSutorRevisions() });
@@ -384,8 +449,9 @@ const server = createServer(async (req, res) => {
       pensionPreviews.consume(pensionPreview[1]);
       return json(res, 200, { ok: true });
     }
+    if(req.method==='GET'&&url.pathname==='/api/dashboard/payment-paths')return json(res,200,await service.getPaymentPaths(url.searchParams.get('refresh')==='1'));
     if (req.method === "GET" && url.pathname === "/api/dashboard/month-check") {
-      return json(res, 200, await service.getDashboardMonthCheck(url.searchParams.get("month") ?? undefined));
+      return json(res, 200, await service.getDashboardMonthCheck(url.searchParams.get("month") ?? undefined,url.searchParams.get("refresh")==="1"));
     }
     if (req.method === "GET" && url.pathname === "/api/dashboard/review") {
       return json(res, 200, await service.getDashboardReview(
@@ -468,8 +534,8 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/api/miles-more/import") {
       const payload = await body(req, 200_000).catch(() => {
         throw new FinanceServiceError("Ungültige Abrechnung", 400);
-      }) as { text?: string; statementDate?: string };
-      return json(res, 200, await service.importMilesMoreStatement(String(payload.text ?? ""), String(payload.statementDate ?? "")));
+      }) as { text?: string; statementDate?: string; settlementKey?:string };
+      return json(res, 200, await service.importMilesMoreStatement(String(payload.text ?? ""), String(payload.statementDate ?? ""),payload.settlementKey));
     }
     if (req.method === "GET" && url.pathname === "/api/dashboard/scenarios") {
       return json(res, 200, { scenarios: service.listNamedScenarios() });

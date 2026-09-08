@@ -4,6 +4,8 @@ import { resolve, sep } from "node:path";
 import type { FinanceDatabase } from "./database.js";
 import type { AppConfig } from "./types.js";
 import type { ActualSpendingRangeSnapshot } from "./dashboard-spending.js";
+import { checkBankCoverage } from "./bank-coverage.js";
+import {listCardReceipts} from './card-document.js';
 import { monthCheckPeriod, shiftMonth, result, type BalanceEvidence, type MonthAccountInput } from "./dashboard-month-check.js";
 
 export function monthAccountKey(id: string) {
@@ -24,7 +26,7 @@ function minor(value: unknown): number | null {
   return Number.isSafeInteger(n) ? (negative ? -n : n) : null;
 }
 // Read just the fields needed for validation. Full JSON is never returned to callers/UI.
-export function bankBalanceEvidence(raw: unknown, accountId: string): BalanceEvidence[] {
+export function bankBalanceEvidence(raw: unknown, accountId: string, observedAt?: string): BalanceEvidence[] {
   const rows = (raw as { balances?: Record<string, { balances?: unknown[] }> } | null)?.balances?.[accountId]?.balances;
   if (!Array.isArray(rows)) return [];
   return rows.flatMap(value => {
@@ -33,7 +35,10 @@ export function bankBalanceEvidence(raw: unknown, accountId: string): BalanceEvi
     const date = String(row?.reference_date ?? "");
     const currency = String(row?.balance_amount?.currency ?? "");
     if (amountMinor === null || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^[A-Z]{3}$/.test(currency)) return [];
-    return [{ date, amountMinor, currency, type: ["CLBD", "ITBD", "CLAV", "ITAV"].includes(String(row.balance_type)) ? String(row.balance_type) : "UNKNOWN", source: "Bank-Rohbeleg" }];
+    const validObserved = observedAt && Number.isFinite(Date.parse(observedAt));
+    const observedDay = validObserved ? new Intl.DateTimeFormat("en-CA", {timeZone:"Europe/Berlin",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(observedAt!)) : "";
+    return [{ date, amountMinor, currency, type: ["CLBD", "ITBD", "CLAV", "ITAV"].includes(String(row.balance_type)) ? String(row.balance_type) : "UNKNOWN", source: "Bank-Rohbeleg",
+      dayClosed: observedDay > date, ...(validObserved ? {observedAt} : {}) }];
   });
 }
 
@@ -63,19 +68,19 @@ export function readMonthEvidence(db: FinanceDatabase, config: AppConfig, root: 
   }
   // Entire normalized read occurs synchronously, so a source run cannot interleave writes.
   const sourceRows = db.query("SELECT id,last_success_at FROM sources");
-  const rawRows = db.db.prepare(`SELECT hash,source_id,relative_path FROM raw_objects
+  const rawRows = db.db.prepare(`SELECT hash,source_id,relative_path,fetched_at FROM raw_objects
     WHERE source_id IN (${sourceIds.map(() => "?").join(",") || "NULL"}) AND media_type='application/json' AND (substr(fetched_at,1,10) BETWEEN ? AND ? OR substr(fetched_at,1,10) BETWEEN ? AND ?)
     ORDER BY fetched_at DESC LIMIT 256`).all(
       ...sourceIds,
       period.openingDate, `${period.month}-04`, period.endDate,
       new Date(Date.parse(`${period.endDate}T00:00:00Z`) + 4 * 86400000).toISOString().slice(0, 10)
-    ) as Array<{ hash: string; source_id: string; relative_path: string }>;
-  const verified: Array<{ source: string; raw: unknown }> = [];
+    ) as Array<{ hash: string; source_id: string; relative_path: string; fetched_at: string }>;
+  const verified: Array<{ source: string; raw: unknown; observedAt: string }> = [];
   let bytes = 0;
   const unavailable = new Set<string>();
   for (const row of rawRows.filter(r => sourceIds.includes(r.source_id))) {
     if (bytes >= 64 * 1024 * 1024) { unavailable.add(row.source_id); continue; }
-    try { const file = readVerifiedMonthRaw(root, row.relative_path, row.hash); bytes += file.bytes; verified.push({source: row.source_id, raw: file.raw}); }
+    try { const file = readVerifiedMonthRaw(root, row.relative_path, row.hash); bytes += file.bytes; verified.push({source: row.source_id, raw: file.raw, observedAt: row.fetched_at}); }
     catch { unavailable.add(row.source_id); }
   }
   const inputs: MonthAccountInput[] = banks.map((bank, index) => {
@@ -89,7 +94,7 @@ export function readMonthEvidence(db: FinanceDatabase, config: AppConfig, root: 
       .all(source, id, period.startDate, `${shiftMonth(period.month, 1)}-01`) as Array<{ amount_minor: number; currency: string }>;
     const sum = tx.reduce((n, t) => n + t.amount_minor, 0);
     const valid = tx.every(t => t.currency === currency && Number.isSafeInteger(t.amount_minor)) && Number.isSafeInteger(sum);
-    const evidence = verified.filter(v => v.source === source).flatMap(v => bankBalanceEvidence(v.raw, id));
+    const evidence = verified.filter(v => v.source === source).flatMap(v => bankBalanceEvidence(v.raw, id, v.observedAt));
     const label = purposeLabel(actual?.accounts.find(a => a.key === key)?.label ?? source, index);
     return {
       key: `bank-${index}`, label, kind: "bank", currency, sourceLabel: "Enable Banking · Bank-Rohbelege",
@@ -98,7 +103,7 @@ export function readMonthEvidence(db: FinanceDatabase, config: AppConfig, root: 
       actualMovementMinor: currency === "EUR" ? ledger?.movementMinor ?? null : null, uncategorized: ledger ? lines.length : null,
       transferLinks: ledger?.transferLinks ?? null, hasUnverifiedTransfer: ledger?.unverifiedTransfers !== 0,
       mappingAmbiguous: ambiguous,
-      coverage: result("unknown", "Unklar", "REQUEST_COVERAGE_UNRECORDED", "Die archivierten Antworten dokumentieren nicht durchgehend den angefragten Zeitraum und die vollständige Pagination. Ein erfolgreicher Abruf ist kein Vollständigkeitsnachweis."),
+      coverage: checkBankCoverage(verified.filter(v=>v.source === source).map(v=>v.raw),id,period.startDate,period.endDate),
       issues: ["Saldenbelege werden in den vier Tagen nach jeder Monatsgrenze gesucht. Fehlende Belege bedeuten nicht automatisch fehlende Buchungen.",
         ...(ambiguous ? ["Konten-Mapping fehlt oder mehrere Quellen/Währungen sind demselben Actual-Konto zugeordnet."] : []),
         ...(!valid ? ["Währung oder Betragsgenauigkeit der Quellenbewegungen ist uneindeutig."] : []),
@@ -107,6 +112,7 @@ export function readMonthEvidence(db: FinanceDatabase, config: AppConfig, root: 
     };
   });
   const mapped = new Set(banks.map(b => config.actual?.accountMap[String(b.account_id)]).filter(Boolean).map(id => monthAccountKey(id!)));
+  const cardReceipts=listCardReceipts(db);
   for (const [index, account] of (actual?.accounts ?? []).entries()) {
     if (mapped.has(account.key)) continue;
     const kind = /amazon/i.test(account.label) ? "enrichment" : /paypal/i.test(account.label) ? "paypal" : /kredit|miles|credit|visa|mastercard/i.test(account.label) ? "card" : "other";
@@ -121,6 +127,7 @@ export function readMonthEvidence(db: FinanceDatabase, config: AppConfig, root: 
       issues: ["Der aktuelle Actual-Abruf belegt nicht, wann die ursprünglichen Abrechnungen zuletzt vollständig importiert wurden.",
         kind === "enrichment" ? "Kein zusätzlicher Salden- oder Ausgabenbeitrag." : "Bestehende Transfers werden nur gelesen. Betragsgleiche Buchungen werden nicht automatisch verbunden.",
         ...(kind === "card" ? ["Vor März 2026 liegen keine Kreditkarten-Einzelabrechnungen vor. Keine historische Hochrechnung in diesem Check."] : []),
+        ...(kind === 'card' && cardReceipts.length ? [cardReceipts.filter(r=>r.state==='APPLIED').length+' bestätigte PDF-Abrechnungen mit strukturierten Belegdaten vorhanden. Ein fehlender expliziter Abrechnungszeitraum wird nicht aus Umsatzdaten erfunden.',...(cardReceipts.some(r=>r.state==='PENDING')?['Eine bestätigte Kartenübernahme ist noch nicht abgeschlossen. Unter Status → Kreditkartenabrechnung prüfen.']:[])] : []),
         ...(kind === "paypal" ? ["Guthaben, Giro- und Kartenfinanzierung sowie Erstattungen können unterschiedliche Zahlungswege bilden."] : [])]
     });
   }

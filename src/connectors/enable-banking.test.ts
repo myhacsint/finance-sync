@@ -125,6 +125,12 @@ test("aktuelle Sitzung, Saldo, Vorzeichen und Folgeseiten werden verarbeitet", a
         "/accounts/uid-1/transactions?transaction_status=BOOK&strategy=longest&date_from=2026-07-01&continuation_key=next-page"
       )
     );
+    const evidence = (bundle.raw as {requestEvidence:Record<string,Array<{pages:number;paginationComplete:boolean;requestedTo:null}>>}).requestEvidence["stable-account"][0];
+    assert.equal(evidence.pages,2);
+    assert.equal(evidence.paginationComplete,true);
+    assert.equal(evidence.requestedTo,null);
+    await assert.rejects(fetchEnableBanking({id:"bank",kind:"enable-banking",enabled:true,settings:{applicationId:"app-id",maximumPages:1}},"session"),/Seitenlimit erreicht/);
+    await assert.rejects(fetchEnableBanking({id:"bank",kind:"enable-banking",enabled:true,settings:{applicationId:"app-id",maximumPages:0}},"session"),/Seitenlimit/);
   } finally {
     globalThis.fetch = originalFetch;
   }

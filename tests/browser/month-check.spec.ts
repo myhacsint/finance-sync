@@ -5,7 +5,7 @@ const at=new Date('2026-09-08T12:00:00Z');
 function fixture(month='2026-08') {
   const period=monthCheckPeriod(month,at);
   const base:MonthAccountInput={key:'bank-a',label:'Giro A',kind:'bank',currency:'EUR',sourceLabel:'Bank-Rohbelege',lastSuccessAt:at.toISOString(),
-    balances:[{date:period.openingDate,amountMinor:10000,currency:'EUR',type:'CLBD',source:'Bank-Rohbeleg'},{date:period.endDate,amountMinor:8000,currency:'EUR',type:'CLBD',source:'Bank-Rohbeleg'}],
+    balances:[{date:period.openingDate,amountMinor:10000,currency:'EUR',type:'CLBD',source:'Bank-Rohbeleg',dayClosed:true},{date:period.endDate,amountMinor:8000,currency:'EUR',type:'CLBD',source:'Bank-Rohbeleg',dayClosed:true}],
     movementMinor:-2000,actualMovementMinor:-2000,transactionCount:12,uncategorized:2,transferLinks:1,hasUnverifiedTransfer:false,
     coverage:result('unknown','Unklar','MISSING','Ein vollständiger Periodennachweis fehlt.'),issues:['Synthetischer Beleg für die Darstellungsprüfung.']};
   return {...buildMonthCheck([base,{...base,key:'bank-b',label:'Giro B',balances:[],uncategorized:0},

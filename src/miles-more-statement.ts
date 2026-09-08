@@ -68,12 +68,13 @@ export function parseMilesMoreStatement(text: string, statementDate: string): Mi
   let balanceMinor: number | undefined;
   for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.trim().replace(/\s+/g, " ");
-    const balance = /^Saldo\s+(-?[\d.]+,\d{2})$/i.exec(line);
+    const balance = /^Saldo\s+([+-]?[\d.]+,\d{2})$/i.exec(line);
     if (balance) {
+      if(balanceMinor!==undefined && balanceMinor!==moneyToMinor(balance[1]))throw new Error('Widersprüchliche Abrechnungssalden');
       balanceMinor = moneyToMinor(balance[1]);
       continue;
     }
-    const fee = /AUSLANDSEINSATZENTGELT\s+(-?[\d.]+,\d{2})$/i.exec(line);
+    const fee = /AUSLANDSEINSATZENTGELT\s+([+-]?[\d.]+,\d{2})$/i.exec(line);
     if (fee) {
       const previous = rows.at(-1);
       if (!previous) throw new Error("Auslandseinsatzentgelt ohne zugehörigen Umsatz");
@@ -82,7 +83,7 @@ export function parseMilesMoreStatement(text: string, statementDate: string): Mi
       previous.foreignFeeMinor += feeMinor;
       continue;
     }
-    const transaction = /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}\.\d{2}\.\d{4})\s+(.+?)\s+(-?[\d.]+,\d{2})$/.exec(line);
+    const transaction = /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}\.\d{2}\.\d{4})\s+(.+?)\s+([+-]?[\d.]+,\d{2})$/.exec(line);
     if (!transaction) continue;
     const [, purchase, booking, descriptionWithFx, amount] = transaction;
     const rawPayee = descriptionWithFx

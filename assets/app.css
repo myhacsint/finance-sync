@@ -1,4 +1,4 @@
-    .month-check-tabs { display:flex; gap:24px; border-bottom:1px solid var(--line); margin-bottom:24px; }
+    .month-check-tabs { display:flex; flex-wrap:wrap; gap:8px 20px; border-bottom:1px solid var(--line); margin-bottom:24px; }
     .month-check-tabs a { padding:12px 4px; min-height:48px; font-size:18px; text-decoration:none; color:var(--muted); border-bottom:3px solid transparent; }
     .month-check-tabs a[aria-current] { color:#75adff; border-bottom-color:var(--blue); }
     .month-check { font-size:16px; }
@@ -1682,3 +1682,18 @@
       .mobile-nav .nav-item { min-height: 44px; font-size: 12px; }
       .source-meta, .pension-source { font-size: 12px; }
     }
+/* Reusable saved analysis controls; retain the Finance Hub shell and type scale. */
+.saved-view-controls{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-top:12px}
+.saved-view-controls label{display:grid;gap:6px;min-width:0;flex:1}
+.saved-view-controls select,.saved-view-controls input{width:100%;min-height:44px;min-width:0}
+.saved-view-message{overflow-wrap:anywhere}
+@media(max-width:600px){.saved-view-controls label{flex-basis:100%}.saved-view-controls button{min-height:44px;flex:1}}
+.card-steps{display:flex;gap:12px;list-style:none;padding:0;margin:12px 0 24px;justify-content:space-between}
+.card-steps li{display:flex;gap:8px;align-items:center;color:var(--muted,#a0aec0);font-size:14px}
+.card-steps li[aria-current]{color:#76aaff}.card-steps b{border:1px solid #49617b;border-radius:50%;padding:6px 10px}
+.card-transactions{max-height:480px;overflow:auto}.card-transactions article{display:grid;grid-template-columns:120px 1fr 100px;gap:12px;padding:14px 0;border-bottom:1px solid #2b3c50}.card-transactions span{text-align:right;font-variant-numeric:tabular-nums}.card-transactions strong{overflow-wrap:anywhere}
+.card-confirm{display:flex;align-items:center;gap:12px;min-height:44px;margin:16px 0}.card-confirm input{width:22px;height:22px;flex-shrink:0}.card-file{display:grid;gap:12px;min-height:44px}.card-file input{max-width:100%;min-height:44px}.card-document p{overflow-wrap:anywhere}
+@media(max-width:600px){.card-steps{gap:4px}.card-steps li{flex-direction:column;font-size:12px}.card-transactions article{grid-template-columns:1fr auto}.card-transactions time{grid-column:1/-1;font-size:13px}}
+.payment-path{padding:20px 0;border-top:1px solid #2b3c50}.payment-path>div{display:flex;justify-content:space-between;gap:16px}.payment-path summary{min-height:44px;cursor:pointer}.payment-path p{overflow-wrap:anywhere}
+.card-document{max-width:1100px;background:#151e2e;border:1px solid #2b3c50;border-radius:16px;padding:24px}.card-document>p{margin:16px 0;line-height:1.55}.card-document h2{margin-bottom:12px}.card-steps{max-width:1100px;background:#111a28;border:1px solid #2b3c50;border-radius:12px;padding:16px!important}.card-file{padding:22px;border:1px dashed #536a86;border-radius:10px;background:#101827}.card-file input::file-selector-button{min-height:44px;border-radius:8px;border:1px solid #536a86;background:#243e64;color:#f0f5ff;padding:0 16px;margin-right:12px;cursor:pointer}.saved-views{border:1px solid #2b3c50;border-radius:12px;padding:20px;background:#151e2e;margin-bottom:20px}.saved-views h2{font-size:18px}.saved-views p{margin:10px 0;color:#b3c1d4}.saved-view-controls input,.saved-view-controls select{background:#101827;color:#e6eef8;border:1px solid #536a86;border-radius:8px;padding:8px}
+@media(max-width:600px){.card-document{padding:16px}.card-steps{padding:12px 8px!important}.card-file{padding:14px}}

@@ -66,9 +66,10 @@ test("Miles & More Vorschau findet genau einen Giro-Ausgleich ohne zu schreiben"
 
 test("Miles & More Import verknüpft einen eindeutigen Ausgleich beidseitig", async () => {
   const fake = fakeActual();
+  const preview=await previewMilesMoreWithActual({text,statementDate:"2026-08-03",serverURL:"http://actual",budgetId:"budget",password:"secret",loadApi:async()=>fake.api as never});
   const result = await importMilesMoreStatement({
     text, statementDate: "2026-08-03", serverURL: "http://actual", budgetId: "budget", password: "secret",
-    loadApi: async () => fake.api as never
+    loadApi: async () => fake.api as never, settlementKey:preview.settlement.candidateKey!
   });
   assert.equal(result.settlement.status, "ready");
   const bank = fake.rows.get("giro")?.[0];
@@ -85,4 +86,14 @@ test("Miles & More Import rät bei mehreren Ausgleichen nicht", async () => {
   });
   assert.equal(result.settlement.status, "ambiguous");
   assert.equal(fake.rows.get("card")?.some((item) => String(item.imported_id).startsWith("miles-more-payment:")), false);
+});
+
+test('a single amount match never links without explicit candidate confirmation',async()=>{
+ const fake=fakeActual();await importMilesMoreStatement({text,statementDate:'2026-08-03',serverURL:'http://actual',budgetId:'budget',password:'synthetic',loadApi:async()=>fake.api as never});
+ assert.equal(fake.rows.get('giro')?.[0].transfer_id,null);
+ assert.equal(fake.rows.get('card')?.some(t=>String(t.imported_id).startsWith('miles-more-payment:')),false);
+});
+test('changed candidate token is rejected before any Actual write',async()=>{
+ const fake=fakeActual();await assert.rejects(importMilesMoreStatement({text,statementDate:'2026-08-03',serverURL:'http://actual',budgetId:'budget',password:'synthetic',settlementKey:'wrong',loadApi:async()=>fake.api as never}),/verändert/);
+ assert.equal(fake.rows.get('card')?.length,0);
 });

@@ -2,6 +2,7 @@ import { createSign, randomBytes } from "node:crypto";
 import { readSecret } from "../config.js";
 import { sha256 } from "../archive.js";
 import type { ImportBundle, SourceConfig } from "../types.js";
+import type { BankRequestEvidence } from "../bank-coverage.js";
 
 interface EnableBankingAccount {
   uid?: string;
@@ -181,7 +182,8 @@ export async function fetchEnableBanking(
     },
     accounts: {},
     balances: {},
-    transactions: {}
+    transactions: {},
+    requestEvidence: {}
   };
   const transactions: NonNullable<ImportBundle["transactions"]> = [];
   const balances: NonNullable<ImportBundle["balances"]> = [];
@@ -248,6 +250,7 @@ export async function fetchEnableBanking(
 
     const pages: EnableBankingTransactions[] = [];
     const maximumPages = Number(source.settings?.maximumPages ?? 50);
+    if (!Number.isSafeInteger(maximumPages) || maximumPages < 1 || maximumPages > 1000) throw new Error("Ungültiges Enable-Banking-Seitenlimit");
     const dateFrom = String(source.settings?.dateFrom ?? "");
     const dateTo = String(
       source.settings?.dateTo ?? new Date().toISOString().slice(0, 10)
@@ -257,8 +260,12 @@ export async function fetchEnableBanking(
     const periods = strategy === "longest"
       ? [{ dateFrom }]
       : transactionPeriods(dateFrom, dateTo, periodDays);
+    const requestEvidence: BankRequestEvidence[] = [];
     for (const period of periods) {
+      const startedAt = new Date().toISOString();
+      const firstPage = pages.length;
       let continuationKey: string | undefined;
+      const seenKeys = new Set<string>();
       let periodPages = 0;
       do {
         const query = new URLSearchParams({ transaction_status: "BOOK" });
@@ -275,8 +282,20 @@ export async function fetchEnableBanking(
         pages.push(result);
         periodPages += 1;
         continuationKey = result.continuation_key;
+        if (continuationKey) {
+          if (seenKeys.has(continuationKey)) throw new Error("Enable Banking: wiederholter Seitenschlüssel; kein Teilimport ausgeführt");
+          seenKeys.add(continuationKey);
+        }
       } while (continuationKey && periodPages < maximumPages);
+      if (continuationKey) throw new Error("Enable Banking: Seitenlimit erreicht; kein Teilimport ausgeführt");
+      const dates = pages.slice(firstPage).flatMap(p=>(p.transactions ?? []).map(t=>t.booking_date ?? t.value_date).filter((d): d is string=>Boolean(d))).sort();
+      requestEvidence.push({version:1,strategy,requestedFrom:period.dateFrom || null,
+        requestedTo:strategy === "longest" ? null : ("dateTo" in period ? String(period.dateTo || "") || null : null),
+        startedAt,completedAt:new Date().toISOString(),pages:periodPages,paginationComplete:true,
+        observedFrom:dates[0] ?? null,observedTo:dates.at(-1) ?? null,
+        transactions:pages.slice(firstPage).reduce((n,p)=>n+(p.transactions?.length ?? 0),0)});
     }
+    (raw.requestEvidence as Record<string, unknown>)[stableAccountId] = requestEvidence;
     (raw.transactions as Record<string, unknown>)[stableAccountId] = pages;
     const rawHash = sha256(JSON.stringify(pages));
     for (const tx of pages.flatMap((page) => page.transactions ?? [])) {

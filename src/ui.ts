@@ -68,6 +68,9 @@ export function renderUi(publicBaseUrl?: string): string {
   </div>
 <script src="/assets/ui-actions.js?v=${assetHash("ui-actions.js")}" defer></script>
 <script src="/assets/month-check.js?v=${assetHash("month-check.js")}" defer></script>
+<script src="/assets/saved-views.js?v=${assetHash("saved-views.js")}" defer></script>
+<script src="/assets/card-upload.js?v=${assetHash("card-upload.js")}" defer></script>
+<script src="/assets/payment-paths.js?v=${assetHash("payment-paths.js")}" defer></script>
 <script src="/assets/app.js?v=${assetHash("app.js")}" defer></script>
 </body>
 </html>`;

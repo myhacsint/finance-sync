@@ -77,7 +77,7 @@ def main():
         # Only known upload work directories; never follow links or touch the queue.
         for path in ROOT.iterdir():
             try:
-                if path.name.startswith(("finance-pension-", "finance-sutor-")) and not path.is_symlink() and path.is_dir() and time.time() - path.stat().st_mtime > 3600:
+                if path.name.startswith(("finance-pension-", "finance-sutor-", "finance-card-")) and not path.is_symlink() and path.is_dir() and time.time() - path.stat().st_mtime > 3600:
                     shutil.rmtree(path)
             except FileNotFoundError:
                 pass

@@ -1,0 +1,8 @@
+window.FinancePaymentPaths={render(data){
+ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const money=n=>new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(n/100);
+ const actual=document.querySelector('.side-links a')?.getAttribute('href');
+ const host=document.getElementById('dashboard');
+ host.innerHTML=window.FinanceMonthCheck.tabs(false)+'<section class="section"><h2>Zahlungswege prüfen</h2><p>Giro, Kreditkarte und PayPal: Gegenbuchungen mit Plattformhinweis, passendem Betrag und zeitlicher Nähe. Nur Vorschläge, keine automatische Änderung.</p><p>Zeitraum '+esc(data.startDate)+' – '+esc(data.endDate)+' · Lesestand '+esc(new Date(data.generatedAt).toLocaleString('de-DE'))+'</p>'+(data.truncated?'<p class="tone-warning">Begrenzte Vorschlagsliste. Nicht alle möglichen Verknüpfungen werden angezeigt.</p>':'')+(data.suggestions.length?data.suggestions.map(s=>`<article class="payment-path"><div><strong>${esc(s.from)} → ${esc(s.to)}</strong><span>${money(s.amountMinor)}</span></div><p>${esc(s.fromDate)} ↔ ${esc(s.toDate)} · ${s.dayDifference} Tage Abstand</p><p class="tone-warning">${s.state==='ambiguous'?'Mehrdeutig: mehrere Gegenbuchungen möglich':'Zu prüfender Vorschlag'}</p><details><summary>Begründung ansehen</summary><ul>${s.reasons.map(r=>'<li>'+esc(r)+'</li>').join('')}</ul><p>${esc(s.note)}</p></details></article>`).join(''):'<p>Keine beleggestützten Vorschläge im gelesenen Zeitraum. Das beweist nicht, dass alle Zahlungswege bereits zugeordnet sind.</p>')+(actual?'<a class="button secondary" href="'+esc(actual)+'" target="_blank" rel="noopener noreferrer">In Actual prüfen ↗</a>':'')+'</section>';
+ host.setAttribute('aria-busy','false');
+}};

@@ -4,6 +4,7 @@ export type CheckState = "ok" | "difference" | "unknown" | "open" | "na" | "erro
 export interface CheckResult { state: CheckState; label: string; reason: string; code: string }
 export interface BalanceEvidence {
   date: string; amountMinor: number; currency: string; type: string; source: string;
+  dayClosed?: boolean; observedAt?: string;
 }
 export interface MonthAccountInput {
   key: string; label: string; kind: "bank" | "card" | "paypal" | "enrichment" | "other";
@@ -40,8 +41,8 @@ export function monthCheckPeriod(value?: string, now = new Date()) {
 }
 
 function boundary(rows: BalanceEvidence[], date: string, currency: string) {
-  // Only dated booked closing balances are independent day-end evidence.
-  const values = rows.filter(b => b.date === date && b.type === "CLBD" && b.currency === currency && Number.isSafeInteger(b.amountMinor));
+  // A CLBD fetched during its reference day cannot prove that day's final balance.
+  const values = rows.filter(b => b.date === date && b.type === "CLBD" && b.dayClosed === true && b.currency === currency && Number.isSafeInteger(b.amountMinor));
   const unique = new Set(values.map(b => b.amountMinor));
   return { value: unique.size === 1 ? values[0] : null, conflict: unique.size > 1 };
 }
@@ -50,7 +51,7 @@ export function checkMonthAccount(input: MonthAccountInput, period: ReturnType<t
   const opening = boundary(input.balances, period.openingDate, input.currency);
   const closing = boundary(input.balances, period.endDate, input.currency);
   let differenceMinor: number | null = null;
-  let balance = result("unknown", "Nicht prüfbar", "BOUNDARY_MISSING", "Kein belegter Buchungssaldo zum Monatsanfang oder Monatsende. Intraday- und verfügbare Salden reichen nicht aus.");
+  let balance = result("unknown", "Nicht prüfbar", "BOUNDARY_MISSING", "Kein belegter Tagesabschlusssaldo zum Monatsanfang oder Monatsende. Ein am Stichtag morgens abgerufener CLBD-Saldo ist noch kein Tagesabschluss; Intraday- und verfügbare Salden reichen ebenfalls nicht aus.");
   if (input.kind === "enrichment") balance = result("na", "Nicht anwendbar", "ENRICHMENT", "Detailanreicherung, kein zusätzlich zu summierendes Zahlungskonto.");
   else if (input.mappingAmbiguous) balance = result("unknown", "Nicht prüfbar", "MAPPING_AMBIGUOUS", "Die Kontenzuordnung ist nicht eindeutig; Quellen werden nicht zusammengezählt.");
   else if (opening.conflict || closing.conflict) balance = result("unknown", "Nicht prüfbar", "BOUNDARY_CONFLICT", "Widersprüchliche belegte Salden am selben Stichtag. Eine Revision muss geklärt werden.");

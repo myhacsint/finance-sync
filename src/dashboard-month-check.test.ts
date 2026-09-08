@@ -12,7 +12,7 @@ import type { AppConfig } from "./types.js";
 const now = new Date("2026-09-08T10:00:00Z"), period = monthCheckPeriod("2026-08", now);
 function input(overrides: Partial<MonthAccountInput> = {}): MonthAccountInput {
   return {key:"a",label:"Giro A",kind:"bank",currency:"EUR",sourceLabel:"Bank-Rohbelege",lastSuccessAt:null,
-    balances:[{date:"2026-07-31",amountMinor:10000,currency:"EUR",type:"CLBD",source:"Bank-Rohbeleg"}, {date:"2026-08-31",amountMinor:8000,currency:"EUR",type:"CLBD",source:"Bank-Rohbeleg"}],
+    balances:[{date:"2026-07-31",amountMinor:10000,currency:"EUR",type:"CLBD",source:"Bank-Rohbeleg",dayClosed:true}, {date:"2026-08-31",amountMinor:8000,currency:"EUR",type:"CLBD",source:"Bank-Rohbeleg",dayClosed:true}],
     movementMinor:-2000,transactionCount:2,actualMovementMinor:-2000,uncategorized:0,transferLinks:0,hasUnverifiedTransfer:false,
     coverage:result("unknown","Unklar","COVERAGE_UNKNOWN","Kein vollständiger Periodennachweis"),issues:[],...overrides};
 }
@@ -32,6 +32,7 @@ test("independent closing balances reconcile cents, transfers included and net-z
   assert.equal(checkMonthAccount(input({movementMinor:0,balances:input().balances.map(b=>({...b,amountMinor:10000}))}),period).balance.state,"ok");
 });
 test("available, intraday, missing, conflicting, mixed currencies and mapping ambiguity never pass",()=>{
+  for (const dayClosed of [undefined, false]) assert.equal(checkMonthAccount(input({balances:input().balances.map(b=>({...b,dayClosed}))}),period).balance.state,"unknown");
   for(const type of ["CLAV","ITAV","ITBD","UNKNOWN"]){
     assert.equal(checkMonthAccount(input({balances:input().balances.map(b=>({...b,type}))}),period).balance.state,"unknown");
   }
@@ -64,6 +65,9 @@ test("raw bank extraction allows only structured non-PII dated evidence, never a
     {balance_type:"CLBD",reference_date:"2026-08-31",balance_amount:{amount:"100.001",currency:"EUR"}}
   ]}}};
   const parsed=bankBalanceEvidence(raw,"privateId");
+  assert.equal(parsed[0].dayClosed,false);
+  assert.equal(bankBalanceEvidence(raw,"privateId","2026-07-31T06:30:00Z")[0].dayClosed,false);
+  assert.equal(bankBalanceEvidence(raw,"privateId","2026-07-31T22:01:00Z")[0].dayClosed,true);
   assert.equal(parsed.length,1);assert.equal(parsed[0].amountMinor,10001);
   assert.ok(!JSON.stringify(parsed).includes("PRIVATE_SENTINEL"));assert.ok(!JSON.stringify(parsed).includes("privateId"));
   assert.deepEqual(bankBalanceEvidence(null,"x"),[]);

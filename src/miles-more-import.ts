@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
 import { parseMilesMoreStatement, type MilesMoreStatement } from "./miles-more-statement.js";
 
 interface ActualMilesApi {
@@ -34,6 +35,7 @@ export interface MilesMoreSettlementPreview {
   date: string | null;
   sourceAccountName: string | null;
   candidates: number;
+  candidateKey: string | null;
 }
 
 interface SettlementCandidate {
@@ -43,7 +45,9 @@ interface SettlementCandidate {
   date: string;
   amountMinor: number;
   transferId?: string | null;
+  notes?: string;
 }
+const settlementKey=(candidate:SettlementCandidate)=>createHash("sha256").update(JSON.stringify([candidate.transactionId,candidate.sourceAccountId,candidate.date,candidate.amountMinor,candidate.transferId ?? null])).digest("hex");
 
 function isoOffset(value: string, days: number): string {
   const date = new Date(`${value}T12:00:00Z`);
@@ -59,20 +63,21 @@ async function settlementCandidates(
 ): Promise<SettlementCandidate[]> {
   const startDate = isoOffset(statement.statementDate, -2);
   const endDate = isoOffset(statement.statementDate, 14);
-  const cardTransactionIds = new Set(
-    (await api.getTransactions(cardId, startDate, endDate)).map((item) => item.id)
+  const cardTransactions = new Map(
+    (await api.getTransactions(cardId, startDate, endDate)).map((item) => [item.id,item])
   );
   const matches = await Promise.all(accounts.filter((account) => account.id !== cardId).map(async (account) =>
     (await api.getTransactions(account.id, startDate, endDate))
       .filter((item) => item.amount === statement.balanceMinor
-        && (!item.transfer_id || cardTransactionIds.has(item.transfer_id)))
+        && (!item.transfer_id || (cardTransactions.get(item.transfer_id)?.amount===-item.amount && cardTransactions.get(item.transfer_id)?.transfer_id===item.id)))
       .map((item) => ({
         transactionId: item.id,
         sourceAccountId: account.id,
         sourceAccountName: account.name,
         date: item.date,
         amountMinor: item.amount,
-        transferId: item.transfer_id
+        transferId: item.transfer_id,
+        notes: item.notes
       }))
   ));
   return matches.flat();
@@ -86,8 +91,9 @@ function settlementPreview(statement: MilesMoreStatement, candidates: Settlement
     status: linked.length === 1 ? "already-linked" : open.length === 1 ? "ready" : open.length === 0 ? "not-found" : "ambiguous",
     amountMinor: Math.abs(statement.balanceMinor),
     date: selected?.date ?? null,
-    sourceAccountName: selected?.sourceAccountName ?? null,
-    candidates: open.length
+    sourceAccountName: selected ? `${/comdirect/i.test(selected.sourceAccountName)?'comdirect ':/dkb/i.test(selected.sourceAccountName)?'DKB ':''}${/gemeinschaft/i.test(selected.sourceAccountName)?'Giro Gemeinschaft':'Girokonto'}` : null,
+    candidates: open.length,
+    candidateKey: selected && !selected.transferId ? settlementKey(selected) : null
   };
 }
 
@@ -125,8 +131,9 @@ export async function previewMilesMoreWithActual(options: {
     initialized = true;
     await api.downloadBudget(options.budgetId);
     const accounts = await api.getAccounts();
-    const card = accounts.find((item) => /kreditkarte/i.test(item.name));
-    if (!card) throw new Error("Kartenkonto 'Kreditkarte' nicht gefunden");
+    const cards = accounts.filter((item) => /kreditkarte/i.test(item.name));
+    if (cards.length!==1) throw new Error("Kartenkonto 'Kreditkarte' fehlt oder ist nicht eindeutig");
+    const card=cards[0];
     const candidates = await settlementCandidates(api, accounts, card.id, statement);
     return { ...previewMilesMore(options.text, options.statementDate), settlement: settlementPreview(statement, candidates) };
   } finally {
@@ -142,8 +149,10 @@ export async function importMilesMoreStatement(options: {
   budgetId: string;
   password: string;
   loadApi: () => Promise<ActualMilesApi>;
+  settlementKey?: string;
+  parsedStatement?: MilesMoreStatement;
 }): Promise<{ added: number; statement: MilesMoreStatement; settlement: MilesMoreSettlementPreview }> {
-  const statement = parseMilesMoreStatement(options.text, options.statementDate);
+  const statement = options.parsedStatement ?? parseMilesMoreStatement(options.text, options.statementDate);
   const dataDir = mkdtempSync(join(tmpdir(), "finance-miles-more-"));
   const api = await options.loadApi();
   let initialized = false;
@@ -152,10 +161,13 @@ export async function importMilesMoreStatement(options: {
     initialized = true;
     await api.downloadBudget(options.budgetId);
     const accounts = await api.getAccounts();
-    const card = accounts.find((item) => /kreditkarte/i.test(item.name));
-    if (!card) throw new Error("Kartenkonto 'Kreditkarte' nicht gefunden");
+    const cards = accounts.filter((item) => /kreditkarte/i.test(item.name));
+    if (cards.length!==1) throw new Error("Kartenkonto 'Kreditkarte' fehlt oder ist nicht eindeutig");
+    const card=cards[0];
     const candidates = await settlementCandidates(api, accounts, card.id, statement);
     const settlement = settlementPreview(statement, candidates);
+    if(options.settlementKey && (settlement.status!=="ready" || options.settlementKey!==settlement.candidateKey))throw new Error("Der bestätigte Zahlungsweg hat sich verändert. Bitte Vorschau erneut prüfen.");
+    const linkSettlement=settlement.status==="ready" && Boolean(options.settlementKey);
     const rawCategories = await api.getCategories();
     const categories = rawCategories.flatMap((row) => row.categories ?? (row.id && row.name ? [{ id: row.id, name: row.name }] : []));
     const categoryIds = new Map(categories.map((item) => [item.name, item.id]));
@@ -172,7 +184,7 @@ export async function importMilesMoreStatement(options: {
     }));
     const openCandidate = candidates.filter((item) => !item.transferId);
     const paymentImportedId = `miles-more-payment:${statement.statementDate}:${Math.abs(statement.balanceMinor)}`;
-    const paymentRow = settlement.status === "ready" ? [{
+    const paymentRow = linkSettlement ? [{
       account: card.id,
       date: openCandidate[0].date,
       amount: Math.abs(statement.balanceMinor),
@@ -183,7 +195,7 @@ export async function importMilesMoreStatement(options: {
     }] : [];
     const imported = await api.importTransactions(card.id, [...rows, ...paymentRow], { defaultCleared: true });
     if (imported.errors?.length) throw new Error(imported.errors.map((item) => item.message).join("; "));
-    if (settlement.status === "ready") {
+    if (linkSettlement) {
       const cardSide = (await api.getTransactions(card.id, openCandidate[0].date, openCandidate[0].date))
         .filter((item) => item.imported_id === paymentImportedId);
       if (cardSide.length !== 1) throw new Error("Karten-Ausgleichsgegenbuchung ist nicht eindeutig");
@@ -195,7 +207,7 @@ export async function importMilesMoreStatement(options: {
         payee: toCard[0].id,
         transfer_id: cardSide[0].id,
         category: null,
-        notes: `Kreditkartenabrechnung ${statement.statementDate}`
+        notes: [openCandidate[0].notes,`Kreditkartenabrechnung ${statement.statementDate}`].filter(Boolean).join(" | ")
       });
       await api.updateTransaction(cardSide[0].id, {
         payee: toSource[0].id,

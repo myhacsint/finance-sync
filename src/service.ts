@@ -121,6 +121,8 @@ import { createNamedScenario } from "./named-scenarios.js";
 import { createLifeEvent } from "./life-events.js";
 import { compareNamedScenarios } from "./scenario-compare.js";
 import { previewMilesMoreWithActual, importMilesMoreStatement } from "./miles-more-import.js";
+import { ReadCache } from "./read-cache.js";
+import { readPaymentPaths } from "./payment-paths.js";
 import { DEFAULT_MERCHANT_RULES, merchantRuleBook } from "./merchant-rules.js";
 import {
   readDashboardWealthHistory,
@@ -868,6 +870,8 @@ export class FinanceService {
   }
 
   private invalidateReviewCaches(): void {
+    this.paymentPathCache.clear();
+    this.monthCheckCache.clear();
     this.spendingCache.clear();
     this.reviewCache.clear();
     this.recurringCache = undefined;
@@ -877,20 +881,35 @@ export class FinanceService {
   }
 
   private monthCheckLoading = new Map<string, Promise<ReturnType<typeof buildMonthCheck>>>();
+  private paymentPathCache=new ReadCache<Awaited<ReturnType<typeof readPaymentPaths>>>(60_000,1);
+  private paymentPathLoading?:Promise<Awaited<ReturnType<typeof readPaymentPaths>>>;
+  async getPaymentPaths(force=false){
+    if(!this.config.actual?.enabled)throw new FinanceServiceError('Actual ist deaktiviert',400);
+    const password=readSecret('actual-password');if(!password)throw new FinanceServiceError('Actual-Zugang fehlt',503);
+    const cached=!force?this.paymentPathCache.get('paths','actual'):undefined;if(cached)return cached;
+    if(this.paymentPathLoading)return this.paymentPathLoading;
+    this.paymentPathLoading=this.withActual(()=>readPaymentPaths({serverURL:this.config.actual!.serverUrl,budgetId:this.config.actual!.budgetId,password,loadApi:async()=>await import('@actual-app/api') as never}));
+    try{const value=await this.paymentPathLoading;this.paymentPathCache.set('paths','actual',value);return value;}
+    catch{throw new FinanceServiceError('Zahlungswege konnten nicht gelesen werden. Bitte später erneut versuchen.',503);}
+    finally{this.paymentPathLoading=undefined;}
+  }
+  private monthCheckCache = new ReadCache<ReturnType<typeof buildMonthCheck> & {actualState:string}>(60_000,12);
 
-  async getDashboardMonthCheck(month?: string) {
+  async getDashboardMonthCheck(month?: string, force = false) {
     const now = new Date();
     let period: ReturnType<typeof monthCheckPeriod>;
     try { period = monthCheckPeriod(month, now); }
     catch { throw new FinanceServiceError("Bitte einen abgeschlossenen Monat ab Januar 2000 auswählen.", 400); }
+    const epoch = () => JSON.stringify([this.db.query("PRAGMA data_version"), this.db.query("SELECT (SELECT total_changes()) AS changes,(SELECT COUNT(*) FROM transactions) AS tx,(SELECT COUNT(*) FROM balances) AS balances")]);
+    const before=epoch();
+    const cached=!force ? this.monthCheckCache.get(period.month,before) : undefined;
+    if(cached)return {...cached,readCache:{hit:true,ttlSeconds:60}};
     const existing = this.monthCheckLoading.get(period.month);
     if (existing) return existing;
     if (this.monthCheckLoading.size >= 2) throw new FinanceServiceError("Es laufen bereits Monatsprüfungen. Bitte kurz warten und erneut versuchen.", 429);
     const loading = (async () => {
       // Capture the local archive/ledger epoch across the external read. Do not
       // present a source import that interleaved that read as a single snapshot.
-      const epoch = () => JSON.stringify([this.db.query("PRAGMA data_version"), this.db.query("SELECT (SELECT total_changes()) AS changes,(SELECT COUNT(*) FROM transactions) AS tx,(SELECT COUNT(*) FROM balances) AS balances")]);
-      const before = epoch();
       let actual: ActualSpendingRangeSnapshot | null = null;
       if (this.config.actual?.enabled) {
         try { actual = await this.withActual(() => readActualSpendingRange(this.config.actual!, period.startDate, period.endDate, now, {mode: "review", monthCheck: true})); }
@@ -902,7 +921,9 @@ export class FinanceService {
         input.uncategorized = null;
         input.issues.push("Die Quelldaten haben sich während der Prüfung verändert. Bitte erneut laden.");
       }
-      return { ...buildMonthCheck(inputs, period, now), actualState: actual ? "current" : "error" };
+      const value={ ...buildMonthCheck(inputs, period, now), actualState: actual ? "current" : "error" };
+      if(actual && epoch()===before)this.monthCheckCache.set(period.month,before,value);
+      return {...value,readCache:{hit:false,ttlSeconds:60}};
     })();
     this.monthCheckLoading.set(period.month, loading);
     try { return await loading; } finally { this.monthCheckLoading.delete(period.month); }
@@ -1177,7 +1198,7 @@ export class FinanceService {
     }
   }
 
-  async importMilesMoreStatement(text: string, statementDate: string) {
+  async importMilesMoreStatement(text: string, statementDate: string, settlementKey?: string, parsedStatement?: import('./miles-more-statement.js').MilesMoreStatement) {
     if (!this.config.actual?.enabled) throw new FinanceServiceError("Actual ist deaktiviert", 400);
     const password = readSecret("actual-password");
     if (!password) throw new FinanceServiceError("Actual-Zugang ist nicht verfügbar", 503);
@@ -1185,6 +1206,8 @@ export class FinanceService {
       const result = await this.withActual(() => importMilesMoreStatement({
         text,
         statementDate,
+        settlementKey,
+        parsedStatement,
         serverURL: this.config.actual!.serverUrl,
         budgetId: this.config.actual!.budgetId,
         password,

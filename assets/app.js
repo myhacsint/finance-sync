@@ -22,10 +22,10 @@ const navItems=[
   {label:"Analysen",icon:"analysis",view:"analyses"},
   {label:"Status",icon:"status",view:"status"}
 ];
-function activeView(){const hash=location.hash;return hash==="#/sutor-riester"?"sutor":hash==="#/pension-documents"?"pension":hash==="#/data-status"?"status":hash==="#/spending"?"spending":hash==="#/assets"?"assets":hash==="#/review"?"review":hash==="#/decision-lab"?"lab":hash==="#/analyses"?"analyses":"overview"}
+function activeView(){const hash=location.hash;return hash==="#/card-documents"?"card":hash==="#/sutor-riester"?"sutor":hash==="#/pension-documents"?"pension":hash==="#/data-status"?"status":hash==="#/spending"?"spending":hash==="#/assets"?"assets":hash==="#/review"?"review":hash==="#/decision-lab"?"lab":hash==="#/analyses"?"analyses":"overview"}
 function viewHref(view){return view==="status"?"#/data-status":view==="spending"?"#/spending":view==="assets"?"#/assets":view==="review"?"#/review":view==="lab"?"#/decision-lab":view==="analyses"?"#/analyses":"#/overview"}
 function navMarkup(compact=false){
-  const current=activeView();const navCurrent=current==="pension"||current==="sutor"?"status":current;
+  const current=activeView();const navCurrent=current==="pension"||current==="sutor"||current==="card"?"status":current;
   const primary=["overview","spending","assets","lab"];
   const link=item=>'<a class="nav-item" href="'+viewHref(item.view)+'"'+(item.view===navCurrent?' aria-current="page"':'')+'>'+icons[item.icon]+'<span>'+item.label+'</span></a>';
   if(!compact)return navItems.map(link).join("");
@@ -413,10 +413,11 @@ async function previewMilesMore(){
   const input=milesMoreInput();
   resetMilesMorePreview();
   const data=await call("/api/miles-more/preview",{method:"POST",body:JSON.stringify(input)});
-  currentMilesMorePreview=input;
+  currentMilesMorePreview={...input,settlementKey:data.settlement?.candidateKey};
   const settlement=data.settlement||{};
-  const settlementText=settlement.status==="ready"?'Eindeutiger Giro-Ausgleich: '+esc(settlement.sourceAccountName||'Girokonto')+' · '+esc(formatDate(settlement.date))+' · '+moneyWhole(settlement.amountMinor)+'. Er wird beim Import automatisch als interner Transfer verknüpft.':settlement.status==="already-linked"?'Der Giro-Ausgleich ist bereits als interner Transfer verknüpft.':settlement.status==="ambiguous"?'Mehrere mögliche Giro-Ausgleiche gefunden. Es wird keiner automatisch verknüpft.':'Kein eindeutiger Giro-Ausgleich gefunden. Es wird keiner automatisch verknüpft.';
+  const settlementText=settlement.status==="ready"?'Möglicher Giro-Ausgleich: '+esc(settlement.sourceAccountName||'Girokonto')+' · '+esc(formatDate(settlement.date))+' · '+moneyWhole(settlement.amountMinor)+'. Betrag und Datum allein beweisen den Zahlungsweg nicht.':settlement.status==="already-linked"?'Der Giro-Ausgleich ist bereits als interner Transfer verknüpft.':settlement.status==="ambiguous"?'Mehrere mögliche Giro-Ausgleiche gefunden. Es wird keiner automatisch verknüpft.':'Kein eindeutiger Giro-Ausgleich gefunden. Es wird keiner automatisch verknüpft.';
   document.getElementById("miles-preview").innerHTML='<p>'+data.bookings+' Umsätze, Saldo '+moneyWhole(data.balanceMinor)+', '+data.categorized+' kategorisiert.</p><p class="'+(settlement.status==="ready"||settlement.status==="already-linked"?'tone-ok':'tone-warning')+'">'+settlementText+'</p><label style="display:flex;align-items:center;gap:8px;margin-top:12px"><input id="miles-confirm-check" type="checkbox" data-fh-change="toggleConfirmation(this,&quot;miles-import-button&quot;)"> Ich habe Abrechnungsdatum, Saldo, Anzahl und Ausgleichsvorschau geprüft.</label>';
+  if(settlement.candidateKey)document.getElementById('miles-preview').insertAdjacentHTML('beforeend','<label class="saved-view-controls"><input type="checkbox" id="miles-link-check"> Diesen Giro-Ausgleich ausdrücklich als internen Transfer verbinden.</label>');
 }
 async function importMilesMore(){
   const input=milesMoreInput();
@@ -425,10 +426,11 @@ async function importMilesMore(){
   const button=document.getElementById("miles-import-button");
   if(button)button.disabled=true;
   try{
-    const data=await call("/api/miles-more/import",{method:"POST",body:JSON.stringify(input)});
+    const settlementKey=document.getElementById('miles-link-check')?.checked?currentMilesMorePreview.settlementKey:undefined;
+    const data=await call("/api/miles-more/import",{method:"POST",body:JSON.stringify({...input,settlementKey})});
     document.getElementById("miles-text").value="";
     resetMilesMorePreview();
-    const linked=data.settlement?.status==="ready"?' Giro-Ausgleich wurde verknüpft.':data.settlement?.status==="already-linked"?' Giro-Ausgleich war bereits verknüpft.':' Kein Giro-Ausgleich wurde automatisch verknüpft.';
+    const linked=data.settlement?.status==="ready"&&settlementKey?' Giro-Ausgleich wurde verknüpft.':data.settlement?.status==="already-linked"?' Giro-Ausgleich war bereits verknüpft.':' Kein Giro-Ausgleich wurde verknüpft. Ohne Zahlungswegzuordnung können Ausgaben doppelt erscheinen.';
     msg("Miles & More importiert: "+(data.added||0)+" Buchungen."+linked);
   }catch(error){msg(error.message,true);if(button)button.disabled=false}
 }
@@ -770,6 +772,7 @@ function renderSpending(data){
   const medical=data.medical&&( !data.selection||data.selection.category==="all"||(data.categories||[]).some(category=>category.selected&&category.label==="Arzt & Apotheke"))?'<section class="expense-summary-band" aria-label="Arzt netto"><div class="expense-summary-stat"><span>Arzt brutto</span><strong>'+moneyWhole(data.medical.grossMinor)+'</strong></div><div class="expense-summary-stat"><span>Oldenburger erstattet</span><strong>'+moneyWhole(data.medical.reimbursedMinor)+'</strong></div><div class="expense-summary-stat"><span>Netto / Selbstbehalt</span><strong>'+moneyWhole(data.medical.netMinor)+'</strong></div></section>':'';
   if(empty){
     document.getElementById("dashboard").innerHTML=summary+medical+'<div style="margin-top:12px">'+expenseState("Keine Buchungen","Für diesen Monat liegen keine Buchungen vor. Wähle einen anderen Monat.","document.getElementById(&quot;expense-month&quot;).focus()","Monat wechseln","warning")+'</div>';
+    window.FinanceSavedViews.mount({call,selection:{...uiState,month:uiState.month||data.month,...data.selection},apply:setExpenseParams});
     document.getElementById("dashboard").setAttribute("aria-busy","false");
     return;
   }
@@ -789,6 +792,7 @@ function renderSpending(data){
   const pagination='<div class="expense-pagination"><span>'+page.from+'–'+page.to+' von '+page.total+' Gruppen</span><div class="expense-pagination-actions"><button class="page-previous" type="button" data-fh-click="setExpensePage('+(page.page-1)+')" aria-label="Vorherige Buchungsseite"'+(page.page<=1?' disabled':'')+'>'+icons.chevron+'</button><button class="page-next" type="button" data-fh-click="setExpensePage('+(page.page+1)+')" aria-label="Nächste Buchungsseite"'+(page.page>=page.pages?' disabled':'')+'>'+icons.chevron+'</button></div></div>';
   document.getElementById("dashboard").innerHTML=summary+medical+'<div class="expense-workspace"><section class="expense-pane expense-category-pane'+(uiState.expanded?' categories-expanded':'')+'" id="expense-category-pane" aria-labelledby="expense-categories-title"><div class="expense-pane-heading"><h2 id="expense-categories-title">Kategorien</h2></div><label class="expense-search"><span class="sr-only">Kategorie suchen</span>'+icons.search+'<input type="search" name="expense-category-search" value="'+esc(uiState.categorySearch)+'" autocomplete="off" placeholder="Kategorie suchen …" data-fh-input="filterExpenseCategories(this.value)"></label><div class="expense-category-list">'+categoryRows+'</div>'+more+'</section><section class="expense-pane expense-transactions-pane" aria-labelledby="expense-transactions-title"><div class="expense-pane-heading"><h2 id="expense-transactions-title">Händler und Dienste</h2><p>'+esc(selectedCategory)+' · '+groups.length+' Gruppen · '+data.filtered.bookings+' Buchungen · größte Summe zuerst</p></div><div class="expense-toolbar"><label class="expense-search"><span class="sr-only">Händler oder Buchung suchen</span>'+icons.search+'<input type="search" name="expense-transaction-search" value="'+esc(data.selection.search)+'" autocomplete="off" placeholder="Händler oder Buchung suchen …" data-fh-input="updateExpenseSearch(this.value)"></label><label><span class="sr-only">Konto filtern</span><select name="expense-account" autocomplete="off" data-fh-change="setExpenseAccount(this.value)">'+accounts+'</select></label></div>'+transactionBody+pagination+'</section></div>';
   if(uiState.categorySearch)filterExpenseCategories(uiState.categorySearch);
+  window.FinanceSavedViews.mount({call,selection:{...uiState,month:uiState.month||data.month,...data.selection},apply:setExpenseParams});
   document.getElementById("dashboard").setAttribute("aria-busy","false");
 }
 
@@ -1499,6 +1503,7 @@ function renderDashboard(data){
     </section>\
     <section class="section" aria-labelledby="pension-documents-title"><div class="section-heading"><div><h2 id="pension-documents-title">Renteninformationen</h2><p>DRV-Werte sicher erkennen, prüfen und als FIRE-Annahme bestätigen.</p></div><a class="button secondary" href="#/pension-documents">Renteninformation prüfen</a></div></section>\
     <section class="section" aria-labelledby="sutor-documents-title"><div class="section-heading"><div><h2 id="sutor-documents-title">Sutor Riester</h2><p>Monatlichen Depotauszug sicher als PDF prüfen und bestätigen.</p></div><a class="button secondary" href="#/sutor-riester">Sutor-PDF prüfen</a></div></section>\
+    <section class="section" aria-labelledby="card-documents-title"><div class="section-heading"><div><h2 id="card-documents-title">Kreditkartenabrechnung</h2><p>Miles &amp; More als PDF prüfen. Zahlungsweg ausdrücklich bestätigen.</p></div><a class="button secondary" href="#/card-documents">Karten-PDF prüfen</a></div></section>\
     <section class="section" aria-labelledby="tasks-title"><div class="section-heading"><div><h2 id="tasks-title">Offene Aufgaben</h2><p>Vertragswerte, die bewusst bestätigt werden müssen.</p></div></div><div class="task-list">'+tasks+'</div></section>\
     <section class="section" aria-labelledby="sources-title"><div class="section-heading"><div><h2 id="sources-title">Automatische Quellen</h2><p>Banken, Depots und Wallets mit geplantem Abruf.</p></div></div><div class="source-list">'+sources+'</div></section>\
     <section class="section" aria-labelledby="history-title"><div class="section-heading"><div><h2 id="history-title">Historische Daten</h2></div></div><details class="historical"><summary><strong>'+icons.archive+'Historische CSV-Importe</strong><span class="details-label">'+data.historical.count+' Quellen '+icons.chevron+'</span></summary><p>'+data.historical.count+' deaktivierte Importquellen bleiben im lückenlosen Archiv erhalten.'+(data.historical.lastSuccessAt?' Letzter Import: '+esc(formatDate(data.historical.lastSuccessAt))+'.':'')+'</p></details></section>\
@@ -1518,6 +1523,7 @@ function renderHeader(view){
     status:{title:"Datenstatus",subtitle:"Aktualität, offene Aufgaben und Systemzustand auf einen Blick."}
     ,pension:{title:"Renteninformation prüfen",subtitle:"DRV-Werte lokal erkennen, nachvollziehen und bewusst übernehmen."}
     ,sutor:{title:"Sutor Riester prüfen",subtitle:"Monatlichen Depotauszug lokal erkennen, nachvollziehen und bewusst übernehmen."}
+    ,card:{title:"Kreditkartenabrechnung",subtitle:"PDF lokal prüfen und erst nach Bestätigung übernehmen."}
   }[view];
   if(view==="analyses"&&analysisSelection().view==="crypto-origin-tax")content.subtitle="Krypto-Herkunft, Investmentbasis und Steuerstatus nachvollziehen.";
   if(view==="analyses"&&analysisSelection().view==="investment-newsletters")content.subtitle="Newsletter-Signale prüfen, einordnen und nachvollziehen.";
@@ -1528,7 +1534,7 @@ function renderHeader(view){
   document.getElementById("page-subtitle").textContent=content.subtitle;
   const action=document.getElementById("refresh-button");
   const analysisExport=view==="analyses"&&analysisSelection().view==="expense-structure";
-  action.hidden=view==="pension"||view==="sutor";
+  action.hidden=view==="pension"||view==="sutor"||view==="card";
   action.setAttribute("aria-label",analysisExport?"Aktuelle Analyse als CSV exportieren":content.title+" aktualisieren");
   action.querySelector("[aria-hidden]").textContent=analysisExport?"↓":"↻";
   action.querySelector(".desktop-label").textContent=analysisExport?"CSV exportieren":"Aktualisieren";
@@ -1582,9 +1588,12 @@ async function refresh(force=false){
     }else if(view==="assets"){
       const data=await call("/api/dashboard/assets"+(force?"?refresh=1":""));renderAssets(data);
     }else if(view==="review"){
-      if(window.FinanceMonthCheck.active()){
+      if(new URLSearchParams(location.search).get('reviewTab')==='payment-paths'){
+        window.FinancePaymentPaths.render(await call('/api/dashboard/payment-paths'+(force?'?refresh=1':'')));
+      }else if(window.FinanceMonthCheck.active()){
         const month=window.FinanceMonthCheck.month();
-        const data=await call("/api/dashboard/month-check"+(month?"?month="+encodeURIComponent(month):""));
+        const query=new URLSearchParams();if(month)query.set('month',month);if(force)query.set('refresh','1');
+        const data=await call("/api/dashboard/month-check?"+query);
         window.FinanceMonthCheck.render(data);
       }else{
       const params=new URLSearchParams();
@@ -1607,6 +1616,8 @@ async function refresh(force=false){
       if(selection.fireOneTimeKeys.length)params.set("fireOneTimeKeys",selection.fireOneTimeKeys.join(","));
       if(force)params.set("refresh","1");
       const data=await call("/api/dashboard/analyses/decision-lab?"+params.toString());renderDecisionLab(data);
+    }else if(view==="card"){
+      window.FinanceCardUpload.mount({call:apiRequest});
     }else if(view==="pension"){
       if(currentPensionPreview)renderPensionReview();else{const data=await call("/api/pension-documents/revisions");renderPensionHome(data.revisions||[])}
     }else if(view==="sutor"){
