@@ -1224,7 +1224,7 @@ async function saveReviewTransaction(lineId){
   }catch(error){msg(error.message,true);if(button)button.disabled=false}
 }
 function renderReviewError(error){
-  if(window.FinanceMonthCheck.active()){window.FinanceMonthCheck.error(error?.message||"Die Belege konnten nicht gelesen werden.");return;}
+  if(window.FinanceMonthCheck.active()){window.FinanceMonthCheck.error(error?.message||"Die Belege konnten nicht gelesen werden.");msg(error?.message||"Die Belege konnten nicht gelesen werden.",true);return;}
   currentReviewData=null;
   document.getElementById("dashboard").innerHTML=expenseState("Nicht verfügbar","Die Prüfliste konnte nicht geladen werden. Bitte versuche es erneut.","refresh(true)","Erneut versuchen");
   document.getElementById("dashboard").setAttribute("aria-busy","false");

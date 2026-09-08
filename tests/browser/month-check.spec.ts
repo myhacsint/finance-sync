@@ -58,6 +58,7 @@ test('loading, error, recovery and empty states retain tabs and never show zero 
   await page.goto('/?reviewTab=month-check#/review');
   await expect(page.getByText('Belege und Kontenzuordnungen werden gelesen …')).toBeVisible();
   release();await expect(page.getByRole('heading',{name:'Monatscheck nicht verfügbar'})).toBeVisible();
+  await expect(page.locator('#message')).toHaveText('Quellen aktuell nicht lesbar.');
   await expect(page.getByRole('link',{name:'Buchungen',exact:true})).toBeVisible();
   await page.screenshot({path:'test-results/month-check-error-'+info.project.name+'.png',fullPage:true});
   await page.unroute('**/api/dashboard/month-check*');await page.getByRole('button',{name:'Erneut versuchen'}).click();
