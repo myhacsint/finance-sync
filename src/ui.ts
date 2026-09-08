@@ -67,6 +67,7 @@ export function renderUi(publicBaseUrl?: string): string {
     <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile Hauptnavigation"></nav>
   </div>
 <script src="/assets/ui-actions.js?v=${assetHash("ui-actions.js")}" defer></script>
+<script src="/assets/month-check.js?v=${assetHash("month-check.js")}" defer></script>
 <script src="/assets/app.js?v=${assetHash("app.js")}" defer></script>
 </body>
 </html>`;

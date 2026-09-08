@@ -92,6 +92,7 @@ export interface SpendingCatalogCategory {
 }
 
 export interface ActualSpendingRangeSnapshot {
+  monthCheckAccounts?: Array<{ key: string; movementMinor: number | null; transactions: number; transferLinks: number; unverifiedTransfers: number }>;
   startDate: string;
   endDate: string;
   generatedAt: string;
@@ -559,7 +560,7 @@ export async function readActualSpendingRange(
   startDate: string,
   endDate: string,
   now = new Date(),
-  options: { loadApi?: ActualSpendingApiLoader; password?: string; mode?: "expenses" | "review" } = {}
+  options: { loadApi?: ActualSpendingApiLoader; password?: string; mode?: "expenses" | "review"; monthCheck?: boolean } = {}
 ): Promise<ActualSpendingRangeSnapshot> {
   if (!config.enabled) throw new Error("Actual ist deaktiviert");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)
@@ -637,6 +638,15 @@ export async function readActualSpendingRange(
       startDate,
       endDate,
       generatedAt: now.toISOString(),
+      ...(options.monthCheck ? { monthCheckAccounts: accountTransactions.map(({account, transactions}) => {
+        const parents = transactions.filter(t => !t.is_child && !t.starting_balance_flag && t.date >= startDate && t.date <= endDate);
+        const sum = parents.reduce((n, t) => n + t.amount, 0);
+        const unique = new Set(parents.map(t => t.id)).size === parents.length;
+        return { key: account.key, movementMinor: unique && parents.every(t => Number.isSafeInteger(t.amount)) && Number.isSafeInteger(sum) ? sum : null,
+          transactions: parents.length,
+          transferLinks: parents.filter(t => Boolean(t.transfer_id)).length,
+          unverifiedTransfers: parents.filter(t => !t.transfer_id && Boolean(payees.get(t.payee ?? "")?.transfer_acct)).length };
+      }) } : {}),
       lines,
       accounts: accounts.map(({ key, label }) => ({ key, label })),
       catalog

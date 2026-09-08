@@ -1,3 +1,81 @@
+    .month-check-tabs { display:flex; gap:24px; border-bottom:1px solid var(--line); margin-bottom:24px; }
+    .month-check-tabs a { padding:12px 4px; min-height:48px; font-size:18px; text-decoration:none; color:var(--muted); border-bottom:3px solid transparent; }
+    .month-check-tabs a[aria-current] { color:#75adff; border-bottom-color:var(--blue); }
+    .month-check { font-size:16px; }
+    .month-check h2 { font-size:24px; line-height:1.3; margin:0; }
+    .month-check > h2 { font-size:30px; margin:24px 0 16px; }
+    .month-check h3 { font-size:18px; margin:0 0 8px; }
+    .month-check svg { width:24px; height:24px; flex-shrink:0; }
+    .mc-period { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
+    .mc-period select { width:auto; min-height:48px; min-width:190px; border:1px solid var(--line); background:var(--surface); border-radius:8px; padding:8px 12px; color:var(--text); font-size:16px; }
+    .mc-period .button { min-width:48px; padding:10px; }
+    .mc-period span { color:var(--muted); font-size:14px; }
+    .mc-prev svg { transform:rotate(180deg); }
+    .mc-summary { display:flex; align-items:flex-start; gap:16px; background:var(--amber-soft); border:1px solid var(--amber); border-radius:8px; padding:16px 20px; margin-bottom:20px; }
+    .mc-summary > svg,.mc-summary strong { color:var(--amber); }
+    .mc-summary p { margin:4px 0 0; }
+    .mc-summary-ok { background:var(--green-soft); border-color:var(--green); }
+    .mc-summary-ok strong,.mc-summary-ok > svg { color:var(--green); }
+    .mc-summary-difference { background:var(--red-soft); border-color:var(--red); }
+    .mc-summary-difference strong { color:var(--red); }
+    .mc-accounts,.mc-selected,.mc-next { border:1px solid var(--line); border-radius:8px; background:var(--surface); margin-bottom:16px; overflow:hidden; }
+    .mc-accounts > h2,.mc-selected > h2,.mc-next > h2 { padding:16px 20px; font-size:21px; border-bottom:1px solid var(--line); }
+    .mc-table { width:100%; border-collapse:collapse; margin:0; font-size:16px; }
+    .mc-table th,.mc-table td { padding:10px 18px; border-bottom:1px solid var(--line); text-align:left; }
+    .mc-table thead th { color:var(--muted); font-size:14px; font-weight:600; }
+    .mc-table tbody th { font-weight:600; }
+    .mc-table tr:last-child > * { border-bottom:0; }
+    .mc-table .is-selected { background:var(--blue-soft); }
+    .mc-status { display:inline-flex; align-items:center; gap:8px; }
+    .mc-status > span { width:18px; height:18px; display:inline-flex; justify-content:center; align-items:center; border-radius:50%; color:var(--canvas); background:var(--muted); font-size:14px; font-weight:700; flex-shrink:0; }
+    .mc-ok > span { background:var(--green); }
+    .mc-open > span { background:var(--amber); }
+    .mc-difference > span,.mc-error > span { background:var(--red); }
+    .mc-disclosure { min-width:44px; min-height:44px; display:flex; align-items:center; justify-content:center; background:none; color:var(--text); border:0; cursor:pointer; border-radius:6px; }
+    .mc-disclosure:hover { background:var(--surface-3); }
+    .mc-disclosure[aria-expanded=true] svg { transform:rotate(90deg); }
+    .mc-detail-body { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:24px; padding:20px; }
+    .mc-detail-body p { margin:8px 0; }
+    .mc-provenance { border-left:1px solid var(--line); padding-left:20px; display:flex; flex-direction:column; gap:10px; color:var(--muted); font-size:14px; }
+    .mc-evidence { margin:0 20px 20px; }
+    .mc-evidence > summary { display:flex; align-items:center; gap:10px; cursor:pointer; min-height:48px; color:#86b9ff; font-weight:600; }
+    .mc-evidence > div { padding-top:12px; }
+    .mc-evidence-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; }
+    .mc-evidence-grid dt { color:var(--muted); font-size:14px; }
+    .mc-evidence-grid dd { margin:4px 0; font-variant-numeric:tabular-nums; }
+    .mc-evidence li { margin-bottom:8px; }
+    .mc-next > a { display:flex; gap:16px; align-items:center; min-height:56px; padding:12px 20px; text-decoration:none; border-bottom:1px solid var(--line); }
+    .mc-next > a span { flex:1; }
+    .mc-next > a:hover { background:var(--surface-2); }
+    .mc-next > a:last-child { border:0; }
+    .mc-note,.mc-captured { color:var(--muted); font-size:14px; }
+    .mc-mobile-list { display:none; }
+    .mc-empty,.mc-error { padding:20px; }
+    .mc-error a { display:block; padding:16px 0; color:#86b9ff; }
+    .mc-loading .skeleton { height:220px; margin-top:20px; }
+    @media (max-width:900px) {
+      .mc-table,.mc-selected { display:none; }
+      .mc-mobile-list { display:block; }
+      .mc-mobile-account { padding:12px 16px; border-bottom:1px solid var(--line); }
+      .mc-mobile-account:last-child { border:0; }
+      .mc-mobile-toggle { display:flex; justify-content:space-between; align-items:center; width:100%; text-align:left; gap:12px; min-height:48px; padding:4px 0; color:var(--text); background:none; border:0; cursor:pointer; font-size:18px; }
+      .mc-mobile-toggle[aria-expanded=true] svg { transform:rotate(90deg); }
+      .mc-account-statuses { margin:10px 0; }
+      .mc-account-statuses > div { display:flex; justify-content:space-between; gap:12px; padding:5px 0; }
+      .mc-account-statuses dt,.mc-account-statuses dd { margin:0; font-size:16px; }
+      .mc-account-statuses dt { color:var(--muted); }
+      .mc-detail-body { display:block; padding:16px 0; }
+      .mc-provenance { border:0; padding:8px 0 0; }
+      .mc-evidence { margin:0 0 12px; }
+      .mc-evidence-grid { grid-template-columns:1fr; }
+      .mc-period { gap:8px; }
+      .mc-period select { flex:1; min-width:0; max-width:260px; }
+      .mc-period span { width:100%; padding-top:4px; }
+      .mc-summary { padding:16px; gap:10px; }
+      .mc-accounts > h2,.mc-next > h2 { font-size:20px; padding:16px; }
+      .mc-next > a { padding:14px 16px; }
+      .month-check p,.mc-evidence li { overflow-wrap:anywhere; }
+    }
     :root {
       color-scheme: dark;
       --canvas: #080d19;

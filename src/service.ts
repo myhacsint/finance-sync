@@ -29,6 +29,8 @@ import {
 } from "./connectors/dkb-fints.js";
 import { importBundle } from "./importer.js";
 import { PublishJournal } from "./publish-journal.js";
+import { buildMonthCheck, monthCheckPeriod } from "./dashboard-month-check.js";
+import { readMonthEvidence } from "./month-check-evidence.js";
 import { exportAll } from "./exporter.js";
 import { reconcileOverviewHistory } from "./overview-history.js";
 import { pushToActual } from "./sinks/actual.js";
@@ -872,6 +874,38 @@ export class FinanceService {
     this.analysesCache.clear();
     this.savingsBaselineCache = undefined;
     this.savingsHistoryCache = undefined;
+  }
+
+  private monthCheckLoading = new Map<string, Promise<ReturnType<typeof buildMonthCheck>>>();
+
+  async getDashboardMonthCheck(month?: string) {
+    const now = new Date();
+    let period: ReturnType<typeof monthCheckPeriod>;
+    try { period = monthCheckPeriod(month, now); }
+    catch { throw new FinanceServiceError("Bitte einen abgeschlossenen Monat ab Januar 2000 auswählen.", 400); }
+    const existing = this.monthCheckLoading.get(period.month);
+    if (existing) return existing;
+    if (this.monthCheckLoading.size >= 2) throw new FinanceServiceError("Es laufen bereits Monatsprüfungen. Bitte kurz warten und erneut versuchen.", 429);
+    const loading = (async () => {
+      // Capture the local archive/ledger epoch across the external read. Do not
+      // present a source import that interleaved that read as a single snapshot.
+      const epoch = () => JSON.stringify([this.db.query("PRAGMA data_version"), this.db.query("SELECT (SELECT total_changes()) AS changes,(SELECT COUNT(*) FROM transactions) AS tx,(SELECT COUNT(*) FROM balances) AS balances")]);
+      const before = epoch();
+      let actual: ActualSpendingRangeSnapshot | null = null;
+      if (this.config.actual?.enabled) {
+        try { actual = await this.withActual(() => readActualSpendingRange(this.config.actual!, period.startDate, period.endDate, now, {mode: "review", monthCheck: true})); }
+        catch { /* Preserve independently available bank evidence; never leak API errors. */ }
+      }
+      const inputs = readMonthEvidence(this.db, this.config, paths.archive, period, actual);
+      if (epoch() !== before) for (const input of inputs) {
+        input.actualMovementMinor = null;
+        input.uncategorized = null;
+        input.issues.push("Die Quelldaten haben sich während der Prüfung verändert. Bitte erneut laden.");
+      }
+      return { ...buildMonthCheck(inputs, period, now), actualState: actual ? "current" : "error" };
+    })();
+    this.monthCheckLoading.set(period.month, loading);
+    try { return await loading; } finally { this.monthCheckLoading.delete(period.month); }
   }
 
   async getDashboardReview(force = false, months = 6): Promise<DashboardReview & {

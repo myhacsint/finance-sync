@@ -49,6 +49,7 @@ const pensionUploadAttempts = new Map<string, number[]>();
 const financeHubMark = readFileSync(new URL("../assets/finance-hub-mark.png", import.meta.url));
 const financeHubClient = readFileSync(new URL("../assets/app.js", import.meta.url));
 const financeHubActions = readFileSync(new URL("../assets/ui-actions.js", import.meta.url));
+const financeHubMonthCheck = readFileSync(new URL("../assets/month-check.js", import.meta.url));
 const financeHubStyles = readFileSync(new URL("../assets/app.css", import.meta.url));
 
 const securityHeaders = {
@@ -221,6 +222,10 @@ const server = createServer(async (req, res) => {
       });
       return res.end(financeHubClient);
     }
+    if (req.method === "GET" && url.pathname === "/assets/month-check.js") {
+      res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff" });
+      return res.end(financeHubMonthCheck);
+    }
     if (req.method === "GET" && url.pathname === "/assets/ui-actions.js") {
       res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff" });
       return res.end(financeHubActions);
@@ -378,6 +383,9 @@ const server = createServer(async (req, res) => {
       if (!sameOriginMutation(req)) return json(res, 403, { error: "Ungültiger Anfrageursprung" });
       pensionPreviews.consume(pensionPreview[1]);
       return json(res, 200, { ok: true });
+    }
+    if (req.method === "GET" && url.pathname === "/api/dashboard/month-check") {
+      return json(res, 200, await service.getDashboardMonthCheck(url.searchParams.get("month") ?? undefined));
     }
     if (req.method === "GET" && url.pathname === "/api/dashboard/review") {
       return json(res, 200, await service.getDashboardReview(

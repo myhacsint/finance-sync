@@ -1224,6 +1224,7 @@ async function saveReviewTransaction(lineId){
   }catch(error){msg(error.message,true);if(button)button.disabled=false}
 }
 function renderReviewError(error){
+  if(window.FinanceMonthCheck.active()){window.FinanceMonthCheck.error(error?.message||"Die Belege konnten nicht gelesen werden.");return;}
   currentReviewData=null;
   document.getElementById("dashboard").innerHTML=expenseState("Nicht verfügbar","Die Prüfliste konnte nicht geladen werden. Bitte versuche es erneut.","refresh(true)","Erneut versuchen");
   document.getElementById("dashboard").setAttribute("aria-busy","false");
@@ -1258,7 +1259,7 @@ function renderReview(data){
   }).join("")||'<div class="empty">Keine offenen Maßnahmen. Bestätige zuerst gestaltbare oder vermeidbare Ausgaben.</div>';
   const actions='<details class="work-section"><summary><span><strong>Maßnahmen</strong><small>Zweiter Schritt nach der Einordnung.</small></span><b>'+data.counts.optimizationsOpen+'</b>'+icons.chevron+'</summary><div class="work-section-body optimization-list">'+actionItems+'</div></details>';
   const management='<details class="management review-management"><summary>Prüfen verwalten</summary><div class="management-body">'+windowBar+closeBar+taxonomy+rulesBox+'</div></details>';
-  document.getElementById("dashboard").innerHTML=summary+bookings+recurring+actions+management;
+  document.getElementById("dashboard").innerHTML=window.FinanceMonthCheck.tabs(false)+summary+bookings+recurring+actions+management;
   document.getElementById("dashboard").setAttribute("aria-busy","false");
 }
 function fillNamedScenarios(selected){const select=document.getElementById("named-scenario");if(!select||!window.namedScenarios)return;select.innerHTML='<option value="">Aktuelles Labor</option>'+window.namedScenarios.map(item=>'<option value="'+esc(item.id)+'"'+(item.id===selected?' selected':'')+'>'+esc(item.name)+'</option>').join("");}
@@ -1534,6 +1535,7 @@ function renderHeader(view){
 }
 function renderLoading(view){
   document.getElementById("dashboard").setAttribute("aria-busy","true");
+  if(view==="review"&&window.FinanceMonthCheck.active()){window.FinanceMonthCheck.loading();return;}
   document.getElementById("dashboard").innerHTML=view==="overview"?'\
     <section class="wealth-overview" aria-label="Vermögensübersicht wird geladen"><div><div class="skeleton" style="width:52%;height:18px">Lädt</div><div class="skeleton" style="width:72%;height:48px;margin-top:10px">Lädt</div></div><div class="skeleton" style="width:100%;height:28px">Lädt</div></section>'
     :view==="spending"?'\
@@ -1580,11 +1582,17 @@ async function refresh(force=false){
     }else if(view==="assets"){
       const data=await call("/api/dashboard/assets"+(force?"?refresh=1":""));renderAssets(data);
     }else if(view==="review"){
+      if(window.FinanceMonthCheck.active()){
+        const month=window.FinanceMonthCheck.month();
+        const data=await call("/api/dashboard/month-check"+(month?"?month="+encodeURIComponent(month):""));
+        window.FinanceMonthCheck.render(data);
+      }else{
       const params=new URLSearchParams();
       const months=Number(new URLSearchParams(location.search).get("reviewMonths")||6);
       if([3,6,12,24].includes(months))params.set("months",String(months));
       if(force)params.set("refresh","1");
       const data=await call("/api/dashboard/review"+(params.toString()?"?"+params:""));renderReview(data);
+      }
     }else if(view==="lab"){
       const selection=analysisSelection();
       const params=new URLSearchParams();
