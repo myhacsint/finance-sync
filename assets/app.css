@@ -1,3 +1,5 @@
+    .page-header>div { min-width:0; }
+    #page-title { overflow-wrap:anywhere; text-wrap:balance; }
     .month-check-tabs { display:flex; flex-wrap:wrap; gap:8px 20px; border-bottom:1px solid var(--line); margin-bottom:24px; }
     .month-check-tabs a { padding:12px 4px; min-height:48px; font-size:18px; text-decoration:none; color:var(--muted); border-bottom:3px solid transparent; }
     .month-check-tabs a[aria-current] { color:#75adff; border-bottom-color:var(--blue); }
