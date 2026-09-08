@@ -50,3 +50,14 @@ test('saved view controls persist and load filters on desktop and mobile',async(
  await page.getByRole('button',{name:'Laden',exact:true}).click();await expect(page).toHaveURL(/expenseMonth=2026-08/);
  await page.getByLabel('Ansicht wählen').selectOption({label:'Test Haushalt '+info.project.name});await page.getByRole('button',{name:'Entfernen',exact:true}).click();await page.getByRole('button',{name:'Wirklich entfernen?',exact:true}).click();await expect(page.getByText('Ansicht entfernt. Buchungen bleiben unverändert.',{exact:true})).toBeVisible();
 });
+test('late card confirmation never replaces a newly selected route',async({page})=>{
+ let release!:()=>void,started=false;const gate=new Promise<void>(r=>release=r);
+ await page.route('**/api/card-documents/previews',r=>r.fulfill({json:{id:'00000000-0000-0000-0000-000000000001',expiresAt:'2099-01-01T12:00:00Z',document,state:'new',settlement:{status:'already-linked'}}}));
+ await page.route('**/api/card-documents/previews/*/confirm',async r=>{started=true;await gate;await r.fulfill({json:{state:'applied',added:2}});});
+ await page.route('**/api/dashboard/assets*',r=>r.fulfill({status:503,json:{error:'Synthetic unavailable'}}));
+ await page.goto('/#/card-documents');await page.getByLabel('Abrechnung auswählen').setInputFiles({name:'synthetic.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.4 synthetic fixture')});
+ await page.locator('#card-reviewed').check();await page.locator('#card-confirm').click();await expect.poll(()=>started).toBe(true);
+ await page.getByRole('link',{name:'Vermögen',exact:true}).click();await expect(page.getByRole('heading',{name:'Nicht verfügbar',exact:true})).toBeVisible();
+ const response=page.waitForResponse(r=>r.url().endsWith('/confirm'));release();await response;
+ await expect(page.getByRole('heading',{name:'Nicht verfügbar',exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'Übernommen',exact:true})).toHaveCount(0);
+});

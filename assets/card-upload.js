@@ -24,7 +24,22 @@ window.FinanceCardUpload=(()=>{
    const enabled=()=>{confirm.disabled=busy||blocked||!reviewed.checked||(link&&!link.checked);};
    reviewed.addEventListener('change',enabled);link?.addEventListener('change',enabled);
    host.querySelector('#card-cancel').addEventListener('click',async()=>{try{await call('/api/card-documents/previews/'+preview.id,{method:'DELETE'});preview=null;render();}catch(e){host.querySelector('#card-message').textContent=e.message;}});
-   confirm.addEventListener('click',async()=>{if(confirm.disabled)return;busy=true;confirm.disabled=true;host.querySelector('#card-cancel').disabled=true;try{const result=await call('/api/card-documents/previews/'+preview.id+'/confirm',{method:'POST',body:JSON.stringify({confirmed:true,settlementKey:link?.checked?settlement.candidateKey:undefined})});preview=null;host.innerHTML=steps(3)+`<section class="section"><h2>${result.state==='duplicate'?'Bereits vorhanden':'Übernommen'}</h2><p>${result.added||0} neue Buchungen. Zahlungsweg wurde geprüft; keine zusätzliche Ausgabensumme aus der Giro-Sammelabbuchung.</p><a class="button" href="#/spending">Ausgaben ansehen</a><a class="button secondary" href="#/data-status">Datenstatus</a></section>`;}catch(e){host.querySelector('#card-message').textContent=e.message;host.querySelector('#card-cancel').disabled=false;confirm.disabled=false;}finally{busy=false;host.setAttribute('aria-busy','false');}});
+   confirm.addEventListener('click',async()=>{
+    if(confirm.disabled)return;
+    busy=true;confirm.disabled=true;host.querySelector('#card-cancel').disabled=true;
+    try{
+     const result=await call('/api/card-documents/previews/'+preview.id+'/confirm',{method:'POST',body:JSON.stringify({confirmed:true,settlementKey:link?.checked?settlement.candidateKey:undefined})});
+     preview=null;
+     // Confirmation continues server-side, but a late answer must never replace
+     // the user's newly selected route or its accessibility/loading state.
+     if(location.hash!=='#/card-documents')return;
+     host.innerHTML=steps(3)+`<section class="section"><h2>${result.state==='duplicate'?'Bereits vorhanden':'Übernommen'}</h2><p>${result.added||0} neue Buchungen. Zahlungsweg wurde geprüft; keine zusätzliche Ausgabensumme aus der Giro-Sammelabbuchung.</p><a class="button" href="#/spending">Ausgaben ansehen</a><a class="button secondary" href="#/data-status">Datenstatus</a></section>`;
+    }catch(e){
+     if(location.hash!=='#/card-documents')return;
+     const notice=host.querySelector('#card-message'),cancel=host.querySelector('#card-cancel');
+     if(notice)notice.textContent=e.message;if(cancel)cancel.disabled=false;confirm.disabled=false;
+    }finally{busy=false;if(location.hash==='#/card-documents')host.setAttribute('aria-busy','false');}
+   });
   };
   async function upload(event){const file=event.target.files?.[0];if(!file)return;if(file.size>12*1024*1024){event.target.value='';host.querySelector('[role=status]').textContent='Die PDF ist größer als 12 MB.';return;}busy=true;render();try{const form=new FormData();form.append('document',file);preview=await call('/api/card-documents/previews',{method:'POST',body:form});}catch(e){busy=false;render();if(location.hash==='#/card-documents')host.querySelector('[role=status]').textContent=e.message;return;}busy=false;render();}
   render();
