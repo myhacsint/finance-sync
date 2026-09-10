@@ -1,6 +1,6 @@
 {
   "name": "finance-sync",
-  "version": "0.51.2",
+  "version": "0.51.3",
   "private": true,
   "description": "Self-hosted finance ingestion, archive and export service for Unraid",
   "type": "module",
@@ -17,7 +17,7 @@
     "test:browser": "playwright test"
   },
   "dependencies": {
-    "@actual-app/api": "26.7.0",
+    "@actual-app/api": "26.9.0",
     "agentmail": "^0.5.20",
     "busboy": "^1.6.0"
   },
