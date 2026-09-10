@@ -369,16 +369,30 @@ export function reviewWindowSelection(
   now: Date,
   timezone: string,
   months = 6
-): { months: number; startDate: string; endDate: string; startMonth: string; endMonth: string } {
+): {
+  months: number;
+  startDate: string;
+  endDate: string;
+  startMonth: string;
+  endMonth: string;
+  currentMonth: string;
+  currentStartDate: string;
+  currentEndDate: string;
+} {
   const allowed = [3, 6, 12, 24].includes(months) ? months : 6;
   const { latestMonth } = spendingMonthSelection(now, timezone);
+  const today = dayParts(now, timezone);
+  const currentMonth = monthKey(today.year, today.month);
   const startMonth = shiftSpendingMonth(latestMonth, -(allowed - 1));
   return {
     months: allowed,
     startDate: `${startMonth}-01`,
     endDate: monthEnd(latestMonth),
     startMonth,
-    endMonth: latestMonth
+    endMonth: latestMonth,
+    currentMonth,
+    currentStartDate: `${currentMonth}-01`,
+    currentEndDate: `${currentMonth}-${String(today.day).padStart(2, "0")}`
   };
 }
 

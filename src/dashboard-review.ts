@@ -32,6 +32,9 @@ export interface DashboardReview {
     months: number;
     startDate: string;
     endDate: string;
+    currentMonth?: string;
+    currentStartDate?: string;
+    currentEndDate?: string;
   };
   counts: {
     uncategorized: number;
@@ -54,7 +57,14 @@ export interface DashboardReviewInput {
   optimizationsOpen: number;
   categories: ReviewCategory[];
   taxonomy?: RecurringExpenseDecision[];
-  window?: { months: number; startDate: string; endDate: string };
+  window?: {
+    months: number;
+    startDate: string;
+    endDate: string;
+    currentMonth?: string;
+    currentStartDate?: string;
+    currentEndDate?: string;
+  };
 }
 
 export function parseSpendingLineId(lineId: string): { parentId: string; transactionId: string } {

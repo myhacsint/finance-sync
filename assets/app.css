@@ -893,6 +893,10 @@
     .work-section[open] > summary svg { transform: rotate(0); }
     .work-section-body { padding: 0 18px 18px; border-top: 1px solid var(--line-soft); }
     .review-booking-list { display: grid; gap: 12px; padding-top: 18px; }
+    .review-period-group + .review-period-group { margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--line); }
+    .review-period-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .review-period-head div { display: grid; gap: 3px; }
+    .review-period-head small { color: var(--muted); }
     .review-booking { display: grid; grid-template-columns: minmax(200px, 1.25fr) auto minmax(180px, .9fr) minmax(180px, .9fr) auto; gap: 12px; align-items: end; padding: 14px; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--canvas); }
     .review-booking > div { align-self: center; min-width: 0; }
     .review-booking > div strong, .review-booking > div span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

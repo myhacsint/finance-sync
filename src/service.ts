@@ -938,7 +938,7 @@ export class FinanceService {
   }> {
     if (!this.config.actual?.enabled) throw new FinanceServiceError("Actual ist deaktiviert", 400);
     const window = reviewWindowSelection(new Date(), this.config.timezone, months);
-    const cacheKey = `${window.startDate}:${window.endDate}`;
+    const cacheKey = `${window.startDate}:${window.currentEndDate}`;
     const now = Date.now();
     let snapshot = this.reviewCache.get(cacheKey);
     if (force || !snapshot || snapshot.expiresAt <= now) {
@@ -947,7 +947,7 @@ export class FinanceService {
         loading = this.withActual(() => readActualSpendingRange(
           this.config.actual!,
           window.startDate,
-          window.endDate,
+          window.currentEndDate,
           new Date(),
           { mode: "review" }
         ));

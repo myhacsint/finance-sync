@@ -72,6 +72,9 @@ test("Prüfansicht behält 24 Monate und schützt Schreibaktionen", () => {
   assert.match(html, /currentMilesMorePreview/);
   assert.match(html, /rule\.deletable/);
   assert.match(html, />Standard<\/span>/);
+  assert.match(html, /Laufender Monat/);
+  assert.match(html, /Abgeschlossene Monate/);
+  assert.match(html, /unvollständig/);
 });
 
 test("gespeicherte Szenarien stellen alle FIRE-Hebel vollständig wieder her", () => {

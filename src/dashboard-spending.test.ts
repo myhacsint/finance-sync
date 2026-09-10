@@ -40,7 +40,10 @@ test("Prüffenster umfasst die letzten vollständigen Monate", () => {
       startDate: "2026-02-01",
       endDate: "2026-07-31",
       startMonth: "2026-02",
-      endMonth: "2026-07"
+      endMonth: "2026-07",
+      currentMonth: "2026-08",
+      currentStartDate: "2026-08-01",
+      currentEndDate: "2026-08-11"
     }
   );
   assert.equal(
