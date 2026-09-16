@@ -1,0 +1,26 @@
+import {test,expect} from '@playwright/test';
+const origin='http://127.0.0.1:18083';
+test('trusted login, session metadata, revocation and same-origin protection',async({page,request},info)=>{
+  await page.goto('/#/card-documents');
+  await expect(page.getByLabel('Verwaltungstoken',{exact:true})).toBeVisible();
+  await page.getByLabel('Diesem Browser 90 Tage vertrauen').check();
+  await page.getByLabel('Verwaltungstoken',{exact:true}).fill('synthetic-browser-test');
+  const login=page.waitForResponse(r=>r.url().endsWith('/api/session'));
+  await page.getByRole('button',{name:'Daten laden',exact:true}).click();
+  const response=await login;
+  const headers=await response.allHeaders();
+  expect(headers['set-cookie']).toContain('Max-Age=7776000');
+  expect(headers['set-cookie']).toContain('HttpOnly');
+  expect(headers['set-cookie']).toContain('SameSite=Strict');
+  expect((await request.get('/api/sessions')).status()).toBe(401);
+  const listed=await page.request.get('/api/sessions');expect(listed.headers()['cache-control']).toBe('no-store');
+  const current=(await listed.json()).sessions.find((s:any)=>s.current);expect(current.trusted).toBe(true);
+  expect((await page.request.delete('/api/sessions/'+current.id,{headers:{origin:'https://foreign.invalid'}})).status()).toBe(403);
+  await page.goto('/#/data-status');await page.getByRole('button',{name:'Zugänge anzeigen',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Hier abmelden',exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBe(0);
+  await page.screenshot({path:'test-results/trusted-browser-'+info.project.name+'.png',fullPage:true});
+  page.once('dialog',d=>d.accept());await page.getByRole('button',{name:'Hier abmelden',exact:true}).click();
+  await expect(page.getByLabel('Verwaltungstoken',{exact:true})).toBeVisible();
+  expect((await page.request.get('/api/sessions')).status()).toBe(401);
+});

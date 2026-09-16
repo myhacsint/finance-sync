@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { timingSafeEqual, randomUUID } from "node:crypto";
-import { BrowserSessions } from "./browser-sessions.js";
+import { BrowserSessions, SESSION_SECONDS, TRUSTED_SECONDS } from "./browser-sessions.js";
 import { loadConfig, paths, readSecret } from "./config.js";
 import { FinanceDatabase } from "./database.js";
 import { FinanceService, FinanceServiceError } from "./service.js";
@@ -48,7 +48,7 @@ const pensionPreviews = new PensionPreviewStore();
 const sutorPreviews = new SutorPreviewStore();
 const cardPreviews = new CardPreviews();
 let cardConfirmBusy=false;
-const browserSessions = new BrowserSessions();
+const browserSessions = new BrowserSessions(db);
 let pensionParserBusy = false;
 const pensionUploadAttempts = new Map<string, number[]>();
 const financeHubMark = readFileSync(new URL("../assets/finance-hub-mark.png", import.meta.url));
@@ -268,14 +268,27 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/api/session") {
       if (!authorized(req, true)) return json(res, 401, { error: "Nicht autorisiert" });
       if (!sameOriginMutation(req)) return json(res, 403, { error: "Ungültiger Anfrageursprung" });
-      const id = browserSessions.create(readSecret("admin-token")!);
+      const payload = (req.headers["transfer-encoding"] || Number(req.headers["content-length"] ?? 0) > 0
+        ? await body(req, 512) : {}) as { remember?: boolean };
+      if (!payload || (payload.remember !== undefined && typeof payload.remember !== "boolean")) return json(res, 400, { error: "Ungültige Sitzungsdauer" });
+      const trusted = payload.remember === true;
+      const id = browserSessions.create(readSecret("admin-token")!, Date.now(), trusted);
       const secure = config.publicBaseUrl?.startsWith("https:") ? "; Secure" : "";
-      res.setHeader("set-cookie", `finance_session=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${secure}`);
+      res.setHeader("set-cookie", `finance_session=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${trusted ? TRUSTED_SECONDS : SESSION_SECONDS}${secure}`);
       return json(res, 200, { authenticated: true });
     }
     if (!authorized(req)) return json(res, 401, { error: "Nicht autorisiert" });
     if (req.method !== "GET" && req.method !== "HEAD" && !authorized(req, true) && !sameOriginMutation(req)) {
       return json(res, 403, { error: "Ungültiger Anfrageursprung" });
+    }
+    if (req.method === "GET" && url.pathname === "/api/sessions") return json(res, 200, { sessions: browserSessions.list(req.headers.cookie, readSecret("admin-token")!) });
+    const revokedSession = /^\/api\/sessions\/([a-f0-9]{64})$/.exec(url.pathname);
+    if (req.method === "DELETE" && revokedSession) {
+      if (!sameOriginMutation(req)) return json(res, 403, { error: "Ungültiger Anfrageursprung" });
+      const current = browserSessions.list(req.headers.cookie, readSecret("admin-token")!).some(s => s.id === revokedSession[1] && s.current);
+      browserSessions.revoke(revokedSession[1]);
+      if (current) res.setHeader("set-cookie", `finance_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${config.publicBaseUrl?.startsWith("https:") ? "; Secure" : ""}`);
+      return json(res, 200, { revoked: true, current });
     }
     if(req.method==='GET' && url.pathname==='/api/card-documents/receipts')return json(res,200,{receipts:listCardReceipts(db)});
     if(req.method==='POST' && url.pathname==='/api/card-documents/previews') {

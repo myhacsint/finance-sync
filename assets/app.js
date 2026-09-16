@@ -88,7 +88,7 @@ function submitToken(event){
 document.getElementById("token-form").addEventListener("submit",submitToken);
 async function apiRequest(path,options={},retry=true){
   if(token){
-    sessionExchange ||= fetch("/api/session",{method:"POST",headers:{authorization:"Bearer "+token}});
+    sessionExchange ||= fetch("/api/session",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({remember:document.getElementById("remember-browser").checked})});
     const response=await sessionExchange;
     token="";sessionStorage.removeItem("financeToken");localStorage.removeItem("financeToken");
     sessionExchange=undefined;
@@ -1520,6 +1520,31 @@ function renderDashboard(data){
   document.getElementById("dashboard").setAttribute("aria-busy","false");
 }
 
+function appendBrowserSessions(){
+  const access=document.createElement("section");access.className="section";
+  access.innerHTML='<h2>Browserzugänge</h2><p>Jeder Browser wird separat angemeldet. Ein Widerruf beendet seinen Zugang sofort.</p><button class="button secondary" type="button">Zugänge anzeigen</button><div role="status" aria-live="polite"></div>';
+  document.getElementById("dashboard").append(access);
+  const output=access.querySelector('[role="status"]');
+  async function loadSessions(){
+    output.textContent="Zugänge werden geladen …";
+    try{
+      const data=await apiRequest('/api/sessions');output.replaceChildren();
+      if(!data.sessions.length)output.textContent="Keine aktiven Browserzugänge.";
+      for(const session of data.sessions){
+        const row=document.createElement('div');row.className='browser-session-row';
+        const label=document.createElement('p');label.textContent=(session.current?'Dieser Browser':'Weiterer Browser')+' · '+(session.trusted?'90-Tage-Zugang':'8-Stunden-Zugang')+' · angemeldet '+formatDate(session.createdAt,true)+' · gültig bis '+formatDate(session.expiresAt,true);
+        const button=document.createElement('button');button.className='button secondary';button.type='button';button.textContent=session.current?'Hier abmelden':'Zugang widerrufen';
+        button.addEventListener('click',async()=>{
+          if(!window.confirm(session.current?'Diesen Browser jetzt abmelden?':'Diesen Browserzugang jetzt widerrufen?'))return;
+          button.disabled=true;
+          try{const result=await apiRequest('/api/sessions/'+session.id,{method:'DELETE'});if(result.current){location.reload();return;}await loadSessions();}
+          catch(error){output.textContent=error.message;}
+        });row.append(label,button);output.append(row);
+      }
+    }catch(error){output.textContent=error.message;}
+  }
+  access.querySelector('button').addEventListener('click',loadSessions);
+}
 function renderHeader(view){
   const content={
     overview:{title:"Übersicht",subtitle:"Finanzen, Vermögen und offene Punkte auf einen Blick."},
@@ -1666,7 +1691,7 @@ async function refresh(force=false){
         const data=await call("/api/dashboard/analyses?"+params.toString());renderAnalyses(data);
       }
     }else{
-      const data=await call("/api/dashboard/status");renderDashboard(data);await loadManualSources();
+      const data=await call("/api/dashboard/status");renderDashboard(data);appendBrowserSessions();await loadManualSources();
     }
     msg("");
   }

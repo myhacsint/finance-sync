@@ -47,13 +47,15 @@ export function renderUi(publicBaseUrl?: string): string {
         <div id="message" class="notice" role="status" aria-live="polite"></div>
         <section class="token-request" id="token-request" aria-hidden="true" aria-labelledby="token-request-title">
           <h2 id="token-request-title">Zugang zum Finance Hub</h2>
-          <p>Bestätige deinen Zugang mit dem Verwaltungstoken. Danach wird nur eine geschützte Sitzung für bis zu acht Stunden verwendet.</p>
+          <p>Bestätige deinen Zugang mit dem Verwaltungstoken. Ohne Vertrauensoption gilt der Zugang acht Stunden.</p>
           <form id="token-form">
             <label for="token-input">Verwaltungstoken</label>
             <div class="token-request-row">
               <input id="token-input" type="password" autocomplete="off" spellcheck="false" required>
               <button class="button" type="submit">Daten laden</button>
             </div>
+            <label class="trusted-browser-option"><input id="remember-browser" name="remember-browser" type="checkbox" autocomplete="off"> <span>Diesem Browser 90 Tage vertrauen</span></label>
+            <p>Nur auf deinem eigenen Gerät wählen. Unter Status kannst du jeden Zugang einzeln widerrufen. Der Verwaltungstoken wird nicht im Browser gespeichert.</p>
           </form>
         </section>
         <div id="dashboard" aria-busy="true">

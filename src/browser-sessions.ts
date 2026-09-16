@@ -1,18 +1,47 @@
 import { createHash, randomBytes } from "node:crypto";
-
+export const SESSION_SECONDS = 8 * 3600;
+export const TRUSTED_SECONDS = 90 * 24 * 3600;
+export const SESSION_STORE_KEY = "security:browser-sessions:v1";
+interface Store { getSetting(key: string): string | undefined; setSetting(key: string, value: string): void }
+interface Session { id: string; expires: number; created: number; tokenHash: string; trusted: boolean }
+/** Persist credential hashes only, never the cookie or management token. */
 export class BrowserSessions {
-  private sessions = new Map<string, { expires: number; tokenHash: string }>();
-  create(token: string, now = Date.now()): string {
-    for (const [id, session] of this.sessions) if (session.expires <= now) this.sessions.delete(id);
-    if (this.sessions.size >= 100) this.sessions.delete(this.sessions.keys().next().value!);
-    const id = randomBytes(32).toString("hex");
-    this.sessions.set(id, { expires: now + 8 * 3600_000, tokenHash: this.hash(token) });
-    return id;
+  private memory: Session[] = [];
+  constructor(private store?: Store) {}
+  private read(): Session[] {
+    if (!this.store) return this.memory;
+    try {
+      const rows: unknown = JSON.parse(this.store.getSetting(SESSION_STORE_KEY) ?? "[]");
+      if (!Array.isArray(rows)) return [];
+      return rows.filter((s): s is Session => s && /^[a-f0-9]{64}$/.test(s.id)
+        && /^[a-f0-9]{64}$/.test(s.tokenHash) && Number.isFinite(s.expires)
+        && Number.isFinite(s.created) && typeof s.trusted === "boolean").slice(-100);
+    } catch { return []; }
+  }
+  private write(rows: Session[]): void {
+    if (this.store) this.store.setSetting(SESSION_STORE_KEY, JSON.stringify(rows));
+    else this.memory = rows;
+  }
+  create(token: string, now = Date.now(), trusted = false): string {
+    const rows = this.read().filter(s => s.expires > now && s.tokenHash === this.hash(token)).slice(-99);
+    const credential = randomBytes(32).toString("hex");
+    rows.push({ id: this.hash(credential), expires: now + (trusted ? TRUSTED_SECONDS : SESSION_SECONDS) * 1000,
+      created: now, tokenHash: this.hash(token), trusted });
+    this.write(rows);
+    return credential;
+  }
+  private cookieId(cookie?: string): string | undefined {
+    const credential = /(?:^|;\s*)finance_session=([a-f0-9]{64})(?:;|$)/.exec(cookie ?? "")?.[1];
+    return credential ? this.hash(credential) : undefined;
   }
   valid(cookie: string | undefined, token: string, now = Date.now()): boolean {
-    const id = /(?:^|;\s*)finance_session=([a-f0-9]{64})(?:;|$)/.exec(cookie ?? "")?.[1];
-    const session = id ? this.sessions.get(id) : undefined;
-    return Boolean(token && session && session.expires > now && session.tokenHash === this.hash(token));
+    return Boolean(token && this.read().some(s => s.id === this.cookieId(cookie) && s.expires > now && s.tokenHash === this.hash(token)));
   }
+  list(cookie: string | undefined, token: string, now = Date.now()) {
+    return this.read().filter(s => s.expires > now && s.tokenHash === this.hash(token))
+      .map(s => ({ id: s.id, createdAt: new Date(s.created).toISOString(), expiresAt: new Date(s.expires).toISOString(),
+        trusted: s.trusted, current: s.id === this.cookieId(cookie) }));
+  }
+  revoke(id: string): void { this.write(this.read().filter(s => s.id !== id)); }
   private hash(token: string): string { return createHash("sha256").update(token).digest("hex"); }
 }
