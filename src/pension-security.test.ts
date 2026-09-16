@@ -20,6 +20,19 @@ test("active PDF content is rejected", () => {
   assert.throws(() => assertSafePdfJson("not-json"), /PDF_STRUCTURE_INVALID/);
 });
 
+test("only internal XYZ start views with valid parameters are allowed", () => {
+  const doc = (action: unknown, extra = {}) => JSON.stringify({ pages: [{ object: "3 0 R" }], catalog: { "/OpenAction": action }, ...extra });
+  assert.doesNotThrow(() => assertSafePdfJson(doc(["3 0 R", "/XYZ", 0, 842.5, 0])));
+  assert.doesNotThrow(() => assertSafePdfJson(doc(["3 0 R", "/XYZ", null, null, null])));
+  for (const action of [
+    ["9 0 R", "/XYZ", 0, 0, 0], ["3 0 R", "/XYZ", 0, 0, -1],
+    ["3 0 R", "/XYZ", "bad", 0, 0], ["3 0 R", "/XYZ", 0, 0],
+    ["3 0 R", "/Fit"], "4 0 R", { "/S": "/GoToR" }, { "/S": "/JavaScript" }
+  ]) assert.throws(() => assertSafePdfJson(doc(action)), /PDF_ACTIVE_CONTENT/);
+  for (const key of ["/JS", "/JavaScript", "/Launch", "/EmbeddedFile", "/AA", "/RichMedia"])
+    assert.throws(() => assertSafePdfJson(doc(["3 0 R", "/XYZ", 0, 0, 0], { [key]: {} })), /PDF_ACTIVE_CONTENT/);
+});
+
 test("malware scanner fails closed and distinguishes a detection", async () => {
   const stale = process.env.FINANCE_CLAMAV_DATABASE_DIR;
   const root = mkdtempSync(join(tmpdir(), "finance-clam-test-"));

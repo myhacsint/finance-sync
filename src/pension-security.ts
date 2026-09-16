@@ -61,11 +61,25 @@ export function assertSafePdfJson(json: string): void {
   const forbidden = ["/JavaScript", "/JS", "/Launch", "/EmbeddedFile", "/OpenAction", "/AA", "/RichMedia"];
   let parsed: unknown;
   try { parsed = JSON.parse(json); } catch { throw new Error("PDF_STRUCTURE_INVALID"); }
+  // Only explicit internal XYZ destinations are supported. Named destinations,
+  // action dictionaries and indirect action references remain fail-closed.
+  const pages = new Set<string>();
+  if (parsed && typeof parsed === "object" && "pages" in parsed && Array.isArray(parsed.pages)) {
+    for (const page of parsed.pages) {
+      if (page && typeof page.object === "string" && /^\d+ \d+ R$/.test(page.object)) pages.add(page.object);
+    }
+  }
+  const safeStartView = (value: unknown): boolean => {
+    if (!Array.isArray(value) || value.length !== 5 || !pages.has(value[0]) || value[1] !== "/XYZ") return false;
+    return value.slice(2).every((n) => n === null || (typeof n === "number" && Number.isFinite(n)))
+      && (value[4] === null || value[4] >= 0);
+  };
   const inspect = (value: unknown): boolean => {
     if (typeof value === "string") return forbidden.includes(value);
     if (Array.isArray(value)) return value.some(inspect);
     if (value && typeof value === "object") {
-      return Object.entries(value).some(([key, child]) => forbidden.includes(key) || inspect(child));
+      return Object.entries(value).some(([key, child]) =>
+        (forbidden.includes(key) && !(key === "/OpenAction" && safeStartView(child))) || inspect(child));
     }
     return false;
   };
