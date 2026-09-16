@@ -29,6 +29,19 @@ The report is not a tax statement. It does not read or invent PDF confirmations,
 include private counterparties/memos in the endpoint, or alter existing expense
 calculations. The later explicit classification/confirmation step is separate.
 
+## Explicit user fee policy (0.53.1)
+
+Without a policy all differences remain unresolved. A separately audited,
+`USER_CONFIRMED` policy in `dkb-depot-fee-policy:v1` permits EUR10 for its one
+named DKB source only: purchase debit = bank-reported value + EUR10, or sale
+credit = value - EUR10. Unique candidate plus ISIN and quantity evidence is
+required. Specific user-confirmed pairs may additionally bind exact IDs, values,
+quantity, ISIN and date where the memo is missing. Ambiguity still blocks them.
+
+Reports identify `USER_CONFIRMED_RULE` versus `USER_CONFIRMED_TRANSACTION` and
+the confirmation timestamp. This is not evidence extracted from a PDF, and does
+not overwrite native MT536 values or silently split Actual transactions.
+
 ## Rollback
 
 Disable the source flag and restore the prior versioned container. No destructive

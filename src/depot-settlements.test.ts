@@ -31,3 +31,21 @@ test('same reference is idempotent but economic corrections fail closed',()=>{
  assert.throws(()=>db.importActivities([{...activity,quantityAtomic:'4'}]),/Widersprüchlicher Depotumsatz/);
  assert.equal(db.query('SELECT COUNT(*) AS n FROM investment_activities')[0].n,1);db.close();
 });
+function policy(db:FinanceDatabase, pairs:unknown[]=[]){db.setSetting('dkb-depot-fee-policy:v1',JSON.stringify({sourceId:'test',confirmedAt:'2026-09-16T08:00:00Z',evidence:'USER_CONFIRMED',feeMinor:1000,currency:'EUR',pairs}));}
+test('explicit fee rule only accepts correct sign and full securities evidence',()=>{
+ const db=fixture(1000);policy(db);const result=depotSettlementReport(db)[0];
+ assert.equal(result.status,'CONFIRMED_WITH_FEE');assert.equal(result.feeMinor,1000);assert.equal(result.feeEvidence,'USER_CONFIRMED_RULE');db.close();
+ for(const [delta,memo] of [[-1000,'Wertpapierabrechnung Stück 3 ISIN US0378331005'],[1000,''],[900,'Wertpapierabrechnung Stück 3 ISIN US0378331005']] as const){
+  const d=fixture(delta,memo);policy(d);assert.equal(depotSettlementReport(d)[0].feeMinor,null);d.close();
+ }
+});
+test('specific confirmation binds complete economics and cannot survive changed data',()=>{
+ const db=fixture(1000,'');const r=depotSettlementReport(db)[0];
+ const pair={activityId:r.activityId,bankTransactionId:r.bankTransactionId,amountMinor:30000,bankAmountMinor:-31000,symbol:'US0378331005',quantityAtomic:'3',atomicDecimals:0,date:'2026-08-20'};
+ policy(db,[pair]);assert.equal(depotSettlementReport(db)[0].feeEvidence,'USER_CONFIRMED_TRANSACTION');
+ policy(db,[{...pair,quantityAtomic:'4'}]);assert.equal(depotSettlementReport(db)[0].feeMinor,null);db.close();
+});
+test('fee rule does not resolve multiple candidate ambiguity or another source',()=>{
+ const db=fixture(1000);policy(db);db.importTransactions([{sourceId:'test',sourceTransactionId:'cash2',accountId:'other',bookedAt:'2026-08-21',amountMinor:-31000n,currency:'EUR',payee:'DKB',rawHash:'synthetic'}]);assert.equal(depotSettlementReport(db)[0].feeMinor,null);db.close();
+ const other=fixture(1000);policy(other);other.db.prepare("UPDATE investment_activities SET source_id='other'").run();assert.equal(depotSettlementReport(other)[0].feeMinor,null);other.close();
+});
