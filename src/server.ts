@@ -5,6 +5,7 @@ import { timingSafeEqual, randomUUID } from "node:crypto";
 import { BrowserSessions, SESSION_SECONDS, TRUSTED_SECONDS } from "./browser-sessions.js";
 import { loadConfig, paths, readSecret } from "./config.js";
 import { FinanceDatabase } from "./database.js";
+import { depotSettlementReport } from "./depot-settlements.js";
 import { FinanceService, FinanceServiceError } from "./service.js";
 import type {
   RecurringExpenseDecision,
@@ -810,6 +811,9 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "GET" && url.pathname === "/api/status") {
       return json(res, 200, { sources: db.listSources() });
+    }
+    if (req.method === "GET" && url.pathname === "/api/depot-settlements") {
+      return json(res, 200, { observations: depotSettlementReport(db), automaticBookingChanges: false });
     }
     if (req.method === "GET" && url.pathname === "/api/manual-workflow/sources") {
       return json(res, 200, { sources: manualPreviews.listSources(config) });

@@ -1240,7 +1240,7 @@ export class FinanceService {
     if (this.config.ghostfolio?.enabled && publishDkbHoldings) {
       counts.ghostfolio = await journal.stage("ghostfolio-activities", () => pushToGhostfolio(
         this.config.ghostfolio!,
-        bundle.activities ?? []
+        source.kind === "dkb-fints" ? [] : bundle.activities ?? []
       ));
       const capturedAtByAccount = new Map<string, string>();
       for (const item of [...(bundle.holdings ?? []), ...(bundle.balances ?? [])]) {

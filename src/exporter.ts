@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { writeAtomic } from "./archive.js";
 import type { FinanceDatabase } from "./database.js";
+import { depotSettlementReport } from "./depot-settlements.js";
 
 export function csvCell(value: unknown, spreadsheetSafe = false): string {
   if (value === null || value === undefined) return "";
@@ -20,6 +21,9 @@ function toCsv(rows: Record<string, unknown>[], spreadsheetSafe = false): string
 
 export function exportAll(db: FinanceDatabase, archiveRoot: string): void {
   const exportsDir = join(archiveRoot, "exports");
+  const settlements = depotSettlementReport(db);
+  writeAtomic(join(exportsDir, 'depot_settlements.csv'), toCsv(settlements));
+  writeAtomic(join(exportsDir, 'tabellensicher', 'depot_settlements.csv'), toCsv(settlements, true));
   const datasets: Array<[string, string]> = [
     ["transactions.csv", `
       SELECT source_id, source_transaction_id, account_id, booked_at, value_at,

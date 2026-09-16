@@ -12,7 +12,7 @@ import json
 import logging
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any
 
 
@@ -177,11 +177,15 @@ def continuation(
         "phase": phase,
         "accountIndex": account_index,
         "completed": completed,
+        # Preserve already received turnover pages across SCA pauses.
+        "turnoverPages": [raw_payload(s) for s in getattr(client, '_touchdown_responses', [])]
+            if phase == 'transactions' else [],
+        "turnoverTouchdown": getattr(client, '_touchdown', None) if phase == 'transactions' else None,
     }
 
 
 def raw_payload(segment: Any) -> str:
-    value = segment.holdings
+    value = segment.holdings if hasattr(segment, 'holdings') else segment.transactions
     if isinstance(value, bytes):
         for encoding in ("utf-8", "iso-8859-1"):
             try:
@@ -296,6 +300,19 @@ def request_holdings(client: Any, config: dict[str, Any], account: dict[str, Any
         )
 
 
+def turnover_factory(config: dict[str, Any], account: dict[str, Any]):
+    from dkb_transactions import segment_factory as turnover_segment_factory
+    end = datetime.now(timezone.utc).date()
+    return turnover_segment_factory(config, account, end - timedelta(days=90), end)
+
+
+def attach_turnovers(portfolio: dict[str, Any], segments: list[Any]) -> None:
+    from dkb_transactions import parse_mt536
+    raw = [raw_payload(segment) for segment in segments]
+    portfolio['rawMt536'] = raw
+    portfolio['turnovers'] = [item for text in raw for item in parse_mt536(text)]
+
+
 def prepare_touchdown_resume(client: Any, config: dict[str, Any], account: dict[str, Any]) -> None:
     factory = segment_factory(client, config, account)
     client._touchdown_responses = []
@@ -320,6 +337,7 @@ def fetch_remaining(
     accounts = config["accounts"]
     captured_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     pending: tuple[Any, bytes, int] | None = None
+    pending_phase = 'holding'
     with client:
         if isinstance(client.init_tan_response, NeedTANResponse):
             dialog_data = client.pause_dialog()
@@ -332,6 +350,17 @@ def fetch_remaining(
                     pending = (result, dialog_data, index)
                     break
                 completed.append(portfolio_from_segments(accounts[index], result, captured_at))
+                if config.get('fetchTransactions', False):
+                    with client._get_dialog() as dialog:
+                        turnovers = client._fetch_with_touchdowns(
+                            dialog, turnover_factory(config, accounts[index]),
+                            lambda responses: responses, 'HIWDU'
+                        )
+                    if isinstance(turnovers, NeedTANResponse):
+                        pending = (turnovers, client.pause_dialog(), index)
+                        pending_phase = 'transactions'
+                        break
+                    attach_turnovers(completed[-1], turnovers)
     if pending:
         challenge, dialog_data, index = pending
         response = public_challenge(challenge)
@@ -339,7 +368,7 @@ def fetch_remaining(
             state="WAITING_FOR_USER",
             continuation=continuation(
                 client, challenge, dialog_data,
-                "init" if challenge is client.init_tan_response else "holding",
+                "init" if challenge is client.init_tan_response else pending_phase,
                 index, completed,
             ),
         )
@@ -365,7 +394,7 @@ def continue_fetch(payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(state, dict):
         raise ValueError("DKB-FinTS Fortsetzungszustand fehlt")
     phase = str(state.get("phase") or "")
-    if phase not in ("init", "holding"):
+    if phase not in ("init", "holding", "transactions"):
         raise ValueError("Ungültige DKB-FinTS Fortsetzungsphase")
     index = int(state.get("accountIndex", 0))
     completed = state.get("completed")
@@ -386,6 +415,16 @@ def continue_fetch(payload: dict[str, Any]) -> dict[str, Any]:
     with client.resume_dialog(dialog_data):
         if phase == "holding":
             prepare_touchdown_resume(client, payload["config"], payload["config"]["accounts"][index])
+        elif phase == 'transactions':
+            from types import SimpleNamespace
+            client._touchdown_responses = [SimpleNamespace(transactions=raw) for raw in state.get('turnoverPages', [])]
+            client._touchdown_counter = 1
+            client._touchdown = state.get('turnoverTouchdown')
+            client._touchdown_dialog = client._standing_dialog
+            client._touchdown_segment_factory = turnover_factory(payload['config'], payload['config']['accounts'][index])
+            client._touchdown_response_processor = lambda responses: responses
+            client._touchdown_args = ('HIWDU',)
+            client._touchdown_kwargs = {}
         result = client.send_tan(challenge, str(payload.get("tan") or ""))
         if isinstance(result, NeedTANResponse):
             pending = (result, client.pause_dialog())
@@ -404,6 +443,25 @@ def continue_fetch(payload: dict[str, Any]) -> dict[str, Any]:
         completed.append(
             portfolio_from_segments(payload["config"]["accounts"][index], result, captured_at)
         )
+        if payload['config'].get('fetchTransactions', False):
+            with client:
+                if isinstance(client.init_tan_response, NeedTANResponse):
+                    # Retain the completed holdings and continue with turnovers
+                    # only after this new login has been approved.
+                    raise ValueError('Erneute Anmeldung nach Depotfreigabe erforderlich; Abruf bitte neu starten')
+                with client._get_dialog() as dialog:
+                    turnovers = client._fetch_with_touchdowns(
+                        dialog, turnover_factory(payload['config'], payload['config']['accounts'][index]),
+                        lambda responses: responses, 'HIWDU')
+                if isinstance(turnovers, NeedTANResponse):
+                    response = public_challenge(turnovers)
+                    response.update(state='WAITING_FOR_USER', continuation=continuation(
+                        client, turnovers, client.pause_dialog(), 'transactions', index, completed))
+                    return response
+                attach_turnovers(completed[-1], turnovers)
+        index += 1
+    elif phase == 'transactions':
+        attach_turnovers(completed[-1], result)
         index += 1
     return fetch_remaining(client, payload, index, completed)
 

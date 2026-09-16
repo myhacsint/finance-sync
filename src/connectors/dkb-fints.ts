@@ -6,6 +6,7 @@ import type {
   ImportBundle,
   NormalizedBalance,
   NormalizedHolding,
+  NormalizedActivity,
   SourceConfig,
   SyncResult
 } from "../types.js";
@@ -38,6 +39,8 @@ interface DkbHelperPortfolio {
   capturedAt: string;
   rawMt535: string[];
   positions: DkbHelperPosition[];
+  rawMt536?: string[];
+  turnovers?: Array<{ identity: string; isin: string; direction: "RECE" | "DELI"; quantity: string; date: string; amount?: string; currency?: string }>;
 }
 
 export interface DkbHelperOutput {
@@ -66,6 +69,7 @@ interface DkbHelperInput {
     serverUrl: string;
     tanMechanism: string;
     tanMedium?: string;
+    fetchTransactions: boolean;
     accounts: DkbAccountConfig[];
   };
 }
@@ -135,6 +139,7 @@ function helperConfig(source: SourceConfig): DkbHelperInput["config"] {
     serverUrl,
     tanMechanism: String(source.settings?.tanMechanism ?? DEFAULT_TAN_MECHANISM),
     tanMedium: String(source.settings?.tanMedium ?? "").trim() || undefined,
+    fetchTransactions: source.settings?.fetchTransactions === true,
     accounts: sourceAccounts(source)
   };
 }
@@ -180,11 +185,27 @@ export function normalizeDkbFintsBundle(
     throw new Error("DKB-FinTS lieferte keinen vollständigen Depotbestand");
   }
   const holdings: NormalizedHolding[] = [];
+  const activities: NormalizedActivity[] = [];
   const balances: NormalizedBalance[] = [];
   for (const portfolio of portfolios) {
     const account = configured.get(portfolio.accountId);
     if (!account) throw new Error("DKB-FinTS lieferte ein nicht konfiguriertes Depot");
     const rawHash = sha256(JSON.stringify(portfolio));
+    for (const turnover of portfolio.turnovers ?? []) {
+      if (!/^[a-f0-9]{64}$/.test(turnover.identity) || !/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(turnover.isin)
+        || !['RECE', 'DELI'].includes(turnover.direction) || !/^\d{4}-\d{2}-\d{2}$/.test(turnover.date)) {
+        throw new Error('Ungültiger DKB-Depotumsatz');
+      }
+      const quantity = decimalParts(turnover.quantity);
+      if (BigInt(quantity.atomic) <= 0n) throw new Error('Ungültige DKB-Depotumsatzmenge');
+      activities.push({sourceId: source.id, accountId: portfolio.accountId,
+        sourceActivityId: sha256(`${portfolio.accountId}:${turnover.identity}`),
+        occurredAt: turnover.date, type: `DEPOT_${turnover.direction}`,
+        symbol: turnover.isin, quantityAtomic: quantity.atomic, atomicDecimals: quantity.decimals,
+        amountMinor: turnover.amount === undefined ? undefined : moneyMinor(turnover.amount),
+        currency: turnover.currency, rawHash,
+        note: 'FinTS MT536 observation; not a confirmed trade; fees unknown'});
+    }
     const values: Array<{ amount: bigint; currency: string }> = [];
     for (const position of portfolio.positions) {
       if (!/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(position.isin)) {
@@ -233,7 +254,8 @@ export function normalizeDkbFintsBundle(
       portfolios
     },
     holdings,
-    balances
+    balances,
+    activities
   };
 }
 

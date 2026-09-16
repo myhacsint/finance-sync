@@ -759,6 +759,16 @@ export class FinanceDatabase {
       const identity = item.sourceActivityId
         ? `${item.sourceId}:id:${item.sourceActivityId}`
         : `${item.sourceId}:hash:${item.rawHash}:${item.accountId}:${item.occurredAt}:${item.type}`;
+      if (item.type === 'DEPOT_RECE' || item.type === 'DEPOT_DELI') {
+        const existing = this.db.prepare('SELECT account_id, occurred_at, type, symbol, quantity_atomic, atomic_decimals, amount_minor, currency FROM investment_activities WHERE identity_key=?').get(identity);
+        if (existing && (existing.account_id !== item.accountId || existing.occurred_at !== item.occurredAt
+          || existing.type !== item.type || existing.symbol !== item.symbol
+          || existing.quantity_atomic !== item.quantityAtomic || existing.atomic_decimals !== item.atomicDecimals
+          || (existing.amount_minor === null ? null : String(existing.amount_minor)) !== (item.amountMinor === undefined ? null : String(item.amountMinor))
+          || existing.currency !== (item.currency ?? null))) {
+          throw new Error('Widersprüchlicher Depotumsatz mit bestehender Bankreferenz; Prüfung erforderlich');
+        }
+      }
       inserted += Number(stmt.run(
         item.sourceId, item.sourceActivityId ?? null, item.accountId,
         item.occurredAt, item.type, item.symbol ?? null,
