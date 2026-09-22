@@ -29,9 +29,12 @@ export function buildHealth(db: FinanceDatabase, config: AppConfig): HealthRepor
   const warnings: string[] = [];
   const critical: string[] = [];
   const now = Date.now();
-  if (process.env.FINANCE_PARSER_WORK_DIR) {
+  const parserWorkDir = process.env.FINANCE_PARSER_WORK_DIR;
+  if (!parserWorkDir) {
+    warnings.push("Isolierte Dokumenterkennung ist nicht konfiguriert; FINANCE_PARSER_WORK_DIR setzen");
+  } else {
     try {
-      if (now - statSync(join(process.env.FINANCE_PARSER_WORK_DIR, ".queue", "heartbeat")).mtimeMs > 90_000) throw new Error();
+      if (now - statSync(join(parserWorkDir, ".queue", "heartbeat")).mtimeMs > 90_000) throw new Error();
     } catch {
       warnings.push("Isolierte Dokumenterkennung nicht verfügbar; Dokument-Worker in Unraid prüfen");
     }
