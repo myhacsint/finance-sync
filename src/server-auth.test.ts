@@ -133,11 +133,12 @@ test("OIDC admin and viewer access; viewer blocks every write route discovered f
   const app = await fixture(true);
   try {
     const admin = await app.login("admin");
-    assert.equal(admin.callback.status, 302);
+    assert.equal(admin.callback.status, 200);
+    assert.match(await admin.callback.clone().text(), /http-equiv="refresh" content="0;url=\/"/);
     assert.equal((await fetch(app.base + "/api/sessions", { headers: { cookie: admin.cookie } })).status, 200);
     assert.match(await (await fetch(app.base + "/", { headers: { cookie: admin.cookie } })).text(), /Anmelden mit Pocket ID/);
     const viewer = await app.login("viewer");
-    assert.equal(viewer.callback.status, 302);
+    assert.equal(viewer.callback.status, 200);
     assert.equal((await fetch(app.base + "/api/dashboard/overview", { headers: { cookie: viewer.cookie } })).status, 200);
     assert.deepEqual(await (await fetch(app.base + "/api/me", { headers: { cookie: viewer.cookie } })).json(), { role: "viewer" });
     assert.equal((await fetch(app.base + "/api/session", { method: "POST", headers: { cookie: viewer.cookie, origin: app.base }, body: "{}" })).status, 403);

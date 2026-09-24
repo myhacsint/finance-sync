@@ -230,8 +230,11 @@ const server = createServer(async (req, res) => {
           const role = await oidc.finish(url.searchParams.get("code") ?? "", url.searchParams.get("state") ?? "", req.headers.cookie);
           const id = browserSessions.create(readSecret("admin-token")!, Date.now(), true, role);
           res.setHeader("set-cookie", [clear, `finance_session=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${TRUSTED_SECONDS}${config.publicBaseUrl?.startsWith("https:") || oidcBaseUrl?.startsWith("https:") ? "; Secure" : ""}`]);
-          res.writeHead(302, { ...securityHeaders, location: "/" });
-          return res.end();
+          // A 302 here would still be part of the cross-site navigation from the IdP, so the
+          // browser would not send the SameSite=Strict session cookie on "/". A same-origin
+          // meta refresh starts a fresh same-site navigation that carries the cookie.
+          res.writeHead(200, { ...securityHeaders, "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+          return res.end(`<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=/"><title>Finance Hub</title><p><a href="/">Weiter zum Finance Hub</a></p>`);
         } catch (error) {
           const forbidden = error instanceof Error && error.message === "Kein Zugang";
           res.writeHead(forbidden ? 403 : 400, { ...securityHeaders, "content-type": "text/html; charset=utf-8" });
