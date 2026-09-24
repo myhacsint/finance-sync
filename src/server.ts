@@ -38,6 +38,8 @@ import { listSavedViews, saveView, deleteView } from "./saved-views.js";
 import { CardPreviews,parseCardPages,cardDerivedText,cardReceipt,cardSemanticHash,listCardReceipts } from "./card-document.js";
 import { confirmCardDocument } from "./card-confirm.js";
 
+const HQ_READ_PATHS = new Set(["/api/dashboard/overview", "/api/dashboard/wealth-history"]);
+
 mkdirSync(paths.data, { recursive: true });
 mkdirSync(paths.archive, { recursive: true });
 mkdirSync(paths.inbox, { recursive: true });
@@ -212,7 +214,8 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
     // The HQ credential must not inherit even the public GET routes.
     if (bearerMatches(req, "hq-read-token")) {
-      if (!(["GET", "HEAD"].includes(req.method ?? "") && url.pathname === "/api/dashboard/overview")) {
+      // Overview plus the wealth curve (dates + totals only); nothing else, no writes.
+      if (!(["GET", "HEAD"].includes(req.method ?? "") && HQ_READ_PATHS.has(url.pathname))) {
         return json(res, url.pathname === "/api/session" ? 401 : 403, { error: "Nicht autorisiert" });
       }
     }

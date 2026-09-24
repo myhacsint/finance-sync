@@ -122,10 +122,13 @@ test("optional OIDC stays disabled and token login continues; HQ token is overvi
     const session = await fetch(app.base + "/api/session", { method: "POST", headers: { authorization: "Bearer test-admin-token", origin: app.base }, body: "{}" });
     assert.equal(session.status, 200);
     assert.equal((await fetch(app.base + "/api/sessions", { headers: { cookie: session.headers.get("set-cookie")!.split(";")[0] } })).status, 200);
-    for (const [method, path, expected] of [["GET", "/api/dashboard/overview", 200], ["HEAD", "/api/dashboard/overview", 200], ["GET", "/api/status", 403], ["GET", "/health", 403], ["POST", "/api/backup", 403], ["POST", "/api/session", 401]] as const) {
+    for (const [method, path, expected] of [["GET", "/api/dashboard/overview", 200], ["HEAD", "/api/dashboard/overview", 200], ["GET", "/api/dashboard/assets", 403], ["GET", "/api/dashboard/spending", 403], ["PUT", "/api/dashboard/wealth-history", 403], ["GET", "/api/status", 403], ["GET", "/health", 403], ["POST", "/api/backup", 403], ["POST", "/api/session", 401]] as const) {
       assert.equal((await fetch(app.base + path, { method, headers: { authorization: "Bearer test-hq-token" } })).status, expected, `${method} ${path}`);
     }
     assert.equal((await fetch(app.base + "/api/dashboard/overview", { headers: { authorization: "Bearer test-admin-token" } })).status, 200);
+    // The wealth curve is the one other HQ read; without Actual it may fail, but never as an auth denial.
+    const curve = await fetch(app.base + "/api/dashboard/wealth-history", { headers: { authorization: "Bearer test-hq-token" } });
+    assert.ok(![401, 403].includes(curve.status), `wealth-history ${curve.status}`);
   } finally { await app.close(); }
 });
 
