@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { SessionRole } from "./browser-sessions.js";
 import { readFileSync } from "node:fs";
 const assetHash = (file: string) => createHash("sha256").update(readFileSync(new URL(`../assets/${file}`, import.meta.url))).digest("hex").slice(0, 16);
 
@@ -11,7 +12,7 @@ function connectedAppUrl(publicBaseUrl: string | undefined, port: number): strin
   return url.toString();
 }
 
-export function renderUi(publicBaseUrl?: string): string {
+export function renderUi(publicBaseUrl?: string, role?: SessionRole, oidcEnabled = false): string {
   const actualUrl = connectedAppUrl(publicBaseUrl, 5006);
   const ghostfolioUrl = connectedAppUrl(publicBaseUrl, 3333);
   return `<!doctype html>
@@ -24,7 +25,7 @@ export function renderUi(publicBaseUrl?: string): string {
   <title>Übersicht · Finance Hub</title>
   <link rel="stylesheet" href="/assets/app.css?v=${assetHash("app.css")}">
 </head>
-<body>
+<body data-role="${role ?? "guest"}">
   <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
   <div class="app">
     <aside class="sidebar" aria-label="Hauptnavigation">
@@ -39,7 +40,7 @@ export function renderUi(publicBaseUrl?: string): string {
     <main class="content" id="main-content">
       <div class="content-inner">
         <header class="page-header">
-          <div><p class="eyebrow" id="page-eyebrow" hidden>Finance Hub</p><h1 id="page-title">Übersicht</h1><p class="subtitle" id="page-subtitle">Finanzen, Vermögen und offene Punkte auf einen Blick.</p></div>
+          <div><p class="eyebrow" id="page-eyebrow" hidden>Finance Hub</p><h1 id="page-title">Übersicht</h1><p class="subtitle" id="page-subtitle">Finanzen, Vermögen und offene Punkte auf einen Blick.</p>${role === "viewer" ? '<span class="viewer-badge">Nur lesen</span>' : ""}</div>
           <button class="button quiet" id="refresh-button" type="button" data-fh-click="headerAction()" aria-label="Übersicht aktualisieren">
             <span aria-hidden="true">↻</span><span class="desktop-label">Aktualisieren</span>
           </button>
@@ -48,6 +49,7 @@ export function renderUi(publicBaseUrl?: string): string {
         <section class="token-request" id="token-request" aria-hidden="true" aria-labelledby="token-request-title">
           <h2 id="token-request-title">Zugang zum Finance Hub</h2>
           <p>Bestätige deinen Zugang mit dem Verwaltungstoken. Ohne Vertrauensoption gilt der Zugang acht Stunden.</p>
+          ${oidcEnabled ? '<a class="button oidc-login" href="/auth/oidc/login">Anmelden mit Pocket ID</a>' : ""}
           <form id="token-form">
             <label for="token-input">Verwaltungstoken</label>
             <div class="token-request-row">

@@ -22,6 +22,18 @@ test("trusted sessions survive service reconstruction, but expire and are revoca
   assert.equal(first.valid(`finance_session=${other}`, "synthetic-admin", 2000), true);
 });
 
+test("viewer role persists, legacy rows default to admin and rotation invalidates both", () => {
+  let value: string | undefined;
+  const store = { getSetting: () => value, setSetting: (_key: string, next: string) => { value = next; } };
+  const sessions = new BrowserSessions(store);
+  const viewer = sessions.create("synthetic", 1000, true, "viewer");
+  assert.equal(new BrowserSessions(store).role(`finance_session=${viewer}`, "synthetic", 2000), "viewer");
+  assert.equal(sessions.role(`finance_session=${viewer}`, "rotated", 2000), undefined);
+  const legacy = sessions.create("synthetic", 1000);
+  value = value!.replace(/,"role":"admin"/g, "");
+  assert.equal(new BrowserSessions(store).role(`finance_session=${legacy}`, "synthetic", 2000), "admin");
+});
+
 test("short sessions stay short, corrupt state fails closed, capacity is bounded", () => {
   let value: string | undefined;
   const store = { getSetting: () => value, setSetting: (_key: string, next: string) => { value = next; } };

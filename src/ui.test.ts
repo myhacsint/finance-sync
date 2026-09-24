@@ -9,6 +9,15 @@ function renderUi(): string {
   return `${renderShell()}\n${clientSource}\n${stylesheetSource}`;
 }
 
+test("OIDC login is optional and viewer shell identifies read-only mode", () => {
+  assert.doesNotMatch(renderShell(), /Anmelden mit Pocket ID/);
+  assert.match(renderShell(undefined, "viewer", true), /data-role="viewer"/);
+  assert.match(renderShell(undefined, "viewer", true), /Nur lesen/);
+  assert.match(renderShell(undefined, "viewer", true), /Anmelden mit Pocket ID/);
+  assert.match(stylesheetSource, /\[data-role="viewer"\]/);
+  assert.match(clientSource, /Nur-Lesen-Zugang/);
+});
+
 test("externes UI-JavaScript ist syntaktisch gültig", () => {
   assert.match(renderShell(), /<script src="\/assets\/app\.js\?v=[a-f0-9]{16}" defer><\/script>/);
   assert.match(clientSource, /match\(\/\^\(\\d\{4\}\)-\(\\d\{2\}\)\$\//);

@@ -87,6 +87,10 @@ function submitToken(event){
 }
 document.getElementById("token-form").addEventListener("submit",submitToken);
 async function apiRequest(path,options={},retry=true){
+  if(document.body.dataset.role==="viewer"&&!(["GET","HEAD"].includes(options.method||"GET"))){
+    msg("Nur-Lesen-Zugang: Änderungen sind nicht möglich.",true);
+    throw new Error("Nur-Lesen-Zugang");
+  }
   if(token){
     sessionExchange ||= fetch("/api/session",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({remember:document.getElementById("remember-browser").checked})});
     const response=await sessionExchange;
@@ -100,6 +104,7 @@ async function apiRequest(path,options={},retry=true){
   let result={};
   try{result=await response.json()}catch{}
   if(response.status===401){requestToken();throw new Error("Bitte Zugang erneut bestätigen.");}
+  if(response.status===403&&result.error==="Nur-Lesen-Zugang")msg("Nur-Lesen-Zugang: Änderungen sind nicht möglich.",true);
   if(!response.ok)throw new Error(result.error||response.statusText);
   return result;
 }
@@ -1521,6 +1526,7 @@ function renderDashboard(data){
 }
 
 function appendBrowserSessions(){
+  if(document.body.dataset.role==="viewer")return;
   const access=document.createElement("section");access.className="section";
   access.innerHTML='<h2>Browserzugänge</h2><p>Jeder Browser wird separat angemeldet. Ein Widerruf beendet seinen Zugang sofort.</p><button class="button secondary" type="button">Zugänge anzeigen</button><div role="status" aria-live="polite"></div>';
   document.getElementById("dashboard").append(access);

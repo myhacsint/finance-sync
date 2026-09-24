@@ -2,7 +2,8 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { timingSafeEqual, randomUUID } from "node:crypto";
-import { BrowserSessions, SESSION_SECONDS, TRUSTED_SECONDS } from "./browser-sessions.js";
+import { BrowserSessions, SESSION_SECONDS, TRUSTED_SECONDS, type SessionRole } from "./browser-sessions.js";
+import { OidcLogin } from "./oidc.js";
 import { loadConfig, paths, readSecret } from "./config.js";
 import { FinanceDatabase } from "./database.js";
 import { depotSettlementReport } from "./depot-settlements.js";
@@ -50,6 +51,13 @@ const sutorPreviews = new SutorPreviewStore();
 const cardPreviews = new CardPreviews();
 let cardConfirmBusy=false;
 const browserSessions = new BrowserSessions(db);
+const oidcIssuer = process.env.FINANCE_OIDC_ISSUER;
+const oidcBaseUrl = process.env.FINANCE_OIDC_BASE_URL;
+const oidcClientId = readSecret("oidc-client-id");
+const oidcClientSecret = readSecret("oidc-client-secret");
+const oidc = oidcIssuer && oidcBaseUrl && oidcClientId && oidcClientSecret
+  ? new OidcLogin({ issuer: oidcIssuer, baseUrl: oidcBaseUrl, clientId: oidcClientId, clientSecret: oidcClientSecret })
+  : undefined;
 let pensionParserBusy = false;
 const pensionUploadAttempts = new Map<string, number[]>();
 const financeHubMark = readFileSync(new URL("../assets/finance-hub-mark.png", import.meta.url));
@@ -162,14 +170,19 @@ function sutorFailure(error: unknown): FinanceServiceError {
   return new FinanceServiceError(match?.[0] ?? "Die Sutor-PDF konnte nicht sicher verarbeitet werden", match?.[1] ?? 400);
 }
 
-function authorized(req: IncomingMessage, bearerOnly = false): boolean {
-  const configured = readSecret("admin-token");
+function bearerMatches(req: IncomingMessage, name: string): boolean {
+  const configured = readSecret(name);
   if (!configured) return false;
-  if (!bearerOnly && browserSessions.valid(req.headers.cookie, configured)) return true;
   const supplied = req.headers.authorization?.replace(/^Bearer\s+/i, "") ?? "";
   const left = Buffer.from(configured);
   const right = Buffer.from(supplied);
   return left.length === right.length && timingSafeEqual(left, right);
+}
+
+function authorized(req: IncomingMessage, bearerOnly = false): SessionRole | undefined {
+  if (bearerMatches(req, "admin-token")) return "admin";
+  const configured = readSecret("admin-token");
+  return !bearerOnly && configured ? browserSessions.role(req.headers.cookie, configured) : undefined;
 }
 
 async function body(req: IncomingMessage, max = 1_048_576): Promise<unknown> {
@@ -197,6 +210,40 @@ const server = createServer(async (req, res) => {
   });
   try {
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+    // The HQ credential must not inherit even the public GET routes.
+    if (bearerMatches(req, "hq-read-token")) {
+      if (!(["GET", "HEAD"].includes(req.method ?? "") && url.pathname === "/api/dashboard/overview")) {
+        return json(res, url.pathname === "/api/session" ? 401 : 403, { error: "Nicht autorisiert" });
+      }
+    }
+    if (req.method === "GET" && url.pathname.startsWith("/auth/oidc/")) {
+      if (!oidc || !readSecret("admin-token")) return json(res, 404, { error: "Nicht gefunden" });
+      if (url.pathname === "/auth/oidc/login") {
+        const started = await oidc.begin();
+        res.writeHead(302, { ...securityHeaders, location: started.authorizationUrl, "set-cookie": started.cookie });
+        return res.end();
+      }
+      if (url.pathname === "/auth/oidc/callback") {
+        const clear = `oidc_login=; HttpOnly; SameSite=Lax; Path=/auth/oidc; Max-Age=0${oidcBaseUrl?.startsWith("https:") ? "; Secure" : ""}`;
+        res.setHeader("set-cookie", clear);
+        try {
+          const role = await oidc.finish(url.searchParams.get("code") ?? "", url.searchParams.get("state") ?? "", req.headers.cookie);
+          const id = browserSessions.create(readSecret("admin-token")!, Date.now(), true, role);
+          res.setHeader("set-cookie", [clear, `finance_session=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${TRUSTED_SECONDS}${config.publicBaseUrl?.startsWith("https:") || oidcBaseUrl?.startsWith("https:") ? "; Secure" : ""}`]);
+          res.writeHead(302, { ...securityHeaders, location: "/" });
+          return res.end();
+        } catch (error) {
+          const forbidden = error instanceof Error && error.message === "Kein Zugang";
+          res.writeHead(forbidden ? 403 : 400, { ...securityHeaders, "content-type": "text/html; charset=utf-8" });
+          return res.end(`<!doctype html><meta charset="utf-8"><title>Finance Hub</title><p>${forbidden ? "Kein Zugang" : "Anmeldung fehlgeschlagen"}</p>`);
+        }
+      }
+    }
+    const role = bearerMatches(req, "hq-read-token") ? "hq" : authorized(req);
+    if (role === "viewer") {
+      if (req.method !== "GET" && req.method !== "HEAD") return json(res, 403, { error: "Nur-Lesen-Zugang" });
+      if (["/api/sessions", "/callbacks/enable-banking"].includes(url.pathname)) return json(res, 403, { error: "Nur-Lesen-Zugang" });
+    }
     if (req.method === "GET" && url.pathname === "/health") {
       const report = buildHealth(db, config);
       return json(res, report.status === "critical" ? 503 : 200, report);
@@ -221,7 +268,7 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "GET" && url.pathname === "/") {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8", ...securityHeaders });
-      return res.end(renderUi(config.publicBaseUrl));
+      return res.end(renderUi(config.publicBaseUrl, role === "hq" ? undefined : role, Boolean(oidc)));
     }
     if (req.method === "GET" && url.pathname === "/assets/app.js") {
       res.writeHead(200, {
@@ -278,11 +325,15 @@ const server = createServer(async (req, res) => {
       res.setHeader("set-cookie", `finance_session=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${trusted ? TRUSTED_SECONDS : SESSION_SECONDS}${secure}`);
       return json(res, 200, { authenticated: true });
     }
-    if (!authorized(req)) return json(res, 401, { error: "Nicht autorisiert" });
+    if (!role) return json(res, 401, { error: "Nicht autorisiert" });
     if (req.method !== "GET" && req.method !== "HEAD" && !authorized(req, true) && !sameOriginMutation(req)) {
       return json(res, 403, { error: "Ungültiger Anfrageursprung" });
     }
-    if (req.method === "GET" && url.pathname === "/api/sessions") return json(res, 200, { sessions: browserSessions.list(req.headers.cookie, readSecret("admin-token")!) });
+    if (req.method === "GET" && url.pathname === "/api/me") return json(res, 200, { role });
+    if (req.method === "GET" && url.pathname === "/api/sessions") {
+      if (role !== "admin") return json(res, 403, { error: "Nicht autorisiert" });
+      return json(res, 200, { sessions: browserSessions.list(req.headers.cookie, readSecret("admin-token")!) });
+    }
     const revokedSession = /^\/api\/sessions\/([a-f0-9]{64})$/.exec(url.pathname);
     if (req.method === "DELETE" && revokedSession) {
       if (!sameOriginMutation(req)) return json(res, 403, { error: "Ungültiger Anfrageursprung" });
@@ -564,7 +615,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "DELETE" && scenarioDelete) {
       return json(res, 200, service.deleteNamedScenario(scenarioDelete[1]));
     }
-    if (req.method === "GET" && url.pathname === "/api/dashboard/overview") {
+    if ((req.method === "GET" || req.method === "HEAD") && url.pathname === "/api/dashboard/overview") {
       const requestedMonths = Number(url.searchParams.get("months") ?? 4);
       const months = [4, 6, 12].includes(requestedMonths) ? requestedMonths : 4;
       const requestedOffset = Number(url.searchParams.get("offset") ?? 0);

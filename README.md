@@ -11,6 +11,17 @@ das Langzeitarchiv.
 - Geheimnisse werden als einzelne Dateien unter `/run/secrets` eingehängt.
 - `/health` ist ohne Anmeldung abrufbar; alle Verwaltungs-APIs benötigen das
   Bearer-Token aus `/run/secrets/admin-token`.
+- Das Admin-Bearer-Token und bestehende Browserzugänge bleiben unverändert nutzbar.
+  Optionale Pocket-ID-Anmeldung wird nur aktiviert, wenn `FINANCE_OIDC_ISSUER`
+  (z. B. `https://id.example.org`), `FINANCE_OIDC_BASE_URL` (öffentliche
+  Finance-Hub-URL) und die Secret-Dateien `oidc-client-id` und
+  `oidc-client-secret` gemeinsam gesetzt sind. Als Redirect-URI beim Provider
+  `<FINANCE_OIDC_BASE_URL>/auth/oidc/callback` eintragen. Die Gruppen `admin`
+  und `family` geben Admin- bzw. Nur-Lesen-Zugang; andere Gruppen keinen Zugang.
+  Browser-Sitzungen bleiben an `admin-token` gebunden (Rotation widerruft alle).
+  Der Admin kann Sitzungen unter Status widerrufen.
+- Optional gewährt `hq-read-token` nur `GET`/`HEAD /api/dashboard/overview`.
+  Diesen Token strikt getrennt vom Admin-Token halten.
 - Solana benötigt nur öffentliche Wallet-Adressen und einen Helius-API-Key,
   niemals Seed Phrase oder Private Key.
 - Enable Banking signiert kurzlebige API-JWTs lokal mit
