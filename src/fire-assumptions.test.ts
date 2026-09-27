@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { DEFAULT_FIRE_ASSUMPTIONS, resolveFireAssumptions } from "./fire-assumptions.js";
+import { FinanceService } from "./service.js";
 import { buildDashboardFireTracking } from "./dashboard-fire.js";
 import type { DashboardAssets } from "./dashboard-assets.js";
 import type { DashboardAnalyses } from "./dashboard-analyses.js";
@@ -22,6 +23,25 @@ test("FIRE-Annahmen übernehmen nur gültige Config-Werte", () => {
   assert.equal(resolved.erikBirthYear, 1970);
   assert.equal(resolved.inflation, 0.03);
   assert.equal(resolved.householdEconomicMeansMinor, DEFAULT_FIRE_ASSUMPTIONS.householdEconomicMeansMinor);
+});
+
+test("Ältere gespeicherte Rentenannahmen erhalten neue FIRE-Defaults und Config-Werte", () => {
+  const service = {
+    db: { activePensionFireAssumptions: () => ({
+      erikBirthYear: 1970,
+      alContributionMinor: 200_000
+    }) },
+    config: { analysis: { fire: {
+      specialExpenseBufferMinor: 500_000,
+      contributionsInExpenseBase: 0
+    } } }
+  } as unknown as FinanceService;
+  const resolved = FinanceService.prototype.effectiveFireAssumptions.call(service);
+  assert.equal(resolved.erikBirthYear, 1970);
+  assert.equal(resolved.alContributionMinor, 200_000);
+  assert.equal(resolved.specialExpenseBufferMinor, 500_000);
+  assert.equal(resolved.contributionsInExpenseBase, 0);
+  assert.equal(resolved.riesterContributionMinor, DEFAULT_FIRE_ASSUMPTIONS.riesterContributionMinor);
 });
 
 const assets = {

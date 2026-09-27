@@ -18,6 +18,8 @@ export interface FireAssumptions {
   wifeGkvMinor: number;
   riesterContributionMinor: number;
   alContributionMinor: number;
+  specialExpenseBufferMinor: number;
+  contributionsInExpenseBase: number;
   alNominalMinor: number;
   alYear: number;
   inflation: number;
@@ -57,6 +59,8 @@ export const DEFAULT_FIRE_ASSUMPTIONS: FireAssumptions = {
   wifeGkvMinor: 850_000,
   riesterContributionMinor: 137_500,
   alContributionMinor: 177_000,
+  specialExpenseBufferMinor: 800_000,
+  contributionsInExpenseBase: 1,
   alNominalMinor: 17_900_000,
   alYear: 2045,
   inflation: 0.02,

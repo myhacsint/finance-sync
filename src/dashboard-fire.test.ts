@@ -3,6 +3,7 @@ import test from "node:test";
 import type { DashboardAssets } from "./dashboard-assets.js";
 import type { DashboardAnalyses } from "./dashboard-analyses.js";
 import type { DashboardRecurringExpenseOptimizations } from "./dashboard-recurring-expenses.js";
+import { DEFAULT_FIRE_ASSUMPTIONS, resolveFireAssumptions } from "./fire-assumptions.js";
 import { buildDashboardFireTracking, groupFireTransactions } from "./dashboard-fire.js";
 
 const assets = {
@@ -77,15 +78,99 @@ const analyses = {
   basis: []
 } satisfies DashboardAnalyses;
 
-test("FIRE-Port reproduziert die freigegebenen v3.1-Alterswerte", () => {
+test("FIRE bevorzugt das typische Jahr, addiert den Sonderausgaben-Puffer und zählt Vorsorge nur einmal", () => {
+  const result = buildDashboardFireTracking(assets, {
+    liveProjectedAnnualExpensesMinor: 12_000_000,
+    normalizedAnnualExpensesMinor: 9_000_000
+  }, emptyOptimizations, analyses, 60);
+  assert.equal(result.trackedAnnualExpensesMinor, 9_485_500);
+  assert.deepEqual(result.expenseBasis, {
+    kind: "normalized",
+    baseMinor: 9_000_000,
+    specialExpenseBufferMinor: 800_000,
+    contributionsRemovedMinor: 314_500
+  });
+  assert.equal(result.liveProjectedAnnualExpensesMinor, 12_000_000);
+  assert.equal(result.normalizedAnnualExpensesMinor, 9_000_000);
+  assert.ok(result.basis.some((text) => text.includes("Median-Monat × 12")
+    && text.includes("Sonderausgaben-Puffer")));
+  assert.ok(result.basis.some((text) => text.includes("AL/Riester")
+    && text.includes("nur einmal")));
+});
+
+test("FIRE nutzt die Live-Hochrechnung nur ohne typisches Jahr", () => {
+  const result = buildDashboardFireTracking(assets, {
+    liveProjectedAnnualExpensesMinor: 10_000_000,
+    normalizedAnnualExpensesMinor: null
+  }, emptyOptimizations, analyses);
+  assert.equal(result.trackedAnnualExpensesMinor, 10_485_500);
+  assert.deepEqual(result.expenseBasis, {
+    kind: "live-projected",
+    baseMinor: 10_000_000,
+    specialExpenseBufferMinor: 800_000,
+    contributionsRemovedMinor: 314_500
+  });
+});
+
+test("Config kann Puffer und Beitragsabzug unabhängig ändern", () => {
+  const assumptions = resolveFireAssumptions({
+    specialExpenseBufferMinor: 250_000,
+    contributionsInExpenseBase: 0,
+    alContributionMinor: 200_000,
+    riesterContributionMinor: 100_000
+  });
+  const result = buildDashboardFireTracking(assets, {
+    liveProjectedAnnualExpensesMinor: null,
+    normalizedAnnualExpensesMinor: 9_000_000
+  }, emptyOptimizations, analyses, 60, [], [], [], assumptions);
+  assert.equal(result.trackedAnnualExpensesMinor, 9_250_000);
+  assert.equal(result.expenseBasis.contributionsRemovedMinor, 0);
+  assert.equal(result.expenseBasis.specialExpenseBufferMinor, 250_000);
+  assert.ok(result.basis.some((text) => text.includes("AL/Riester")
+    && text.includes("ohne Abzug")));
+  const withContributionRemoval = buildDashboardFireTracking(assets, {
+    liveProjectedAnnualExpensesMinor: null,
+    normalizedAnnualExpensesMinor: 9_000_000
+  }, emptyOptimizations, analyses, 60, [], [], [], {
+    ...assumptions,
+    contributionsInExpenseBase: 1
+  });
+  assert.equal(withContributionRemoval.trackedAnnualExpensesMinor, 8_950_000);
+  assert.equal(withContributionRemoval.expenseBasis.contributionsRemovedMinor, 300_000);
+});
+
+test("FIRE-Ausgaben bleiben auch nach Beitragsabzug nie negativ", () => {
+  const result = buildDashboardFireTracking(assets, {
+    liveProjectedAnnualExpensesMinor: 2_000_000,
+    normalizedAnnualExpensesMinor: 0
+  }, emptyOptimizations, analyses, 60, [], [], [], {
+    ...DEFAULT_FIRE_ASSUMPTIONS,
+    specialExpenseBufferMinor: 0
+  });
+  assert.equal(result.trackedAnnualExpensesMinor, 0);
+  assert.equal(result.expenseBasis.kind, "normalized");
+  const missing = buildDashboardFireTracking(assets, {
+    liveProjectedAnnualExpensesMinor: null,
+    normalizedAnnualExpensesMinor: null
+  }, emptyOptimizations, analyses);
+  assert.equal(missing.trackedAnnualExpensesMinor, null);
+  assert.equal(missing.expenseBasis.kind, null);
+});
+
+test("FIRE-Port reproduziert die freigegebenen v3.1-Alterswerte mit historischer Ausgabenbasis", () => {
+  const historicalAssumptions = {
+    ...DEFAULT_FIRE_ASSUMPTIONS,
+    specialExpenseBufferMinor: 0,
+    contributionsInExpenseBase: 0
+  };
   const at115 = buildDashboardFireTracking(assets, {
     liveProjectedAnnualExpensesMinor: 11_500_000,
     normalizedAnnualExpensesMinor: 11_500_000
-  }, emptyOptimizations, analyses, 60);
+  }, emptyOptimizations, analyses, 60, [], [], [], historicalAssumptions);
   const at974 = buildDashboardFireTracking(assets, {
     liveProjectedAnnualExpensesMinor: 9_740_000,
     normalizedAnnualExpensesMinor: 9_740_000
-  }, emptyOptimizations, analyses, 60);
+  }, emptyOptimizations, analyses, 60, [], [], [], historicalAssumptions);
   assert.equal(at115.bridgeCapitalMinor, 7_158_400);
   assert.equal(at115.lockedPensionMinor, 11_308_900);
   assert.equal(at115.central.currentExitAge, 67);
@@ -196,7 +281,7 @@ test("Kategorieprozente und Einmalposten zählen nicht als FIRE-Hebel", () => {
   assert.equal(result.oneTimeCandidates[0].observedMinor, 300_000);
   assert.equal(result.oneTimeCandidates[0].countsTowardScenario, false);
   assert.equal(result.selectedOneTimeSavingsMinor, 0);
-  assert.equal(result.scenarioAnnualExpensesMinor, 11_500_000);
+  assert.equal(result.scenarioAnnualExpensesMinor, result.trackedAnnualExpensesMinor);
   assert.equal(result.scenarioBridgeCapitalMinor, 7_158_400);
 });
 

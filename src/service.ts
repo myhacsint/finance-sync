@@ -542,8 +542,10 @@ export class FinanceService {
   }
 
   effectiveFireAssumptions(): FireAssumptions {
-    return this.db.activePensionFireAssumptions()
-      ?? resolveFireAssumptions(this.config.analysis?.fire);
+    return resolveFireAssumptions({
+      ...this.config.analysis?.fire,
+      ...this.db.activePensionFireAssumptions()
+    });
   }
 
   listPensionRevisions() {

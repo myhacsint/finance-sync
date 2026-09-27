@@ -291,6 +291,12 @@ test("Analysenansicht besitzt ein zugängliches Entscheidungslabor", () => {
   assert.match(html, /Einmaliger Zu- oder Abfluss/);
   assert.match(html, /Finanzvermögen über 20 Jahre/);
   assert.match(html, /FIRE-Kurs und konkrete Stellschrauben/);
+  assert.match(html, /FIRE-Jahresausgaben/);
+  assert.match(html, /fire\.trackedAnnualExpensesMinor/);
+  assert.match(html, /fire\.expenseBasis\.specialExpenseBufferMinor/);
+  assert.match(html, /fire\.expenseBasis\.contributionsRemovedMinor/);
+  assert.match(html, /Live-Hochrechnung/);
+  assert.match(html, /Median × 12/);
   assert.match(html, /Überbrückungskapital heute/);
   assert.match(html, /Gebundene Vorsorge/);
   assert.match(html, /Erwartet frei mit/);

@@ -37,6 +37,12 @@ export interface DashboardFireTracking {
   trackedAnnualExpensesMinor: number | null;
   normalizedAnnualExpensesMinor: number | null;
   liveProjectedAnnualExpensesMinor: number | null;
+  expenseBasis: {
+    kind: "normalized" | "live-projected" | null;
+    baseMinor: number | null;
+    specialExpenseBufferMinor: number;
+    contributionsRemovedMinor: number;
+  };
   economicMeansAnnualMinor: number;
   bridgeCapitalMinor: number | null;
   lockedPensionMinor: number | null;
@@ -576,8 +582,18 @@ export function buildDashboardFireTracking(
   const a = assumptions;
   const safeTargetAge = Math.max(50, Math.min(67, Math.round(targetAge)));
   const bridgeCapital = freeCapitalMinor(assets);
-  const trackedAnnualExpensesMinor = annual.liveProjectedAnnualExpensesMinor
-    ?? annual.normalizedAnnualExpensesMinor;
+  const baseMinor = annual.normalizedAnnualExpensesMinor ?? annual.liveProjectedAnnualExpensesMinor;
+  const contributionsRemovedMinor = a.contributionsInExpenseBase === 1
+    ? a.alContributionMinor + a.riesterContributionMinor : 0;
+  const expenseBasis: DashboardFireTracking["expenseBasis"] = {
+    kind: annual.normalizedAnnualExpensesMinor !== null ? "normalized"
+      : annual.liveProjectedAnnualExpensesMinor !== null ? "live-projected" : null,
+    baseMinor,
+    specialExpenseBufferMinor: a.specialExpenseBufferMinor,
+    contributionsRemovedMinor
+  };
+  const trackedAnnualExpensesMinor = baseMinor === null ? null
+    : Math.max(0, baseMinor + a.specialExpenseBufferMinor - contributionsRemovedMinor);
   const baselineExitAge = trackedAnnualExpensesMinor === null ? null
     : earliestExitAge(trackedAnnualExpensesMinor, bridgeCapital, 300, a);
   const actions = actionImpacts(optimizations, trackedAnnualExpensesMinor, bridgeCapital, baselineExitAge);
@@ -679,6 +695,7 @@ export function buildDashboardFireTracking(
     trackedAnnualExpensesMinor,
     normalizedAnnualExpensesMinor: annual.normalizedAnnualExpensesMinor,
     liveProjectedAnnualExpensesMinor: annual.liveProjectedAnnualExpensesMinor,
+    expenseBasis,
     economicMeansAnnualMinor: a.householdEconomicMeansMinor,
     bridgeCapitalMinor: bridgeCapital,
     lockedPensionMinor: pensionCapitalMinor(assets),
@@ -721,6 +738,10 @@ export function buildDashboardFireTracking(
       "Kapitalziele vergleichen das bis zum Ausstiegsalter erwartete freie Finanzvermögen mit dem ab diesem Zeitpunkt benötigten FIRE-Kapital; alle Beträge sind reale Euro in heutiger Kaufkraft mit Basisjahr 2026, gebundene Vorsorge bleibt separat [SCHÄTZUNG]",
       "Kinderkosten sinken ab 2030 und 2048 und werden vollständig der Sparrate zugeführt [SCHÄTZUNG]",
       "Erbschaft und unbelegte Riester-Kapitalhöhe werden nicht angesetzt",
+      "FIRE-Ausgabenbasis = typisches Jahr (Median-Monat × 12) + fester Sonderausgaben-Puffer; falls der Median fehlt, stattdessen Live-Jahresend-Hochrechnung [SCHÄTZUNG]",
+      a.contributionsInExpenseBase === 1
+        ? "Vorsorgebeiträge AL/Riester sind in den gebuchten Ausgaben enthalten und werden aus der FIRE-Ausgabenbasis abgezogen; im Phasenmodell werden sie nur einmal bis zum jeweiligen Beitragsende gezählt [SCHÄTZUNG]"
+        : "Vorsorgebeiträge AL/Riester bleiben ohne Abzug in der FIRE-Ausgabenbasis; im Phasenmodell werden sie zusätzlich bis zum jeweiligen Beitragsende angesetzt [SCHÄTZUNG]",
       "Nur bestätigte laufende Maßnahmen zählen als Szenario-Hebel; Kategorieprozente und vergangene Einmalposten nicht [SCHÄTZUNG]"
     ],
     warnings
