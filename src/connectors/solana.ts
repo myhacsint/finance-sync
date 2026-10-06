@@ -57,6 +57,29 @@ async function rpc<T>(url: string, method: string, params: unknown[]): Promise<T
   return json.result;
 }
 
+async function fetchStakeAccounts(
+  rpcUrl: string,
+  wallet: string
+): Promise<Array<{ pubkey: string; account: { lamports: number } }>> {
+  const params = [
+    "Stake11111111111111111111111111111111111111",
+    {
+      encoding: "base64",
+      filters: [{ memcmp: { offset: 44, bytes: wallet } }]
+    }
+  ];
+  try {
+    return await rpc(rpcUrl, "getProgramAccounts", params);
+  } catch {
+    try {
+      return await rpc(rpcUrl, "getProgramAccounts", params);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`Solana-Stake-Konten nicht abrufbar: ${reason}`);
+    }
+  }
+}
+
 async function fetchHistory(
   rpcUrl: string,
   wallet: string,
@@ -129,17 +152,9 @@ export async function fetchSolana(source: SourceConfig): Promise<ImportBundle> {
         "getTokenAccountsByOwner",
         [wallet, { programId: "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" }, { encoding: "jsonParsed" }]
       ),
-      rpc<Array<{ pubkey: string; account: { lamports: number } }>>(
-        rpcUrl,
-        "getProgramAccounts",
-        [
-          "Stake11111111111111111111111111111111111111",
-          {
-            encoding: "base64",
-            filters: [{ memcmp: { offset: 44, bytes: wallet } }]
-          }
-        ]
-      ).catch(() => []),
+      // A failed stake lookup must fail the run: treating it as "no stake"
+      // would store and push ~0 SOL while the stake still exists on-chain.
+      fetchStakeAccounts(rpcUrl, wallet),
       fetchHistory(rpcUrl, wallet, source)
     ]);
     const walletRaw = { native, tokenAccounts, token2022Accounts, stakeAccounts, history };
