@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { sha256 } from "../archive.js";
 import { readSecret } from "../config.js";
+import { depotEconomicActivityId, depotEconomicKey } from "../depot-identity.js";
 import type {
   ImportBundle,
   NormalizedBalance,
@@ -40,7 +41,7 @@ interface DkbHelperPortfolio {
   rawMt535: string[];
   positions: DkbHelperPosition[];
   rawMt536?: string[];
-  turnovers?: Array<{ identity: string; isin: string; direction: "RECE" | "DELI"; quantity: string; date: string; amount?: string; currency?: string }>;
+  turnovers?: Array<{ identity: string | null; isin: string; direction: "RECE" | "DELI"; quantity: string; date: string; amount?: string; currency?: string }>;
 }
 
 export interface DkbHelperOutput {
@@ -191,19 +192,29 @@ export function normalizeDkbFintsBundle(
     const account = configured.get(portfolio.accountId);
     if (!account) throw new Error("DKB-FinTS lieferte ein nicht konfiguriertes Depot");
     const rawHash = sha256(JSON.stringify(portfolio));
+    const occurrences = new Map<string, number>();
     for (const turnover of portfolio.turnovers ?? []) {
-      if (!/^[a-f0-9]{64}$/.test(turnover.identity) || !/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(turnover.isin)
+      if ((turnover.identity !== null && !/^[a-f0-9]{64}$/.test(turnover.identity)) || !/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(turnover.isin)
         || !['RECE', 'DELI'].includes(turnover.direction) || !/^\d{4}-\d{2}-\d{2}$/.test(turnover.date)) {
         throw new Error('Ungültiger DKB-Depotumsatz');
       }
       const quantity = decimalParts(turnover.quantity);
       if (BigInt(quantity.atomic) <= 0n) throw new Error('Ungültige DKB-Depotumsatzmenge');
-      activities.push({sourceId: source.id, accountId: portfolio.accountId,
-        sourceActivityId: sha256(`${portfolio.accountId}:${turnover.identity}`),
-        occurredAt: turnover.date, type: `DEPOT_${turnover.direction}`,
-        symbol: turnover.isin, quantityAtomic: quantity.atomic, atomicDecimals: quantity.decimals,
+      const economics = {accountId: portfolio.accountId, symbol: turnover.isin,
+        type: `DEPOT_${turnover.direction}`, occurredAt: turnover.date,
+        quantityAtomic: quantity.atomic, atomicDecimals: quantity.decimals,
         amountMinor: turnover.amount === undefined ? undefined : moneyMinor(turnover.amount),
-        currency: turnover.currency, rawHash,
+        currency: turnover.currency};
+      let sourceActivityId: string;
+      if (turnover.identity === null) {
+        const key = depotEconomicKey(economics);
+        const occurrence = occurrences.get(key) ?? 0;
+        occurrences.set(key, occurrence + 1);
+        sourceActivityId = depotEconomicActivityId(economics, occurrence);
+      } else {
+        sourceActivityId = sha256(`${portfolio.accountId}:${turnover.identity}`);
+      }
+      activities.push({sourceId: source.id, ...economics, sourceActivityId, rawHash,
         note: 'FinTS MT536 observation; not a confirmed trade; fees unknown'});
     }
     const values: Array<{ amount: bigint; currency: string }> = [];

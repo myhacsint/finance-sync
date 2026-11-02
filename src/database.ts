@@ -19,6 +19,7 @@ import type {
 } from "./types.js";
 import type { ConfirmedPensionRevision } from "./pension-revisions.js";
 import { migrateSchema } from "./schema-migrations.js";
+import { depotEconomicActivityId, legacyNonrefActivityId } from "./depot-identity.js";
 import type { FireAssumptions } from "./fire-assumptions.js";
 import type { PensionPreviewSummary } from "./pension-document-types.js";
 import type { ConfirmedSutorRevision, StoredSutorPreview, SutorPreviousStand } from "./sutor-document-types.js";
@@ -44,7 +45,36 @@ export class FinanceDatabase {
     mkdirSync(dirname(file), { recursive: true });
     this.db = new DatabaseSync(file);
     this.db.exec("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;");
-    migrateSchema(this.db, [{ version: 1, name: "baseline-0.49", up: () => this.migrate() }]);
+    migrateSchema(this.db, [
+      { version: 1, name: "baseline-0.49", up: () => this.migrate() },
+      { version: 2, name: "dkb-nonref-depot-identity", up: () => this.migrateNonrefDepotIdentity() }
+    ]);
+  }
+
+  /**
+   * Up to 0.55.1 the DKB `RELA//NONREF` placeholder was hashed as if it were a
+   * bank reference, so every depot turnover of one ISIN shared one identity.
+   * Re-key those rows to the economic identity the connector now emits.
+   */
+  private migrateNonrefDepotIdentity(): void {
+    const rows = this.db.prepare(`
+      SELECT id, source_id, source_activity_id, account_id, occurred_at, type, symbol,
+        quantity_atomic, atomic_decimals, amount_minor, currency
+      FROM investment_activities
+      WHERE type IN ('DEPOT_RECE', 'DEPOT_DELI') AND source_activity_id IS NOT NULL
+        AND symbol IS NOT NULL AND quantity_atomic IS NOT NULL AND atomic_decimals IS NOT NULL
+      ORDER BY id
+    `).all() as Array<{ id: number; source_id: string; source_activity_id: string; account_id: string;
+      occurred_at: string; type: string; symbol: string; quantity_atomic: string; atomic_decimals: number;
+      amount_minor: number | bigint | null; currency: string | null }>;
+    const update = this.db.prepare("UPDATE investment_activities SET source_activity_id=?, identity_key=? WHERE id=?");
+    for (const row of rows) {
+      if (row.source_activity_id !== legacyNonrefActivityId(row.account_id, row.symbol)) continue;
+      const id = depotEconomicActivityId({ accountId: row.account_id, symbol: row.symbol, type: row.type,
+        occurredAt: row.occurred_at, quantityAtomic: row.quantity_atomic, atomicDecimals: row.atomic_decimals,
+        amountMinor: row.amount_minor, currency: row.currency }, 0);
+      update.run(id, `${row.source_id}:id:${id}`, row.id);
+    }
   }
 
   private migrate(): void {

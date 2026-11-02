@@ -44,6 +44,24 @@ class ParseMt536Test(unittest.TestCase):
     def test_no_turnovers_is_valid(self):
         self.assertEqual(parse_mt536(':16R:GENL\n:16S:GENL'), [])
 
+    def test_nonref_placeholder_is_not_a_bank_reference(self):
+        # DKB sends RELA//NONREF for every turnover; buy and sell of one ISIN
+        # must not share an identity.
+        buy = self.fixture().replace('synthetic-reference', 'NONREF')
+        sell = buy.replace('RECE', 'DELI').replace('20260820', '20261023')
+        values = parse_mt536(buy + '\n' + sell)
+        self.assertEqual(len(values), 2)
+        self.assertEqual([v['identity'] for v in values], [None, None])
+        self.assertNotIn('reference', values[0])
+        self.assertEqual([v['direction'] for v in values], ['RECE', 'DELI'])
+
+    def test_real_reference_wins_over_nonref_placeholder(self):
+        raw = self.fixture().replace(':20C::RELA//synthetic-reference',
+                                     ':20C::RELA//NONREF\n:20C::TRRF//real-reference')
+        value = parse_mt536(raw)[0]
+        self.assertEqual(value['reference'], 'real-reference')
+        self.assertRegex(value['identity'], r'^[a-f0-9]{64}$')
+
     def test_response_attachment_uses_transaction_payload(self):
         from types import SimpleNamespace
         portfolio = {}

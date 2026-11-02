@@ -26,14 +26,20 @@ def parse_mt536(raw):
         elif clause == ':16S:TRAN':
             if transaction is None:
                 raise ValueError('Unvollständiger Depotumsatz')
-            required = ('isin', 'reference', 'direction', 'quantity', 'date')
+            nonref = transaction.pop('nonref', False)
+            required = ('isin', 'direction', 'quantity', 'date')
             if any(not transaction.get(k) for k in required):
+                raise ValueError('Depotumsatz ohne eindeutige Pflichtfelder')
+            if not transaction.get('reference') and not nonref:
                 raise ValueError('Depotumsatz ohne eindeutige Pflichtfelder')
             if Decimal(transaction['quantity']) <= 0:
                 raise ValueError('Ungültige Depotumsatzmenge')
+            # DKB sends ``RELA//NONREF`` for every turnover. That placeholder is
+            # explicitly "no reference"; the connector then derives the
+            # identity from the economic fields instead of colliding per ISIN.
             transaction['identity'] = hashlib.sha256(
                 (transaction['isin'] + ':' + transaction['reference']).encode()
-            ).hexdigest()
+            ).hexdigest() if transaction.get('reference') else None
             result.append(transaction)
             transaction = None
         elif transaction is not None:
@@ -44,7 +50,10 @@ def parse_mt536(raw):
             match = re.match(r'^:20C::(?:RELA|TRRF)//([^|]+)$', clause)
             if match:
                 # Prefer RELA only when no competing reference exists; no guessing.
-                put('reference', match.group(1))
+                if match.group(1).strip().upper() == 'NONREF':
+                    transaction['nonref'] = True
+                else:
+                    put('reference', match.group(1))
             match = re.match(r'^:36B::PSTA//UNIT/(.+)$', clause)
             if match: put('quantity', swift_decimal(match.group(1)))
             match = re.match(r'^:22H::REDE//(RECE|DELI)$', clause)
