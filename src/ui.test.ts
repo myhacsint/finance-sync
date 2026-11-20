@@ -411,3 +411,16 @@ test("alte Analyse-URLs landen auf Prüfen oder Labor", () => {
   assert.match(html, /view==="expense-optimizations"/);
   assert.match(html, /migrateLegacyRoutes\(\)/);
 });
+
+test("Jetzt abrufen zeigt Ergebnis und HTTP-500-Fehlertext sichtbar an", () => {
+  // Server answers failed syncs with 500 + {state,message}; the message must reach the user.
+  assert.match(clientSource, /throw new Error\(result\.error\|\|result\.message\|\|response\.statusText\)/);
+  const fn = /async function syncSource\(id\)\{.*\}\n/.exec(clientSource)?.[0] ?? "";
+  assert.ok(fn.length > 0);
+  // refresh() clears the notice, so the result must be written after the refresh.
+  assert.ok(fn.indexOf("await refresh(") < fn.indexOf("showSyncResult(result.message"));
+  assert.ok(fn.indexOf("await refresh(") < fn.indexOf("showSyncResult(error.message,true)"));
+  assert.match(fn, /showSyncResult/);
+  assert.match(clientSource, /function showSyncResult\(/);
+  assert.match(clientSource, /scrollIntoView/);
+});

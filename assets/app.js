@@ -105,7 +105,7 @@ async function apiRequest(path,options={},retry=true){
   try{result=await response.json()}catch{}
   if(response.status===401){requestToken();throw new Error("Bitte Zugang erneut bestätigen.");}
   if(response.status===403&&result.error==="Nur-Lesen-Zugang")msg("Nur-Lesen-Zugang: Änderungen sind nicht möglich.",true);
-  if(!response.ok)throw new Error(result.error||response.statusText);
+  if(!response.ok)throw new Error(result.error||result.message||response.statusText);
   return result;
 }
 const call=apiRequest;
@@ -1714,7 +1714,8 @@ async function finishDkbApproval(id){
   }
   throw new Error("Die DKB-Freigabe wurde nach zwei Minuten noch nicht bestätigt. Der offene Vorgang kann später mit ‚App-Freigabe prüfen‘ fortgesetzt werden.");
 }
-async function syncSource(id){try{msg("Abruf läuft …");let result=await call("/api/sync/"+id,{method:"POST"});if(result.state==="WAITING_FOR_USER"&&result.decoupled)result=await finishDkbApproval(id);msg(result.message);await refresh(true)}catch(error){msg(error.message,true);await refresh()}}
+function showSyncResult(text,isError=false){msg(text,isError);document.getElementById("message")?.scrollIntoView({block:"nearest",behavior:"smooth"})}
+async function syncSource(id){try{msg("Abruf läuft …");let result=await call("/api/sync/"+id,{method:"POST"});if(result.state==="WAITING_FOR_USER"&&result.decoupled)result=await finishDkbApproval(id);await refresh(true);showSyncResult(result.message,result.state==="ERROR")}catch(error){await refresh();showSyncResult(error.message,true)}}
 async function preflightDkb(id){try{msg("FinTS-Konfiguration wird geprüft …");const result=await call("/api/dkb-fints/preflight/"+id,{method:"POST"});msg(result.message);await refresh()}catch(error){msg(error.message,true)}}
 async function continueDkb(id){try{msg("DKB-App-Freigabe wird geprüft …");const result=await call("/api/dkb-fints/continue/"+id,{method:"POST",body:"{}"});msg(result.message);await refresh()}catch(error){msg(error.message,true)}}
 async function exportNow(){try{await call("/api/export",{method:"POST"});msg("CSV-Dateien wurden aktualisiert.")}catch(error){msg(error.message,true)}}

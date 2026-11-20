@@ -338,8 +338,7 @@ def request_holdings(client: Any, config: dict[str, Any], account: dict[str, Any
         )
 
 
-# Controlled diagnostic comparison (9010 on HKWDU): 14 days instead of 90.
-TURNOVER_DAYS = 14
+TURNOVER_DAYS = 90
 
 
 def turnover_period(end=None):
