@@ -25,7 +25,8 @@ import {
   dkbAccountIds,
   fetchDkbFints,
   preflightDkbFints,
-  type DkbFintsOutcome
+  type DkbFintsOutcome,
+  type DkbFintsRunner
 } from "./connectors/dkb-fints.js";
 import { importBundle } from "./importer.js";
 import { PublishJournal } from "./publish-journal.js";
@@ -161,6 +162,11 @@ export class FinanceService {
   private marketArchiveLoading?: Promise<void>;
   private marketArchiveLastFailureAt = 0;
   private newsletterPriceCache?: { expiresAt: number; value: Array<{ symbol: string; name: string; priceMinor: number; currency: string; capturedAt?: string; source?: string }> };
+
+  /** Test seam: replaces the Python FinTS helper. */
+  dkbRunner?: DkbFintsRunner;
+  /** Minimum gap between two bank contacts for one open decoupled approval. */
+  dkbMinPollIntervalMs = DKB_MIN_POLL_INTERVAL_MS;
 
   constructor(readonly db: FinanceDatabase, readonly config: AppConfig) {
     for (const source of config.sources) {
@@ -1383,7 +1389,8 @@ export class FinanceService {
       } else if (source.kind === "dkb-fints") {
         const outcome = await fetchDkbFints(
           source,
-          this.db.getSetting(`dkb-fints:${source.id}:client`)
+          this.db.getSetting(`dkb-fints:${source.id}:client`),
+          this.dkbRunner
         );
         this.storeDkbOutcome(source.id, outcome);
         if (outcome.state === "WAITING_FOR_USER") {
@@ -1445,13 +1452,26 @@ export class FinanceService {
     const open = this.dkbContinuationStatus(id);
     if (open.status !== "open") return { state: "ERROR", message: "Keine offene DKB-Freigabe vorhanden" };
     const stored = open.stored;
+    if (!tan) {
+      const lastContact = Date.parse(this.db.getSetting(`dkb-fints:${id}:continuation-at`) ?? "");
+      if (Number.isFinite(lastContact) && Date.now() - lastContact < this.dkbMinPollIntervalMs) {
+        // Too early to poll again: keep the stored dialog untouched, no bank call.
+        const parsed = JSON.parse(stored) as { decoupled?: unknown };
+        return {
+          state: "WAITING_FOR_USER",
+          message: "DKB-Freigabe erforderlich",
+          decoupled: Boolean(parsed.decoupled)
+        };
+      }
+    }
     this.running.add(id);
     const runId = this.db.beginRun(id);
     try {
       const outcome = await continueDkbFints(
         source,
         JSON.parse(stored) as Record<string, unknown>,
-        tan
+        tan,
+        this.dkbRunner
       );
       this.storeDkbOutcome(id, outcome);
       if (outcome.state === "WAITING_FOR_USER") {
@@ -1628,6 +1648,10 @@ export class FinanceService {
 }
 
 const DKB_APPROVAL_MAX_AGE_MS = 15 * 60_000;
+// DKB invalidates the paused dialog (FinTS 9010) when the decoupled approval is
+// polled every few seconds; 15 s polls are accepted. Faster UI polls are
+// answered locally without touching the bank.
+const DKB_MIN_POLL_INTERVAL_MS = 15_000;
 
 export function requiresUserAction(message: string): boolean {
   return /Secret|Zustimmung|Freigabe|fehlt|(?:^|\W)(?:TAN|SCA)(?:\W|$)/i.test(message);
