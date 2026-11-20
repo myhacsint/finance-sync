@@ -1277,12 +1277,32 @@ export class FinanceService {
     return counts;
   }
 
+  private clearDkbContinuation(id: string, alsoClient = false): void {
+    this.db.setSetting(`dkb-fints:${id}:continuation`, "");
+    this.db.setSetting(`dkb-fints:${id}:continuation-at`, "");
+    if (alsoClient) this.db.setSetting(`dkb-fints:${id}:client`, "");
+  }
+
+  /** Open approval younger than DKB_APPROVAL_MAX_AGE_MS, else null (stale state is discarded). */
+  private openDkbContinuation(id: string): string | null {
+    const stored = this.db.getSetting(`dkb-fints:${id}:continuation`);
+    if (!stored) return null;
+    const at = Date.parse(this.db.getSetting(`dkb-fints:${id}:continuation-at`) ?? "");
+    if (!Number.isFinite(at) || Date.now() - at > DKB_APPROVAL_MAX_AGE_MS) {
+      console.warn(`dkb-fints ${id}: veralteter Fortsetzungszustand verworfen`);
+      this.clearDkbContinuation(id);
+      return null;
+    }
+    return stored;
+  }
+
   private storeDkbOutcome(id: string, outcome: DkbFintsOutcome): void {
     if (outcome.state === "WAITING_FOR_USER") {
       this.db.setSetting(`dkb-fints:${id}:continuation`, JSON.stringify(outcome.continuation));
+      this.db.setSetting(`dkb-fints:${id}:continuation-at`, new Date().toISOString());
     } else if (outcome.clientData) {
       this.db.setSetting(`dkb-fints:${id}:client`, outcome.clientData);
-      this.db.setSetting(`dkb-fints:${id}:continuation`, "");
+      this.clearDkbContinuation(id);
     }
   }
 
@@ -1324,6 +1344,11 @@ export class FinanceService {
     if (!source) return { state: "ERROR", message: "Unbekannte Quelle" };
     if (!source.enabled) return { state: "DISABLED", message: "Quelle ist deaktiviert" };
     if (this.running.has(id)) return { state: "RUNNING", message: "Abruf läuft bereits" };
+    if (source.kind === "dkb-fints" && this.openDkbContinuation(id)) {
+      // Never start a second dialog while an app approval is open: that would
+      // invalidate the pending dialog ID (FinTS 9010). Resume the existing one.
+      return this.continueDkbFints(id);
+    }
     this.running.add(id);
     const runId = this.db.beginRun(id);
     try {
@@ -1373,6 +1398,10 @@ export class FinanceService {
       const message = error instanceof Error ? error.message : String(error);
       const waiting = requiresUserAction(message);
       const state = waiting ? "WAITING_FOR_USER" : "ERROR";
+      if (source.kind === "dkb-fints") {
+        console.error(`dkb-fints ${id}: Abruf fehlgeschlagen: ${message}`);
+        if (/\b9010\b/.test(message)) this.clearDkbContinuation(id, true);
+      }
       this.db.finishRun(runId, id, state, message);
       return { state, message };
     } finally {
@@ -1395,7 +1424,7 @@ export class FinanceService {
     }
     if (!source.enabled) return { state: "DISABLED", message: "Quelle ist deaktiviert" };
     if (this.running.has(id)) return { state: "RUNNING", message: "Abruf läuft bereits" };
-    const stored = this.db.getSetting(`dkb-fints:${id}:continuation`);
+    const stored = this.openDkbContinuation(id);
     if (!stored) return { state: "ERROR", message: "Keine offene DKB-Freigabe vorhanden" };
     this.running.add(id);
     const runId = this.db.beginRun(id);
@@ -1423,6 +1452,10 @@ export class FinanceService {
       const message = error instanceof Error ? error.message : String(error);
       const waiting = requiresUserAction(message);
       const state = waiting ? "WAITING_FOR_USER" : "ERROR";
+      // A failed continue leaves a dead dialog behind; drop it so the next
+      // sync starts clean (9010 additionally invalidates the cached client state).
+      this.clearDkbContinuation(id, /\b9010\b/.test(message));
+      console.error(`dkb-fints ${id}: Fortsetzung fehlgeschlagen, Zustand verworfen: ${message}`);
       this.db.finishRun(runId, id, state, message);
       return { state, message };
     } finally {
@@ -1574,6 +1607,8 @@ export class FinanceService {
     return id;
   }
 }
+
+const DKB_APPROVAL_MAX_AGE_MS = 15 * 60_000;
 
 export function requiresUserAction(message: string): boolean {
   return /Secret|Zustimmung|Freigabe|fehlt|(?:^|\W)(?:TAN|SCA)(?:\W|$)/i.test(message);

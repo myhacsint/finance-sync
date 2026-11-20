@@ -16,6 +16,35 @@ from datetime import datetime, timezone, timedelta
 from typing import Any
 
 
+RETURN_CODES: list[str] = []
+
+
+def install_return_code_recorder() -> None:
+    """Record FinTS return codes (code only, no payload) for error messages."""
+    try:
+        from fints.client import FinTS3PinTanClient
+    except Exception:
+        return
+    original = FinTS3PinTanClient._process_response
+
+    def recording(self: Any, dialog: Any, segment: Any, response: Any) -> Any:
+        try:
+            code = str(getattr(response, "code", "") or "")
+            if re.fullmatch(r"\d{4}", code) and code not in RETURN_CODES[-20:]:
+                RETURN_CODES.append(code)
+        except Exception:
+            pass
+        return original(self, dialog, segment, response)
+
+    FinTS3PinTanClient._process_response = recording  # type: ignore[method-assign]
+
+
+def error_codes_suffix() -> str:
+    # Only 4xxx-9xxx codes are interesting for failures; 0xxx/3xxx are routine.
+    bad = [c for c in RETURN_CODES if c[0] in "89" or c[0] == "4" or c[0] == "5"]
+    return f" [FinTS-Rückgabecode: {', '.join(bad[-5:])}]" if bad else ""
+
+
 def fail(message: str) -> None:
     print(json.dumps({"state": "ERROR", "message": message}, ensure_ascii=False))
 
@@ -475,6 +504,7 @@ def main() -> None:
         action = str(payload.get("action") or "")
         validate(payload, network=action in ("fetch", "continue"))
         import fints
+        install_return_code_recorder()
 
         if action == "preflight":
             print(json.dumps({
@@ -491,7 +521,7 @@ def main() -> None:
             raise ValueError("Unbekannte DKB-FinTS Aktion")
         print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
     except Exception as exc:
-        fail(f"{type(exc).__name__}: {exc}")
+        fail(f"{type(exc).__name__}: {exc}{error_codes_suffix()}")
 
 
 if __name__ == "__main__":

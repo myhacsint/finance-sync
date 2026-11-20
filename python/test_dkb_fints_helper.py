@@ -151,3 +151,12 @@ class ContinuationStateTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReturnCodeTest(unittest.TestCase):
+    def test_error_suffix_shows_real_code_only(self):
+        import dkb_fints_helper as h
+        h.RETURN_CODES[:] = ["0010", "3920", "9010"]
+        self.assertEqual(h.error_codes_suffix(), " [FinTS-Rückgabecode: 9010]")
+        h.RETURN_CODES[:] = ["0010"]
+        self.assertEqual(h.error_codes_suffix(), "")
