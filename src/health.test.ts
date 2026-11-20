@@ -69,3 +69,56 @@ test("health is ok with a fresh document-worker heartbeat", () => {
   assert.equal(report.status, "ok");
   assert.deepEqual(report.warnings, []);
 });
+
+function healthWithTurnoverWarning(sinceDaysAgo: number) {
+  const root = mkdtempSync(join(tmpdir(), "finance-health-dkb-"));
+  const previousArchive = paths.archive;
+  const previousBackup = paths.backup;
+  const previousWorkDir = process.env.FINANCE_PARSER_WORK_DIR;
+  try {
+    paths.archive = join(root, "archive");
+    paths.backup = join(root, "backup");
+    mkdirSync(paths.archive);
+    mkdirSync(paths.backup);
+    writeFileSync(join(paths.backup, "last-success"), "ok");
+    const workDir = join(root, "parser-work");
+    mkdirSync(join(workDir, ".queue"), { recursive: true });
+    writeFileSync(join(workDir, ".queue", "heartbeat"), "ok");
+    process.env.FINANCE_PARSER_WORK_DIR = workDir;
+    const now = new Date().toISOString();
+    const since = new Date(Date.now() - sinceDaysAgo * 86_400_000 - 60_000).toISOString();
+    const dkbDb = {
+      listSources: () => [{ id: "dkb-depots", enabled: 1, state: "SUCCESS", message: "ok", last_success_at: now, last_attempt_at: now }],
+      getSetting: (key: string) => key === "dkb-fints:dkb-depots:turnover-warning"
+        ? JSON.stringify({ accounts: [{ accountId: "a", since, lastAt: now, message: "FinTS 9010: Bank meldet 'x'" }] })
+        : undefined
+    } as unknown as FinanceDatabase;
+    const dkbConfig = {
+      ...config,
+      sources: [{ id: "dkb-depots", kind: "dkb-fints", enabled: true, settings: { accounts: [{ accountId: "a", accountNumber: "1234567851" }] } }]
+    } as unknown as AppConfig;
+    return { report: buildHealth(dkbDb, dkbConfig), since };
+  } finally {
+    paths.archive = previousArchive;
+    paths.backup = previousBackup;
+    if (previousWorkDir === undefined) delete process.env.FINANCE_PARSER_WORK_DIR;
+    else process.env.FINANCE_PARSER_WORK_DIR = previousWorkDir;
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+test("health: DKB turnover failure under 60 days is a warning, not critical", () => {
+  const { report, since } = healthWithTurnoverWarning(10);
+  assert.equal(report.status, "warning");
+  assert.deepEqual(report.critical, []);
+  assert.deepEqual(report.warnings, [
+    `dkb-depots: Depotumsätze für Depot …851 seit ${since.slice(0, 10)} nicht abrufbar (FinTS 9010: Bank meldet 'x')`
+  ]);
+  assert.ok(!JSON.stringify(report).includes("1234567851"));
+});
+
+test("health: DKB turnover failure of 60 days or more is critical", () => {
+  const { report } = healthWithTurnoverWarning(60);
+  assert.equal(report.status, "critical");
+  assert.deepEqual(report.critical, ["dkb-depots: Depotumsätze für Depot …851 seit 60 Tagen nicht abrufbar; Lücke ab 90 Tagen"]);
+});

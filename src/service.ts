@@ -23,9 +23,11 @@ import { preflightInteractiveSource } from "./connectors/status-only.js";
 import {
   continueDkbFints,
   dkbAccountIds,
+  dkbDepotLabel,
   fetchDkbFints,
   preflightDkbFints,
   type DkbFintsOutcome,
+  type DkbTurnoverWarning,
   type DkbFintsRunner
 } from "./connectors/dkb-fints.js";
 import { importBundle } from "./importer.js";
@@ -1283,13 +1285,36 @@ export class FinanceService {
     return counts;
   }
 
-  /** Holdings were imported, but the bank refused an optional part (turnovers): show a real error. */
-  private finishPartialDkb(
-    runId: number, id: string, counts: Record<string, number>, warning: string
-  ): SyncResult {
-    const message = `Depotbestände gespeichert (${counts.holdings ?? 0} neu); ${warning}`;
-    this.db.finishRun(runId, id, "ERROR", message, counts);
-    return { state: "ERROR", message, counts };
+  /** Persist per-depot turnover failures; `since` survives while a depot keeps failing. */
+  private recordDkbTurnoverWarnings(
+    source: SourceConfig, warnings: DkbTurnoverWarning[] | undefined
+  ): string | undefined {
+    const key = `dkb-fints:${source.id}:turnover-warning`;
+    if (!warnings?.length) {
+      this.db.setSetting(key, "");
+      return undefined;
+    }
+    let previous: Array<{ accountId?: string; since?: string }> = [];
+    try {
+      const parsed = JSON.parse(this.db.getSetting(key) || "{}") as { accounts?: typeof previous };
+      if (Array.isArray(parsed.accounts)) previous = parsed.accounts;
+    } catch {
+      // unreadable old state: treat every depot as newly failing
+    }
+    const now = new Date().toISOString();
+    const accounts = warnings.map((warning) => {
+      const since = previous.find((item) => item.accountId === warning.accountId)?.since;
+      return {
+        accountId: warning.accountId,
+        since: since && Number.isFinite(Date.parse(since)) ? since : now,
+        lastAt: now,
+        message: warning.message
+      };
+    });
+    this.db.setSetting(key, JSON.stringify({ accounts }));
+    return warnings
+      .map((warning) => `Depotumsätze für Depot ${dkbDepotLabel(source, warning.accountId)} nicht abrufbar: ${warning.message}`)
+      .join("; ");
   }
 
   private clearDkbContinuation(id: string, alsoClient = false): void {
@@ -1386,7 +1411,7 @@ export class FinanceService {
     const runId = this.db.beginRun(id);
     try {
       let bundle: ImportBundle;
-      let dkbWarning: string | undefined;
+      let dkbWarnings: DkbTurnoverWarning[] | undefined;
       if (source.kind === "solana") {
         bundle = await fetchSolana(source);
       } else if (source.kind === "dkb-csv") {
@@ -1413,7 +1438,7 @@ export class FinanceService {
           };
         }
         bundle = outcome.bundle;
-        dkbWarning = outcome.warning;
+        dkbWarnings = outcome.turnoverWarnings;
       } else if (source.kind === "comdirect") {
         const result = preflightInteractiveSource(source);
         this.db.finishRun(runId, id, result.state, result.message);
@@ -1427,7 +1452,14 @@ export class FinanceService {
         return result;
       }
       const counts = await this.importSourceBundle(source, bundle);
-      if (dkbWarning) return this.finishPartialDkb(runId, id, counts, dkbWarning);
+      if (source.kind === "dkb-fints") {
+        const clause = this.recordDkbTurnoverWarnings(source, dkbWarnings);
+        if (clause) {
+          const message = `Depotbestände gespeichert (${counts.holdings ?? 0} neu); ${clause}`;
+          this.db.finishRun(runId, id, "SUCCESS", message, counts);
+          return { state: "SUCCESS", message, counts };
+        }
+      }
       const message = `Abruf erfolgreich; ${Object.values(counts).reduce((a, b) => a + b, 0)} neue Datensätze`;
       this.db.finishRun(runId, id, "SUCCESS", message, counts);
       return { state: "SUCCESS", message, counts };
@@ -1496,7 +1528,12 @@ export class FinanceService {
         };
       }
       const counts = await this.importSourceBundle(source, outcome.bundle);
-      if (outcome.warning) return this.finishPartialDkb(runId, id, counts, outcome.warning);
+      const clause = this.recordDkbTurnoverWarnings(source, outcome.turnoverWarnings);
+      if (clause) {
+        const message = `Depotbestände gespeichert (${counts.holdings ?? 0} neu); ${clause}`;
+        this.db.finishRun(runId, id, "SUCCESS", message, counts);
+        return { state: "SUCCESS", message, counts };
+      }
       const message = `DKB-FinTS-Abruf erfolgreich; ${counts.holdings ?? 0} neue Positionen`;
       this.db.finishRun(runId, id, "SUCCESS", message, counts);
       return { state: "SUCCESS", message, counts };

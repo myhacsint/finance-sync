@@ -248,7 +248,96 @@ class TurnoverFailureTest(unittest.TestCase):
         h.turnover_factory = lambda config, account: None
         result = h.try_fetch_turnovers(Boom(), {}, {})
         self.assertIsInstance(result, h.TurnoverFailure)
-        self.assertIn("HKWDU", result.message)
+        self.assertEqual(result.account_id, "")
         self.assertIn("9010", result.message)
         self.assertNotIn("BPD", result.message)
         h.RETURN_CODES[:] = []
+
+
+class PerDepotTurnoverTest(unittest.TestCase):
+    def setUp(self):
+        import sys, types
+        import dkb_fints_helper as h
+        self.h = h
+        self.saved = (h.request_holdings, h.try_fetch_turnovers, h.portfolio_from_segments,
+                      h.attach_turnovers, sys.modules.get("fints"), sys.modules.get("fints.client"))
+        fints = types.ModuleType("fints")
+        client_mod = types.ModuleType("fints.client")
+        client_mod.NeedTANResponse = type("NeedTANResponse", (), {})
+        sys.modules["fints"], sys.modules["fints.client"] = fints, client_mod
+        h.RETURN_CODES[:] = []
+        h.RETURN_TEXTS.clear()
+
+    def tearDown(self):
+        import sys
+        h = self.h
+        (h.request_holdings, h.try_fetch_turnovers, h.portfolio_from_segments,
+         h.attach_turnovers, fints, client_mod) = self.saved
+        for name, mod in (("fints", fints), ("fints.client", client_mod)):
+            if mod is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = mod
+        h.RETURN_CODES[:] = []
+        h.RETURN_TEXTS.clear()
+
+    def test_failure_of_depot_0_does_not_skip_depot_1(self):
+        h = self.h
+
+        class Client:
+            init_tan_response = None
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def deconstruct(self, including_private=False): return b"c"
+
+        h.RETURN_CODES[:] = ["9010"]
+        h.RETURN_TEXTS["9010"] = "Verarbeitungssystem 1234567890 nicht verfügbar"
+        calls = []
+
+        def fake_turnovers(client, config, account):
+            calls.append(account["accountId"])
+            if account["accountId"] == "d0":
+                return h.TurnoverFailure(
+                    h.friendly_message("could not fetch BPD"), account["accountId"])
+            return ["segments"]
+
+        attached = []
+        h.request_holdings = lambda client, config, account: "holdings"
+        h.try_fetch_turnovers = fake_turnovers
+        h.portfolio_from_segments = lambda account, result, at: {"accountId": account["accountId"], "positions": []}
+        h.attach_turnovers = lambda portfolio, segments: attached.append(portfolio["accountId"])
+        config = {"fetchTransactions": True, "accounts": [{"accountId": "d0"}, {"accountId": "d1"}]}
+        result = h.fetch_remaining(Client(), {"config": config}, 0, [])
+        self.assertEqual(calls, ["d0", "d1"])
+        self.assertEqual(attached, ["d1"])
+        self.assertEqual(result["state"], "SUCCESS")
+        self.assertNotIn("turnoverError", result)
+        self.assertEqual([e["accountId"] for e in result["turnoverErrors"]], ["d0"])
+        message = result["turnoverErrors"][0]["message"]
+        self.assertIn("Bank meldet 'Verarbeitungssystem *** nicht verfügbar'", message)
+        self.assertNotIn("1234567890", message)
+
+    def test_no_failures_omits_field(self):
+        h = self.h
+
+        class Client:
+            init_tan_response = None
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def deconstruct(self, including_private=False): return b"c"
+
+        h.request_holdings = lambda client, config, account: "holdings"
+        h.try_fetch_turnovers = lambda client, config, account: []
+        h.portfolio_from_segments = lambda account, result, at: {"accountId": account["accountId"], "positions": []}
+        h.attach_turnovers = lambda portfolio, segments: None
+        config = {"fetchTransactions": True, "accounts": [{"accountId": "d0"}]}
+        self.assertNotIn("turnoverErrors", h.fetch_remaining(Client(), {"config": config}, 0, []))
+
+    def test_bank_text_sanitised_and_capped(self):
+        h = self.h
+        h.RETURN_CODES[:] = ["9010"]
+        h.RETURN_TEXTS["9010"] = "x" * 200 + "12345"
+        text = h.friendly_message("could not fetch BPD")
+        self.assertEqual(text, "FinTS 9010: Bank meldet '" + "x" * 80 + "'")
+        h.RETURN_TEXTS.clear()
+        self.assertIn("Verarbeitungssystem nicht verfügbar", h.friendly_message("could not fetch BPD"))

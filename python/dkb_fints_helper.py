@@ -18,6 +18,7 @@ from typing import Any
 
 
 RETURN_CODES: list[str] = []
+RETURN_TEXTS: dict[str, str] = {}
 
 
 def install_return_code_recorder() -> None:
@@ -33,6 +34,9 @@ def install_return_code_recorder() -> None:
             code = str(getattr(response, "code", "") or "")
             if re.fullmatch(r"\d{4}", code) and code not in RETURN_CODES[-20:]:
                 RETURN_CODES.append(code)
+            text = str(getattr(response, "text", "") or "")
+            if code.startswith("9") and re.fullmatch(r"\d{4}", code) and text:
+                RETURN_TEXTS[code] = text
         except Exception:
             pass
         return original(self, dialog, segment, response)
@@ -46,9 +50,16 @@ def error_codes_suffix() -> str:
     return f" [FinTS-Rückgabecode: {', '.join(bad[-5:])}]" if bad else ""
 
 
+def sanitize_bank_text(text: str) -> str:
+    return re.sub(r"\d{5,}", "***", text).strip()[:80]
+
+
 def friendly_message(message: str) -> str:
     # python-fints raises the misleading "could not fetch BPD / wrong BLZ" text for 9010.
     if "could not fetch BPD" in message and "9010" in RETURN_CODES:
+        bank_text = sanitize_bank_text(RETURN_TEXTS.get("9010", ""))
+        if bank_text:
+            return f"FinTS 9010: Bank meldet '{bank_text}'"
         return ("FinTS 9010: Die Bank hat den Auftrag mit 'Verarbeitungssystem nicht verfügbar' "
                 "abgelehnt (Dialog ungültig oder Bank-Fehler)")
     return message
@@ -362,8 +373,9 @@ def attach_turnovers(portfolio: dict[str, Any], segments: list[Any]) -> None:
 class TurnoverFailure:
     """A failed HKWDU request; holdings fetched before it stay valid."""
 
-    def __init__(self, message: str) -> None:
+    def __init__(self, message: str, account_id: str = "") -> None:
         self.message = message
+        self.account_id = account_id
 
 
 def try_fetch_turnovers(client: Any, config: dict[str, Any], account: dict[str, Any]) -> Any:
@@ -380,8 +392,13 @@ def try_fetch_turnovers(client: Any, config: dict[str, Any], account: dict[str, 
     except Exception as exc:  # FinTSClientError and friends
         fints_trace.emit("turnover-failed", error=type(exc).__name__, codes=RETURN_CODES[-8:])
         return TurnoverFailure(
-            f"Depotumsätze (HKWDU) nicht abrufbar: {friendly_message(str(exc))}{error_codes_suffix()}"
+            f"{friendly_message(str(exc))}{error_codes_suffix()}",
+            str(account.get("accountId") or ""),
         )
+
+
+def turnover_error_entry(failure: TurnoverFailure) -> dict[str, str]:
+    return {"accountId": failure.account_id, "message": failure.message}
 
 
 def prepare_touchdown_resume(client: Any, config: dict[str, Any], account: dict[str, Any]) -> None:
@@ -401,7 +418,7 @@ def fetch_remaining(
     payload: dict[str, Any],
     start_index: int,
     completed: list[dict[str, Any]],
-    turnover_errors_in: list[str] | None = None,
+    turnover_errors_in: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     from fints.client import NeedTANResponse
 
@@ -410,7 +427,7 @@ def fetch_remaining(
     captured_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     pending: tuple[Any, bytes, int] | None = None
     pending_phase = 'holding'
-    turnover_errors: list[str] = list(turnover_errors_in or [])
+    turnover_errors: list[dict[str, str]] = list(turnover_errors_in or [])
     with client:
         if isinstance(client.init_tan_response, NeedTANResponse):
             dialog_data = client.pause_dialog()
@@ -424,15 +441,13 @@ def fetch_remaining(
                     break
                 completed.append(portfolio_from_segments(accounts[index], result, captured_at))
                 if config.get('fetchTransactions', False):
-                    if turnover_errors:
-                        continue  # bank refused HKWDU in this run; do not hammer it
                     turnovers = try_fetch_turnovers(client, config, accounts[index])
                     if isinstance(turnovers, NeedTANResponse):
                         pending = (turnovers, client.pause_dialog(), index)
                         pending_phase = 'transactions'
                         break
                     if isinstance(turnovers, TurnoverFailure):
-                        turnover_errors.append(turnovers.message)
+                        turnover_errors.append(turnover_error_entry(turnovers))
                         continue
                     attach_turnovers(completed[-1], turnovers)
     if pending:
@@ -454,7 +469,7 @@ def fetch_remaining(
         "clientData": b64(client.deconstruct(including_private=True)),
     }
     if turnover_errors:
-        result["turnoverError"] = turnover_errors[0]
+        result["turnoverErrors"] = turnover_errors
     return result
 
 
@@ -491,7 +506,7 @@ def continue_fetch(payload: dict[str, Any]) -> dict[str, Any]:
     dialog_data = unb64(require_text(state.get("dialogData"), "FinTS Dialog-Zustand"))
     result: Any
     pending: tuple[Any, bytes] | None = None
-    turnover_errors: list[str] = []
+    turnover_errors: list[dict[str, str]] = []
     with client.resume_dialog(dialog_data):
         if phase == "holding":
             prepare_touchdown_resume(client, payload["config"], payload["config"]["accounts"][index])
@@ -536,7 +551,7 @@ def continue_fetch(payload: dict[str, Any]) -> dict[str, Any]:
                         client, turnovers, client.pause_dialog(), 'transactions', index, completed))
                     return response
                 if isinstance(turnovers, TurnoverFailure):
-                    turnover_errors.append(turnovers.message)
+                    turnover_errors.append(turnover_error_entry(turnovers))
                 else:
                     attach_turnovers(completed[-1], turnovers)
         index += 1

@@ -4,6 +4,7 @@ import type { AppConfig } from "./types.js";
 import type { FinanceDatabase } from "./database.js";
 import { paths } from "./config.js";
 import { sourceIsStale } from "./source-freshness.js";
+import { dkbDepotLabel } from "./connectors/dkb-fints.js";
 
 export interface HealthReport {
   status: "ok" | "warning" | "critical";
@@ -57,6 +58,25 @@ export function buildHealth(db: FinanceDatabase, config: AppConfig): HealthRepor
         const days = (now - new Date(String(basis)).getTime()) / 86_400_000;
         if (days >= 10) critical.push(`${row.id}: seit ${Math.floor(days)} Tagen kein Erfolg`);
         else if (days >= 7) warnings.push(`${row.id}: seit ${Math.floor(days)} Tagen kein Erfolg`);
+      }
+      // The bank serves 90 days of turnovers; the archive only gets a gap after that.
+      const turnoverState = db.getSetting(`dkb-fints:${row.id}:turnover-warning`);
+      if (turnoverState) {
+        let entries: Array<{ accountId?: unknown; since?: unknown; message?: unknown }> = [];
+        try {
+          const parsed = JSON.parse(turnoverState) as { accounts?: typeof entries };
+          if (Array.isArray(parsed.accounts)) entries = parsed.accounts;
+        } catch {
+          // unreadable state is ignored
+        }
+        for (const entry of entries) {
+          const since = Date.parse(String(entry.since ?? ""));
+          if (!Number.isFinite(since)) continue;
+          const label = dkbDepotLabel(source, String(entry.accountId ?? ""));
+          const days = Math.floor((now - since) / 86_400_000);
+          if (days >= 60) critical.push(`${row.id}: Depotumsätze für Depot ${label} seit ${days} Tagen nicht abrufbar; Lücke ab 90 Tagen`);
+          else warnings.push(`${row.id}: Depotumsätze für Depot ${label} seit ${new Date(since).toISOString().slice(0, 10)} nicht abrufbar (${String(entry.message ?? "")})`);
+        }
       }
     }
     const expiry = db.getSetting(`enable-banking:${row.id}:consent-expires`)

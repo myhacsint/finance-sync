@@ -44,6 +44,11 @@ interface DkbHelperPortfolio {
   turnovers?: Array<{ identity: string | null; isin: string; direction: "RECE" | "DELI"; quantity: string; date: string; amount?: string; currency?: string }>;
 }
 
+export interface DkbTurnoverWarning {
+  accountId: string;
+  message: string;
+}
+
 export interface DkbHelperOutput {
   state: "READY" | "SUCCESS" | "WAITING_FOR_USER" | "ERROR";
   message: string;
@@ -53,7 +58,7 @@ export interface DkbHelperOutput {
   clientData?: string;
   portfolios?: DkbHelperPortfolio[];
   libraryVersion?: string;
-  turnoverError?: string;
+  turnoverErrors?: Array<{ accountId: string; message: string }>;
 }
 
 interface DkbHelperInput {
@@ -77,7 +82,7 @@ interface DkbHelperInput {
 }
 
 export type DkbFintsOutcome =
-  | { state: "SUCCESS"; message: string; bundle: ImportBundle; clientData?: string; warning?: string }
+  | { state: "SUCCESS"; message: string; bundle: ImportBundle; clientData?: string; turnoverWarnings?: DkbTurnoverWarning[] }
   | {
       state: "WAITING_FOR_USER";
       message: string;
@@ -397,6 +402,25 @@ export async function continueDkbFints(
   return outcomeFromHelper(source, output);
 }
 
+/** Depot label for messages: "…" plus the last three digits, never the full number. */
+export function dkbDepotLabel(source: SourceConfig, accountId: string): string {
+  const account = sourceAccounts(source).find((item) => item.accountId === accountId);
+  return account ? `…${account.accountNumber.slice(-3)}` : "unbekannt";
+}
+
+function validatedTurnoverWarnings(
+  source: SourceConfig, errors: DkbHelperOutput["turnoverErrors"]
+): DkbTurnoverWarning[] | undefined {
+  if (!errors?.length) return undefined;
+  const configured = new Set(dkbAccountIds(source));
+  return errors.map((entry) => {
+    if (!entry || typeof entry.accountId !== "string" || !configured.has(entry.accountId)) {
+      throw new Error("DKB-FinTS Depotumsatz-Warnung für unbekanntes Depot");
+    }
+    return { accountId: entry.accountId, message: String(entry.message ?? "").slice(0, 200) };
+  });
+}
+
 function outcomeFromHelper(source: SourceConfig, output: DkbHelperOutput): DkbFintsOutcome {
   if (output.state === "WAITING_FOR_USER") {
     if (!output.continuation) throw new Error("DKB-FinTS lieferte keinen Fortsetzungszustand");
@@ -414,6 +438,6 @@ function outcomeFromHelper(source: SourceConfig, output: DkbHelperOutput): DkbFi
     message: output.message,
     bundle: normalizeDkbFintsBundle(source, output),
     clientData: output.clientData,
-    warning: output.turnoverError
+    turnoverWarnings: validatedTurnoverWarnings(source, output.turnoverErrors)
   };
 }

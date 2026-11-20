@@ -97,23 +97,63 @@ test("zu schnelle UI-Polls erreichen die Bank nicht und lassen den Dialog unber�
   assert.ok(service.db.getSetting("dkb-fints:dkb-depots:continuation"));
 });
 
-test("HKWDU-Fehler: Depotbestände werden gespeichert, UI zeigt ERROR statt WAITING", async () => {
-  const { service } = setup();
-  service.dkbMinPollIntervalMs = 0;
+const WARNING = [{ accountId: "dkb-depot-a", message: "FinTS 9010: Bank meldet 'Verarbeitungssystem nicht verfügbar'" }];
+const WARNING_KEY = "dkb-fints:dkb-depots:turnover-warning";
+
+function withWarnings(service: ReturnType<typeof setup>["service"], warnings: () => DkbHelperOutput["turnoverErrors"]) {
   const base = service.dkbRunner!;
   service.dkbRunner = async (input) => {
     const out = await base(input);
-    if (out.state === "SUCCESS") {
-      return { ...out, turnoverError: "Depotumsätze (HKWDU) nicht abrufbar: FinTS 9010 [FinTS-Rückgabecode: 9050, 9010]" };
-    }
-    return out;
+    return out.state === "SUCCESS" ? { ...out, turnoverErrors: warnings() } : out;
   };
+}
+
+test("HKWDU-Fehler (Continue-Pfad): Bestände gespeichert, Lauf SUCCESS, Warnung mit …Endziffern gespeichert", async () => {
+  const { service } = setup();
+  service.dkbMinPollIntervalMs = 0;
+  withWarnings(service, () => WARNING);
   await service.sync("dkb-depots");
   let result = await service.continueDkbFints("dkb-depots");
   while (result.state === "WAITING_FOR_USER") result = await service.continueDkbFints("dkb-depots");
-  assert.equal(result.state, "ERROR");
-  assert.match(result.message, /Depotbestände gespeichert/);
-  assert.match(result.message, /HKWDU/);
+  assert.equal(result.state, "SUCCESS");
+  assert.match(result.message, /^Depotbestände gespeichert \(\d+ neu\); Depotumsätze für Depot …789 nicht abrufbar: FinTS 9010: Bank meldet/);
+  assert.ok(!result.message.includes("123456789"));
+  const stored = JSON.parse(service.db.getSetting(WARNING_KEY)!) as { accounts: Array<{ accountId: string; since: string; lastAt: string; message: string }> };
+  assert.equal(stored.accounts.length, 1);
+  assert.equal(stored.accounts[0].accountId, "dkb-depot-a");
+  assert.equal(stored.accounts[0].message, WARNING[0].message);
   assert.equal(service.db.getSetting("dkb-fints:dkb-depots:client"), "client-blob");
   assert.ok(!service.db.getSetting("dkb-fints:dkb-depots:continuation"));
+});
+
+test("HKWDU-Fehler (Sync-Pfad): SUCCESS, since bleibt beim zweiten Fehler, sauberer Lauf leert die Einstellung", async () => {
+  const { service } = setup();
+  let failing = true;
+  service.dkbRunner = async () => ({
+    state: "SUCCESS", message: "ok", clientData: "client-blob",
+    turnoverErrors: failing ? WARNING : undefined,
+    portfolios: [{
+      accountId: "dkb-depot-a", capturedAt: "2026-11-20T10:00:00Z",
+      rawMt535: [":16R:FIN\n:35B:ISIN DE0007164600\n:16S:FIN"],
+      positions: [{ isin: "DE0007164600", name: "SAP SE", quantity: "1", price: "100.00", priceCurrency: "EUR",
+        marketValue: "100.00", marketValueCurrency: "EUR", valuationDate: "2026-11-20" }]
+    }]
+  });
+  const first = await service.sync("dkb-depots");
+  assert.equal(first.state, "SUCCESS");
+  assert.match(first.message, /Depot …789 nicht abrufbar/);
+  const sinceFirst = (JSON.parse(service.db.getSetting(WARNING_KEY)!) as { accounts: Array<{ since: string }> }).accounts[0].since;
+  // Backdate so a changed `since` would be visible.
+  const backdated = "2026-10-01T00:00:00.000Z";
+  service.db.setSetting(WARNING_KEY, JSON.stringify({ accounts: [{ accountId: "dkb-depot-a", since: backdated, lastAt: sinceFirst, message: "alt" }] }));
+  const second = await service.sync("dkb-depots");
+  assert.equal(second.state, "SUCCESS");
+  const kept = (JSON.parse(service.db.getSetting(WARNING_KEY)!) as { accounts: Array<{ since: string; lastAt: string; message: string }> }).accounts[0];
+  assert.equal(kept.since, backdated);
+  assert.equal(kept.message, WARNING[0].message);
+  failing = false;
+  const clean = await service.sync("dkb-depots");
+  assert.equal(clean.state, "SUCCESS");
+  assert.doesNotMatch(clean.message, /nicht abrufbar/);
+  assert.equal(service.db.getSetting(WARNING_KEY), "");
 });
