@@ -1283,17 +1283,25 @@ export class FinanceService {
     if (alsoClient) this.db.setSetting(`dkb-fints:${id}:client`, "");
   }
 
-  /** Open approval younger than DKB_APPROVAL_MAX_AGE_MS, else null (stale state is discarded). */
-  private openDkbContinuation(id: string): string | null {
+  /**
+   * "open": usable approval; "stale": older than the limit (discarded);
+   * "none": nothing stored. Legacy state without timestamp is adopted, not dropped.
+   */
+  private dkbContinuationStatus(id: string): { status: "open"; stored: string } | { status: "stale" | "none" } {
     const stored = this.db.getSetting(`dkb-fints:${id}:continuation`);
-    if (!stored) return null;
-    const at = Date.parse(this.db.getSetting(`dkb-fints:${id}:continuation-at`) ?? "");
+    if (!stored) return { status: "none" };
+    const raw = this.db.getSetting(`dkb-fints:${id}:continuation-at`);
+    if (!raw) {
+      this.db.setSetting(`dkb-fints:${id}:continuation-at`, new Date().toISOString());
+      return { status: "open", stored };
+    }
+    const at = Date.parse(raw);
     if (!Number.isFinite(at) || Date.now() - at > DKB_APPROVAL_MAX_AGE_MS) {
       console.warn(`dkb-fints ${id}: veralteter Fortsetzungszustand verworfen`);
       this.clearDkbContinuation(id);
-      return null;
+      return { status: "stale" };
     }
-    return stored;
+    return { status: "open", stored };
   }
 
   private storeDkbOutcome(id: string, outcome: DkbFintsOutcome): void {
@@ -1344,10 +1352,20 @@ export class FinanceService {
     if (!source) return { state: "ERROR", message: "Unbekannte Quelle" };
     if (!source.enabled) return { state: "DISABLED", message: "Quelle ist deaktiviert" };
     if (this.running.has(id)) return { state: "RUNNING", message: "Abruf läuft bereits" };
-    if (source.kind === "dkb-fints" && this.openDkbContinuation(id)) {
-      // Never start a second dialog while an app approval is open: that would
-      // invalidate the pending dialog ID (FinTS 9010). Resume the existing one.
-      return this.continueDkbFints(id);
+    if (source.kind === "dkb-fints") {
+      const open = this.dkbContinuationStatus(id);
+      if (open.status === "open") {
+        // Never start a second dialog while an app approval is open: that would
+        // invalidate the pending dialog ID (FinTS 9010). Resume the existing one.
+        return this.continueDkbFints(id);
+      }
+      if (open.status === "stale") {
+        // Do not silently open a new dialog (and a new app request) after discarding.
+        return {
+          state: "ERROR",
+          message: "Veraltete DKB-Freigabe verworfen; bitte den Abruf bewusst neu starten"
+        };
+      }
     }
     this.running.add(id);
     const runId = this.db.beginRun(id);
@@ -1424,8 +1442,9 @@ export class FinanceService {
     }
     if (!source.enabled) return { state: "DISABLED", message: "Quelle ist deaktiviert" };
     if (this.running.has(id)) return { state: "RUNNING", message: "Abruf läuft bereits" };
-    const stored = this.openDkbContinuation(id);
-    if (!stored) return { state: "ERROR", message: "Keine offene DKB-Freigabe vorhanden" };
+    const open = this.dkbContinuationStatus(id);
+    if (open.status !== "open") return { state: "ERROR", message: "Keine offene DKB-Freigabe vorhanden" };
+    const stored = open.stored;
     this.running.add(id);
     const runId = this.db.beginRun(id);
     try {

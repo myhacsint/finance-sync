@@ -45,6 +45,14 @@ def error_codes_suffix() -> str:
     return f" [FinTS-Rückgabecode: {', '.join(bad[-5:])}]" if bad else ""
 
 
+def friendly_message(message: str) -> str:
+    # python-fints raises the misleading "could not fetch BPD / wrong BLZ" text for 9010.
+    if "could not fetch BPD" in message and "9010" in RETURN_CODES:
+        return ("FinTS 9010: Dialog-ID ungültig oder abgelaufen; die offene DKB-Freigabe "
+                "ist nicht mehr gültig, bitte neuen Abruf starten")
+    return message
+
+
 def fail(message: str) -> None:
     print(json.dumps({"state": "ERROR", "message": message}, ensure_ascii=False))
 
@@ -521,7 +529,7 @@ def main() -> None:
             raise ValueError("Unbekannte DKB-FinTS Aktion")
         print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
     except Exception as exc:
-        fail(f"{type(exc).__name__}: {exc}{error_codes_suffix()}")
+        fail(f"{type(exc).__name__}: {friendly_message(str(exc))}{error_codes_suffix()}")
 
 
 if __name__ == "__main__":

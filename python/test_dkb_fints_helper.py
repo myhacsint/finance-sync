@@ -160,3 +160,10 @@ class ReturnCodeTest(unittest.TestCase):
         self.assertEqual(h.error_codes_suffix(), " [FinTS-Rückgabecode: 9010]")
         h.RETURN_CODES[:] = ["0010"]
         self.assertEqual(h.error_codes_suffix(), "")
+
+    def test_9010_message_is_not_misleading(self):
+        import dkb_fints_helper as h
+        h.RETURN_CODES[:] = ["9010"]
+        self.assertNotIn("BPD", h.friendly_message("x could not fetch BPD y"))
+        h.RETURN_CODES[:] = []
+        self.assertIn("BPD", h.friendly_message("x could not fetch BPD y"))
