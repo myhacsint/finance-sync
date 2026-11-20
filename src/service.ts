@@ -1283,6 +1283,15 @@ export class FinanceService {
     return counts;
   }
 
+  /** Holdings were imported, but the bank refused an optional part (turnovers): show a real error. */
+  private finishPartialDkb(
+    runId: number, id: string, counts: Record<string, number>, warning: string
+  ): SyncResult {
+    const message = `Depotbestände gespeichert (${counts.holdings ?? 0} neu); ${warning}`;
+    this.db.finishRun(runId, id, "ERROR", message, counts);
+    return { state: "ERROR", message, counts };
+  }
+
   private clearDkbContinuation(id: string, alsoClient = false): void {
     this.db.setSetting(`dkb-fints:${id}:continuation`, "");
     this.db.setSetting(`dkb-fints:${id}:continuation-at`, "");
@@ -1377,6 +1386,7 @@ export class FinanceService {
     const runId = this.db.beginRun(id);
     try {
       let bundle: ImportBundle;
+      let dkbWarning: string | undefined;
       if (source.kind === "solana") {
         bundle = await fetchSolana(source);
       } else if (source.kind === "dkb-csv") {
@@ -1403,6 +1413,7 @@ export class FinanceService {
           };
         }
         bundle = outcome.bundle;
+        dkbWarning = outcome.warning;
       } else if (source.kind === "comdirect") {
         const result = preflightInteractiveSource(source);
         this.db.finishRun(runId, id, result.state, result.message);
@@ -1416,6 +1427,7 @@ export class FinanceService {
         return result;
       }
       const counts = await this.importSourceBundle(source, bundle);
+      if (dkbWarning) return this.finishPartialDkb(runId, id, counts, dkbWarning);
       const message = `Abruf erfolgreich; ${Object.values(counts).reduce((a, b) => a + b, 0)} neue Datensätze`;
       this.db.finishRun(runId, id, "SUCCESS", message, counts);
       return { state: "SUCCESS", message, counts };
@@ -1484,6 +1496,7 @@ export class FinanceService {
         };
       }
       const counts = await this.importSourceBundle(source, outcome.bundle);
+      if (outcome.warning) return this.finishPartialDkb(runId, id, counts, outcome.warning);
       const message = `DKB-FinTS-Abruf erfolgreich; ${counts.holdings ?? 0} neue Positionen`;
       this.db.finishRun(runId, id, "SUCCESS", message, counts);
       return { state: "SUCCESS", message, counts };
@@ -1654,5 +1667,7 @@ const DKB_APPROVAL_MAX_AGE_MS = 15 * 60_000;
 const DKB_MIN_POLL_INTERVAL_MS = 15_000;
 
 export function requiresUserAction(message: string): boolean {
+  // A concrete FinTS bank error is an error, even if its text mentions "Freigabe".
+  if (/FinTS[ -](?:Rückgabecode:?\s*)?[^\]]*\b9\d{3}\b/.test(message)) return false;
   return /Secret|Zustimmung|Freigabe|fehlt|(?:^|\W)(?:TAN|SCA)(?:\W|$)/i.test(message);
 }

@@ -49,8 +49,8 @@ def error_codes_suffix() -> str:
 def friendly_message(message: str) -> str:
     # python-fints raises the misleading "could not fetch BPD / wrong BLZ" text for 9010.
     if "could not fetch BPD" in message and "9010" in RETURN_CODES:
-        return ("FinTS 9010: Dialog-ID ungültig oder abgelaufen; die offene DKB-Freigabe "
-                "ist nicht mehr gültig, bitte neuen Abruf starten")
+        return ("FinTS 9010: Die Bank hat den Auftrag mit 'Verarbeitungssystem nicht verfügbar' "
+                "abgelehnt (Dialog ungültig oder Bank-Fehler)")
     return message
 
 
@@ -351,6 +351,31 @@ def attach_turnovers(portfolio: dict[str, Any], segments: list[Any]) -> None:
     portfolio['turnovers'] = [item for text in raw for item in parse_mt536(text)]
 
 
+class TurnoverFailure:
+    """A failed HKWDU request; holdings fetched before it stay valid."""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
+def try_fetch_turnovers(client: Any, config: dict[str, Any], account: dict[str, Any]) -> Any:
+    """Fetch depot turnovers; a bank error must not discard the holdings.
+
+    Returns the segments, a NeedTANResponse, or a TurnoverFailure.
+    """
+    try:
+        with client._get_dialog() as dialog:
+            return client._fetch_with_touchdowns(
+                dialog, turnover_factory(config, account),
+                lambda responses: responses, 'HIWDU'
+            )
+    except Exception as exc:  # FinTSClientError and friends
+        fints_trace.emit("turnover-failed", error=type(exc).__name__, codes=RETURN_CODES[-8:])
+        return TurnoverFailure(
+            f"Depotumsätze (HKWDU) nicht abrufbar: {friendly_message(str(exc))}{error_codes_suffix()}"
+        )
+
+
 def prepare_touchdown_resume(client: Any, config: dict[str, Any], account: dict[str, Any]) -> None:
     factory = segment_factory(client, config, account)
     client._touchdown_responses = []
@@ -368,6 +393,7 @@ def fetch_remaining(
     payload: dict[str, Any],
     start_index: int,
     completed: list[dict[str, Any]],
+    turnover_errors_in: list[str] | None = None,
 ) -> dict[str, Any]:
     from fints.client import NeedTANResponse
 
@@ -376,6 +402,7 @@ def fetch_remaining(
     captured_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     pending: tuple[Any, bytes, int] | None = None
     pending_phase = 'holding'
+    turnover_errors: list[str] = list(turnover_errors_in or [])
     with client:
         if isinstance(client.init_tan_response, NeedTANResponse):
             dialog_data = client.pause_dialog()
@@ -389,15 +416,16 @@ def fetch_remaining(
                     break
                 completed.append(portfolio_from_segments(accounts[index], result, captured_at))
                 if config.get('fetchTransactions', False):
-                    with client._get_dialog() as dialog:
-                        turnovers = client._fetch_with_touchdowns(
-                            dialog, turnover_factory(config, accounts[index]),
-                            lambda responses: responses, 'HIWDU'
-                        )
+                    if turnover_errors:
+                        continue  # bank refused HKWDU in this run; do not hammer it
+                    turnovers = try_fetch_turnovers(client, config, accounts[index])
                     if isinstance(turnovers, NeedTANResponse):
                         pending = (turnovers, client.pause_dialog(), index)
                         pending_phase = 'transactions'
                         break
+                    if isinstance(turnovers, TurnoverFailure):
+                        turnover_errors.append(turnovers.message)
+                        continue
                     attach_turnovers(completed[-1], turnovers)
     if pending:
         challenge, dialog_data, index = pending
@@ -411,12 +439,15 @@ def fetch_remaining(
             ),
         )
         return response
-    return {
+    result = {
         "state": "SUCCESS",
         "message": f"DKB-FinTS lieferte {sum(len(item['positions']) for item in completed)} Positionen",
         "portfolios": completed,
         "clientData": b64(client.deconstruct(including_private=True)),
     }
+    if turnover_errors:
+        result["turnoverError"] = turnover_errors[0]
+    return result
 
 
 def fetch(payload: dict[str, Any]) -> dict[str, Any]:
@@ -452,6 +483,7 @@ def continue_fetch(payload: dict[str, Any]) -> dict[str, Any]:
     dialog_data = unb64(require_text(state.get("dialogData"), "FinTS Dialog-Zustand"))
     result: Any
     pending: tuple[Any, bytes] | None = None
+    turnover_errors: list[str] = []
     with client.resume_dialog(dialog_data):
         if phase == "holding":
             prepare_touchdown_resume(client, payload["config"], payload["config"]["accounts"][index])
@@ -489,21 +521,21 @@ def continue_fetch(payload: dict[str, Any]) -> dict[str, Any]:
                     # Retain the completed holdings and continue with turnovers
                     # only after this new login has been approved.
                     raise ValueError('Erneute Anmeldung nach Depotfreigabe erforderlich; Abruf bitte neu starten')
-                with client._get_dialog() as dialog:
-                    turnovers = client._fetch_with_touchdowns(
-                        dialog, turnover_factory(payload['config'], payload['config']['accounts'][index]),
-                        lambda responses: responses, 'HIWDU')
+                turnovers = try_fetch_turnovers(client, payload['config'], payload['config']['accounts'][index])
                 if isinstance(turnovers, NeedTANResponse):
                     response = public_challenge(turnovers)
                     response.update(state='WAITING_FOR_USER', continuation=continuation(
                         client, turnovers, client.pause_dialog(), 'transactions', index, completed))
                     return response
-                attach_turnovers(completed[-1], turnovers)
+                if isinstance(turnovers, TurnoverFailure):
+                    turnover_errors.append(turnovers.message)
+                else:
+                    attach_turnovers(completed[-1], turnovers)
         index += 1
     elif phase == 'transactions':
         attach_turnovers(completed[-1], result)
         index += 1
-    return fetch_remaining(client, payload, index, completed)
+    return fetch_remaining(client, payload, index, completed, turnover_errors)
 
 
 def main() -> None:

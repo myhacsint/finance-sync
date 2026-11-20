@@ -96,3 +96,24 @@ test("zu schnelle UI-Polls erreichen die Bank nicht und lassen den Dialog unber�
   assert.equal(bank.rejected, 0);
   assert.ok(service.db.getSetting("dkb-fints:dkb-depots:continuation"));
 });
+
+test("HKWDU-Fehler: Depotbestände werden gespeichert, UI zeigt ERROR statt WAITING", async () => {
+  const { service } = setup();
+  service.dkbMinPollIntervalMs = 0;
+  const base = service.dkbRunner!;
+  service.dkbRunner = async (input) => {
+    const out = await base(input);
+    if (out.state === "SUCCESS") {
+      return { ...out, turnoverError: "Depotumsätze (HKWDU) nicht abrufbar: FinTS 9010 [FinTS-Rückgabecode: 9050, 9010]" };
+    }
+    return out;
+  };
+  await service.sync("dkb-depots");
+  let result = await service.continueDkbFints("dkb-depots");
+  while (result.state === "WAITING_FOR_USER") result = await service.continueDkbFints("dkb-depots");
+  assert.equal(result.state, "ERROR");
+  assert.match(result.message, /Depotbestände gespeichert/);
+  assert.match(result.message, /HKWDU/);
+  assert.equal(service.db.getSetting("dkb-fints:dkb-depots:client"), "client-blob");
+  assert.ok(!service.db.getSetting("dkb-fints:dkb-depots:continuation"));
+});

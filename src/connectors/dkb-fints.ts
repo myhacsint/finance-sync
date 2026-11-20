@@ -53,6 +53,7 @@ export interface DkbHelperOutput {
   clientData?: string;
   portfolios?: DkbHelperPortfolio[];
   libraryVersion?: string;
+  turnoverError?: string;
 }
 
 interface DkbHelperInput {
@@ -76,7 +77,7 @@ interface DkbHelperInput {
 }
 
 export type DkbFintsOutcome =
-  | { state: "SUCCESS"; message: string; bundle: ImportBundle; clientData?: string }
+  | { state: "SUCCESS"; message: string; bundle: ImportBundle; clientData?: string; warning?: string }
   | {
       state: "WAITING_FOR_USER";
       message: string;
@@ -412,6 +413,7 @@ function outcomeFromHelper(source: SourceConfig, output: DkbHelperOutput): DkbFi
     state: "SUCCESS",
     message: output.message,
     bundle: normalizeDkbFintsBundle(source, output),
-    clientData: output.clientData
+    clientData: output.clientData,
+    warning: output.turnoverError
   };
 }

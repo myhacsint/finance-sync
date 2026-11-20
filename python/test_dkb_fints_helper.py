@@ -227,3 +227,21 @@ class ContinuationBlobTest(unittest.TestCase):
         self.assertEqual(base64.b64decode(state["dialogData"]), b"dialog-with-msg-numbers")
         self.assertEqual(base64.b64decode(state["tanData"]), b"tan")
         self.assertTrue(state["decoupled"])
+
+
+class TurnoverFailureTest(unittest.TestCase):
+    def test_bank_error_on_hkwdu_becomes_failure_not_exception(self):
+        import dkb_fints_helper as h
+
+        class Boom:
+            def _get_dialog(self):
+                raise RuntimeError("Error during dialog initialization, could not fetch BPD")
+
+        h.RETURN_CODES[:] = ["9050", "9010"]
+        h.turnover_factory = lambda config, account: None
+        result = h.try_fetch_turnovers(Boom(), {}, {})
+        self.assertIsInstance(result, h.TurnoverFailure)
+        self.assertIn("HKWDU", result.message)
+        self.assertIn("9010", result.message)
+        self.assertNotIn("BPD", result.message)
+        h.RETURN_CODES[:] = []
