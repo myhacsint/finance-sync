@@ -338,10 +338,19 @@ def request_holdings(client: Any, config: dict[str, Any], account: dict[str, Any
         )
 
 
+# Controlled diagnostic comparison (9010 on HKWDU): 14 days instead of 90.
+TURNOVER_DAYS = 14
+
+
+def turnover_period(end=None):
+    end = end or datetime.now(timezone.utc).date()
+    return end - timedelta(days=TURNOVER_DAYS), end
+
+
 def turnover_factory(config: dict[str, Any], account: dict[str, Any]):
     from dkb_transactions import segment_factory as turnover_segment_factory
-    end = datetime.now(timezone.utc).date()
-    return turnover_segment_factory(config, account, end - timedelta(days=90), end)
+    start, end = turnover_period()
+    return turnover_segment_factory(config, account, start, end)
 
 
 def attach_turnovers(portfolio: dict[str, Any], segments: list[Any]) -> None:

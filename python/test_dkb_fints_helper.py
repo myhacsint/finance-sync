@@ -1,4 +1,5 @@
 import unittest
+from datetime import date
 from dkb_transactions import parse_mt536
 
 from dkb_fints_helper import (
@@ -147,6 +148,12 @@ class ContinuationStateTest(unittest.TestCase):
             Challenge(), {}, {"tanMechanism": "940"}
         )
         self.assertTrue(older.decoupled)
+
+
+class TurnoverPeriodTest(unittest.TestCase):
+    def test_period_is_14_days(self):
+        import dkb_fints_helper as h
+        self.assertEqual(h.turnover_period(date(2026, 11, 20)), (date(2026, 11, 6), date(2026, 11, 20)))
 
 
 if __name__ == "__main__":
