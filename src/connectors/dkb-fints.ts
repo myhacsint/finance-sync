@@ -404,7 +404,13 @@ export async function continueDkbFints(
 
 /** Depot label for messages: "…" plus the last three digits, never the full number. */
 export function dkbDepotLabel(source: SourceConfig, accountId: string): string {
-  const account = sourceAccounts(source).find((item) => item.accountId === accountId);
+  let accounts: DkbAccountConfig[];
+  try {
+    accounts = sourceAccounts(source);
+  } catch {
+    return "unbekannt"; // used by the unauthenticated /health: a broken config must not throw here
+  }
+  const account = accounts.find((item) => item.accountId === accountId);
   return account ? `…${account.accountNumber.slice(-3)}` : "unbekannt";
 }
 
@@ -417,7 +423,9 @@ function validatedTurnoverWarnings(
     if (!entry || typeof entry.accountId !== "string" || !configured.has(entry.accountId)) {
       throw new Error("DKB-FinTS Depotumsatz-Warnung für unbekanntes Depot");
     }
-    return { accountId: entry.accountId, message: String(entry.message ?? "").slice(0, 200) };
+    // Messages reach the unauthenticated /health: never let an account number through.
+    const message = String(entry.message ?? "").replace(/\d{5,}/g, "***").slice(0, 200);
+    return { accountId: entry.accountId, message };
   });
 }
 

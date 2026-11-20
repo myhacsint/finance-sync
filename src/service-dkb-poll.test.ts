@@ -157,3 +157,22 @@ test("HKWDU-Fehler (Sync-Pfad): SUCCESS, since bleibt beim zweiten Fehler, saube
   assert.doesNotMatch(clean.message, /nicht abrufbar/);
   assert.equal(service.db.getSetting(WARNING_KEY), "");
 });
+
+test("HKWDU-Fehler: lange Ziffernfolgen im Fehlertext werden vor Speicherung maskiert", async () => {
+  const { service } = setup();
+  service.dkbRunner = async () => ({
+    state: "SUCCESS", message: "ok", clientData: "client-blob",
+    turnoverErrors: [{ accountId: "dkb-depot-a", message: "Konto 123456789 gesperrt" }],
+    portfolios: [{
+      accountId: "dkb-depot-a", capturedAt: "2026-11-20T10:00:00Z",
+      rawMt535: [":16R:FIN\n:35B:ISIN DE0007164600\n:16S:FIN"],
+      positions: [{ isin: "DE0007164600", name: "SAP SE", quantity: "1", price: "100.00", priceCurrency: "EUR",
+        marketValue: "100.00", marketValueCurrency: "EUR", valuationDate: "2026-11-20" }]
+    }]
+  });
+  const result = await service.sync("dkb-depots");
+  assert.equal(result.state, "SUCCESS");
+  assert.match(result.message, /Depot …789 nicht abrufbar: Konto \*\*\* gesperrt/);
+  assert.ok(!result.message.includes("123456789"));
+  assert.ok(!service.db.getSetting(WARNING_KEY)!.includes("123456789"));
+});

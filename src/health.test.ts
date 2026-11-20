@@ -70,7 +70,7 @@ test("health is ok with a fresh document-worker heartbeat", () => {
   assert.deepEqual(report.warnings, []);
 });
 
-function healthWithTurnoverWarning(sinceDaysAgo: number) {
+function healthWithTurnoverWarning(sinceDaysAgo: number, rawSetting?: string) {
   const root = mkdtempSync(join(tmpdir(), "finance-health-dkb-"));
   const previousArchive = paths.archive;
   const previousBackup = paths.backup;
@@ -90,7 +90,7 @@ function healthWithTurnoverWarning(sinceDaysAgo: number) {
     const dkbDb = {
       listSources: () => [{ id: "dkb-depots", enabled: 1, state: "SUCCESS", message: "ok", last_success_at: now, last_attempt_at: now }],
       getSetting: (key: string) => key === "dkb-fints:dkb-depots:turnover-warning"
-        ? JSON.stringify({ accounts: [{ accountId: "a", since, lastAt: now, message: "FinTS 9010: Bank meldet 'x'" }] })
+        ? rawSetting ?? JSON.stringify({ accounts: [{ accountId: "a", since, lastAt: now, message: "FinTS 9010: Bank meldet 'x'" }] })
         : undefined
     } as unknown as FinanceDatabase;
     const dkbConfig = {
@@ -121,4 +121,12 @@ test("health: DKB turnover failure of 60 days or more is critical", () => {
   const { report } = healthWithTurnoverWarning(60);
   assert.equal(report.status, "critical");
   assert.deepEqual(report.critical, ["dkb-depots: Depotumsätze für Depot …851 seit 60 Tagen nicht abrufbar; Lücke ab 90 Tagen"]);
+});
+
+test("health: malformed DKB turnover state does not crash /health", () => {
+  for (const raw of ["{not json", "null", "5", '{"accounts":[null,7,"x",{"since":"nope"}]}', '{"accounts":{"a":1}}']) {
+    const { report } = healthWithTurnoverWarning(0, raw);
+    assert.equal(report.status, "ok", raw);
+    assert.deepEqual(report.critical, [], raw);
+  }
 });

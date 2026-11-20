@@ -64,12 +64,13 @@ export function buildHealth(db: FinanceDatabase, config: AppConfig): HealthRepor
       if (turnoverState) {
         let entries: Array<{ accountId?: unknown; since?: unknown; message?: unknown }> = [];
         try {
-          const parsed = JSON.parse(turnoverState) as { accounts?: typeof entries };
-          if (Array.isArray(parsed.accounts)) entries = parsed.accounts;
+          const parsed = JSON.parse(turnoverState) as { accounts?: typeof entries } | null;
+          if (Array.isArray(parsed?.accounts)) entries = parsed.accounts;
         } catch {
           // unreadable state is ignored
         }
         for (const entry of entries) {
+          if (!entry || typeof entry !== "object") continue;
           const since = Date.parse(String(entry.since ?? ""));
           if (!Number.isFinite(since)) continue;
           const label = dkbDepotLabel(source, String(entry.accountId ?? ""));
