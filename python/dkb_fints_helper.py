@@ -8,6 +8,7 @@ the continuation blob, or command-line arguments.
 from __future__ import annotations
 
 import base64
+import fints_trace
 import json
 import logging
 import re
@@ -438,6 +439,8 @@ def continue_fetch(payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(completed, list):
         raise ValueError("Ungültiger DKB-FinTS Zwischenstand")
     client = make_client(payload, require_text(state.get("clientData"), "FinTS Client-Zustand"))
+    fints_trace.emit("continue-state", phase=phase, accountIndex=index,
+                     decoupled=bool(state.get("decoupled")), **fints_trace.client_state(client))
     restore_tan_for_resume(client, payload["config"])
     challenge = restore_challenge_for_resume(
         NeedRetryResponse.from_data(
@@ -513,6 +516,8 @@ def main() -> None:
         validate(payload, network=action in ("fetch", "continue"))
         import fints
         install_return_code_recorder()
+        fints_trace.install()
+        fints_trace.emit("helper-start", action=action)
 
         if action == "preflight":
             print(json.dumps({
@@ -529,6 +534,8 @@ def main() -> None:
             raise ValueError("Unbekannte DKB-FinTS Aktion")
         print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
     except Exception as exc:
+        fints_trace.emit("helper-error", error=type(exc).__name__, detail=str(exc)[:200],
+                         codes=RETURN_CODES[-8:])
         fail(f"{type(exc).__name__}: {friendly_message(str(exc))}{error_codes_suffix()}")
 
 

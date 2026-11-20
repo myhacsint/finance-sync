@@ -167,3 +167,63 @@ class ReturnCodeTest(unittest.TestCase):
         self.assertNotIn("BPD", h.friendly_message("x could not fetch BPD y"))
         h.RETURN_CODES[:] = []
         self.assertIn("BPD", h.friendly_message("x could not fetch BPD y"))
+
+
+class FintsTraceTest(unittest.TestCase):
+    def setUp(self):
+        import tempfile, fints_trace
+        self.fints_trace = fints_trace
+        self.tmp = tempfile.mkdtemp()
+        fints_trace.ENABLE_FILE = self.tmp + "/enable"
+        fints_trace.LOG_FILE = self.tmp + "/trace.log"
+
+    def test_disabled_without_marker(self):
+        self.fints_trace.emit("x", a=1)
+        import os
+        self.assertFalse(os.path.exists(self.fints_trace.LOG_FILE))
+
+    def test_masks_system_id_and_logs_dialog_numbers(self):
+        import enum, os
+        open(self.fints_trace.ENABLE_FILE, "w").close()
+
+        class Direction(enum.Enum):
+            FROM_CUSTOMER = 1
+            FROM_INSTITUTE = 2
+
+        class Dialog:
+            dialog_id = "DIALOG123"
+            next_message_number = {Direction.FROM_CUSTOMER: 3, Direction.FROM_INSTITUTE: 2}
+            open = True
+            need_init = False
+            paused = False
+
+        class Client:
+            system_id = "SECRETSYSTEMID99"
+            selected_security_function = "940"
+            bpd_version = 1
+            upd_version = 2
+
+        self.fints_trace.emit("dialog-pause", state=self.fints_trace.dialog_state(Dialog()),
+                              **self.fints_trace.client_state(Client()))
+        text = open(self.fints_trace.LOG_FILE, encoding="utf-8").read()
+        self.assertNotIn("SECRETSYSTEMID99", text)
+        self.assertIn("SEC…D99(16)", text)
+        self.assertIn("DIALOG123", text)
+        self.assertIn('"FROM_CUSTOMER": 3', text)
+
+
+class ContinuationBlobTest(unittest.TestCase):
+    def test_continuation_carries_client_dialog_and_tan_state(self):
+        class Challenge:
+            decoupled = True
+            def get_data(self): return b"tan"
+        class Client:
+            def deconstruct(self, including_private=False):
+                assert including_private
+                return b"client-with-system-id"
+        state = continuation(Client(), Challenge(), b"dialog-with-msg-numbers", "init", 0, [])
+        import base64
+        self.assertEqual(base64.b64decode(state["clientData"]), b"client-with-system-id")
+        self.assertEqual(base64.b64decode(state["dialogData"]), b"dialog-with-msg-numbers")
+        self.assertEqual(base64.b64decode(state["tanData"]), b"tan")
+        self.assertTrue(state["decoupled"])
